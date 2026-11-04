@@ -115,7 +115,7 @@ const server = createServer(async (req, res) => {
         url: parsed.toString(), title: typeof body.title === "string" ? body.title.slice(0, 300) : "",
         notes: typeof body.notes === "string" ? body.notes.slice(0, 4000) : "",
         submittedBy: "admin", retrievedAt: new Date().toISOString(),
-        acquisition: "user-supplied-reference", fetched: false
+        acquisition: "user-supplied-reference", fetched: false, quotaReservationId: `source-${sourceId}`
       };
       await store.transact(state => { state.sources.push(source); });
       return send(res, 201, { source, fetched: false, note: "Source URL registered only. No crawler or remote fetch was executed." });
