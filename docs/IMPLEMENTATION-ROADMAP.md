@@ -41,6 +41,20 @@
 - [ ] Production deployment, secrets management, monitoring, and cost ledger.
 - [ ] Multi-instance persistence and atomic cross-process quotas.
 
+
+## Track E — Frontend product experience
+- [x] Replace the prototype shell with a responsive Linear-inspired workspace.
+- [x] Build a vector-first editorial dashboard with original inline SVG artwork.
+- [x] Integrate React Bits SpotlightCard with upstream source attribution and license.
+- [x] Add light mode default, dark mode, Arabic-first RTL, and English shell labels.
+- [x] Add desktop sidebar and mobile bottom navigation.
+- [x] Connect article creation and article listing to the standalone Node API.
+- [x] Add controlled one-stage-at-a-time article progression in the UI.
+- [x] Retain platform registry, capability inspector, and backend research settings.
+- [ ] Add authenticated user/workspace switching and role-based navigation.
+- [ ] Add functional notifications, file/media upload, editorial evidence workspace, and approval inbox.
+- [ ] Add browser-level responsive and accessibility tests.
+
 ## Acceptance rules
 - A contract or UI status is not proof of a working engine.
 - A registered URL is not proof that its content was fetched or verified.
