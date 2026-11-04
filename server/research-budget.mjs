@@ -1,14 +1,18 @@
 export const DEFAULT_LIMITS = Object.freeze({
   sourceUrlsPerArticle: 3,
+  scrapesPerArticle: 3,
   searchesPerArticle: 5,
   inspectionsPerArticle: 5
 });
 
 const KEY_BY_OPERATION = {
   source: "sourceUrls",
+  scrape: "scrapes",
   search: "searches",
   inspect: "inspections"
 };
+
+const USAGE_OPERATIONS = ["source", "scrape", "search", "inspect"];
 
 export function validateLimits(value) {
   const errors = [];
@@ -20,10 +24,12 @@ export function validateLimits(value) {
 }
 
 export function ensureTask(state, taskId, workspaceId) {
+  state.limits = { ...DEFAULT_LIMITS, ...(state.limits || {}) };
+  state.tasks ||= {};
   if (!state.tasks[taskId]) {
     state.tasks[taskId] = {
       workspaceId,
-      usage: { source: 0, search: 0, inspect: 0 },
+      usage: { source: 0, scrape: 0, search: 0, inspect: 0 },
       reservations: {},
       createdAt: new Date().toISOString()
     };
@@ -34,12 +40,15 @@ export function ensureTask(state, taskId, workspaceId) {
     error.status = 404;
     throw error;
   }
+  task.usage ||= {};
+  for (const operation of USAGE_OPERATIONS) task.usage[operation] = Number.isSafeInteger(task.usage[operation]) && task.usage[operation] >= 0 ? task.usage[operation] : 0;
+  task.reservations ||= {};
   return task;
 }
 
 export function reserveBudget(state, { taskId, workspaceId, operation, units = 1, reservationId }) {
   if (!KEY_BY_OPERATION[operation]) {
-    const error = new Error("operation must be source, search, or inspect");
+    const error = new Error("operation must be source, scrape, search, or inspect");
     error.status = 400;
     throw error;
   }
@@ -65,8 +74,8 @@ export function reserveBudget(state, { taskId, workspaceId, operation, units = 1
   }
   const used = task.usage[operation];
   const limit = state.limits[KEY_BY_OPERATION[operation] + "PerArticle"];
-  if (used + units > limit) {
-    return { allowed: false, operation, used, limit, remaining: Math.max(0, limit - used), reason: "limit-reached", usage: { ...task.usage } };
+  if (!Number.isSafeInteger(limit) || used + units > limit) {
+    return { allowed: false, operation, used, limit: Number.isSafeInteger(limit) ? limit : 0, remaining: Math.max(0, (Number.isSafeInteger(limit) ? limit : 0) - used), reason: "limit-reached", usage: { ...task.usage } };
   }
   task.usage[operation] += units;
   const reservation = { operation, units, status: "reserved", createdAt: new Date().toISOString() };
