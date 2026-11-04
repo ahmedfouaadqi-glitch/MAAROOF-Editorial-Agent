@@ -59,6 +59,23 @@ describe("editorial evidence", () => {
     expect(result.exactMatchTaskId).toBe("task-a");
   });
 
+  it("flags high token-overlap text as a possible near duplicate", () => {
+    const state = stateFixture();
+    checkOriginality(state, {
+      workspaceId: "workspace-a",
+      taskId: "task-a",
+      text: "The company announced a major expansion across several regional markets during the current financial year."
+    });
+    const result = checkOriginality(state, {
+      workspaceId: "workspace-a",
+      taskId: "task-b",
+      text: "The company announced a major expansion across several regional markets during the current fiscal year."
+    });
+    expect(result.outcome).toBe("possible-near-duplicate");
+    expect(result.nearMatches[0].taskId).toBe("task-a");
+    expect(result.nearMatches[0].similarity).toBeGreaterThanOrEqual(0.82);
+  });
+
   it("does not compare content across workspaces", () => {
     const state = stateFixture();
     const text = "A sufficiently long editorial text is used here to verify workspace isolation behavior.";
