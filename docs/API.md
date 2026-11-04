@@ -107,3 +107,15 @@ Body:
 ```
 
 The baseline normalizes Unicode, common Arabic letter variants, diacritics, punctuation, and whitespace, then checks SHA-256 exact matches and token-set Jaccard overlap (near-match threshold 0.82). It stores only the normalized text and fingerprint in the local JSON store so later checks can compare against it. This is a deterministic heuristic, not semantic similarity or plagiarism detection. It does not check external websites, translated paraphrases, or text never submitted to this endpoint. Do not treat `no-match-found` as proof of originality.
+
+
+## Entity intelligence registry
+- `POST /api/v1/entities` — register a typed entity with a canonical name, optional aliases, and a required disambiguation note.
+- `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/entities` — list article-scoped entities and their linked claim IDs.
+- `POST /api/v1/entities/scan` — match registered aliases against claims in the same article and create idempotent entity-to-claim links.
+- `POST /api/v1/entity-relationships` — register a directed relationship between two article-scoped entities, optionally linked to supporting claim IDs.
+- `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/entity-relationships` — list registered relationships.
+
+Supported entity types: `person`, `organization`, `place`, `product`, `event`, `concept`, `unknown`. Canonical names and aliases are normalized for duplicate detection within a workspace. Entity relationships must reference two distinct entities and any supporting claims must belong to the same workspace and article.
+
+The current scanner is deliberately limited to exact normalized matches against aliases entered by an operator. It does not perform named-entity recognition, discover new entities, resolve ambiguous identities across sources, infer relations from prose, or establish that a claim supports a relationship. Relationship evidence states remain `claim-linked-unverified` or `unsubstantiated`.
