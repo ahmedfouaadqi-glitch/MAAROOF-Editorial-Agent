@@ -77,3 +77,33 @@ Retries using the same reservation ID and same operation/units are idempotent. R
 - The shared admin bearer token is a temporary operator gate, not production identity authentication.
 - Workspace IDs are record-scoped but must be bound to authenticated users before public multi-tenant deployment.
 - Configure `CORS_ORIGIN`, `HOST`, `DATA_FILE`, and `ADMIN_API_TOKEN` through environment variables.
+
+## Editorial evidence and claims
+- `POST /api/v1/claims` — register a factual/editorial claim for an article and optionally link it to source IDs.
+- `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/claims` — list claims and return deterministic source-link coverage.
+
+Claim body:
+```json
+{
+  "workspaceId": "workspace-id",
+  "taskId": "article-task-id",
+  "text": "The company reported annual revenue growth.",
+  "sourceIds": ["registered-source-id"]
+}
+```
+
+A source can only be linked when it belongs to the same workspace and article. The API labels a linked claim as `source-linked-unverified`; this means only that a reference was attached. It does not mean the source was opened, checked, or proven to support the claim. Coverage is the percentage of claims with at least one linked source, not an accuracy score.
+
+## Deterministic originality baseline
+- `POST /api/v1/originality/check` — compare submitted text with prior text checks from other articles in the same workspace.
+
+Body:
+```json
+{
+  "workspaceId": "workspace-id",
+  "taskId": "article-task-id",
+  "text": "At least 30 characters of draft text..."
+}
+```
+
+The baseline normalizes Unicode, common Arabic letter variants, diacritics, punctuation, and whitespace, then checks SHA-256 exact matches and token-set Jaccard overlap (near-match threshold 0.82). It stores only the normalized text and fingerprint in the local JSON store so later checks can compare against it. This is a deterministic heuristic, not semantic similarity or plagiarism detection. It does not check external websites, translated paraphrases, or text never submitted to this endpoint. Do not treat `no-match-found` as proof of originality.
