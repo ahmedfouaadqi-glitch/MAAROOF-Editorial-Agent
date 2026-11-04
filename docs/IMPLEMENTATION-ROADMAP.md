@@ -29,12 +29,13 @@
 - [x] Add deterministic matching of registered aliases against editorial claims.
 - [x] Add explicit entity relationships linked to supporting claim IDs, with unverified evidence states.
 - [ ] Implement model-assisted named-entity recognition, entity resolution, and search-intent extraction after provider contracts and evaluation sets are ready.
-- [x] Add a workspace-scoped, deterministic objective-based outline scaffold and human-editable draft persistence/UI in Arabic and English. This is not LLM-generated writing; model-assisted drafting remains deferred until a provider is explicitly selected and approved.
+- [x] Add a workspace-scoped, deterministic objective-based outline scaffold and human-editable draft persistence/UI in Arabic and English. This is a deterministic scaffold. Optional model-assisted drafting is implemented behind server configuration and explicit invocation; it remains disabled until a provider is selected and credentials are installed.
 - [x] Add deterministic exact-match and token-overlap near-duplicate checks against previously submitted workspace text.
 - [ ] Add semantic, cross-language, and external-corpus originality checks; these require validated embeddings/models and a wider corpus.
 - [x] Add deterministic tests for evidence linking, workspace isolation, Arabic normalization, and exact-match detection.
 - [ ] Add deterministic tests for the remaining editorial engines.
-- [ ] Add model-provider interface only after engine contracts are tested.
+- [x] Add an opt-in server-side OpenAI-compatible model adapter and evidence-constrained article drafting engine, with explicit user invocation, atomic per-article request limits, and usage records; no provider is enabled by default.
+- [ ] Add model-assisted named-entity recognition, entity resolution, and search intent extraction after evaluation sets are ready.
 
 ## Track C — Independent execution services
 - [x] Standalone Node.js API with admin bearer-token protection.
