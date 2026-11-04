@@ -73,3 +73,9 @@ The API defaults to `http://127.0.0.1:8787`. Set `HOST=0.0.0.0` only when the se
 
 ## Research acquisition policy
 No Firecrawl or automated crawler is used. Source URLs are manually registered and are not fetched. Search and inspection quotas are reserved by backend API endpoints, but no live search or inspection provider is currently connected.
+
+### Entity intelligence baseline
+- Register article-scoped people, organizations, places, products, events, concepts, or unknown entities with aliases and a disambiguation note.
+- Match registered aliases against claim text and link matching claims to entities.
+- Record explicit directed relationships between entities and optionally attach claim IDs as unverified support.
+- Current matching is deterministic alias matching, not automatic named-entity recognition or global identity resolution.
