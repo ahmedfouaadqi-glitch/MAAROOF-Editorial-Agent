@@ -30,7 +30,8 @@
     "tailwindcss": "3.4.17",
     "typescript": "latest",
     "vite": "latest",
-    "vitest": "latest"
+    "vitest": "latest",
+    "@types/node": "latest"
   },
   "engines": {
     "node": ">=22"
