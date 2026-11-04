@@ -8,11 +8,12 @@ import {
 } from "lucide-react";
 import SpotlightCard from "./components/SpotlightCard";
 import EditorialEvidencePanel from "./components/EditorialEvidencePanel";
+import AIVisibilityPanel from "./components/AIVisibilityPanel";
 import { DEFAULT_RESEARCH_BUDGET, validateResearchBudgetLimits, type ResearchBudgetLimits } from "./domain/research-budget";
 import { categoryLabels, modeLabels, platforms, readinessLabels, type PlatformCategory } from "./data/platforms";
 import { adapterRegistry } from "./data/adapter-registry";
 
-type View = "home" | "articles" | "registry" | "research-settings";
+type View = "home" | "articles" | "registry" | "research-settings" | "ai-visibility";
 type Article = { id: string; topic: string; language: string; objective: string; stage: string; createdAt: string };
 type Locale = "ar" | "en";
 const NEXT_STAGE: Record<string, string> = { intake: "planning", planning: "research", research: "entity-analysis", "entity-analysis": "outline", outline: "drafting", drafting: "source-review", "source-review": "originality-review", "originality-review": "media-review", "media-review": "editorial-approval", "editorial-approval": "ready-to-publish" };
@@ -32,7 +33,7 @@ const enStageLabels: Record<string, string> = {
 const t = {
   ar: {
     workspace: "مساحة العمل الرئيسية", overview: "نظرة عامة", articles: "المقالات", registry: "المنصات والمجلات",
-    research: "البحث والمصادر", settings: "الإعدادات", help: "المساعدة", search: "ابحث عن أي شيء...",
+    research: "البحث والمصادر", visibility: "رصد ظهور الذكاء الاصطناعي", settings: "الإعدادات", help: "المساعدة", search: "ابحث عن أي شيء...",
     eyebrow: "منظومة العمليات التحريرية", title: "مساحة العمل التحريرية", subtitle: "من الفكرة إلى مقال موثّق وجاهز للنشر، ضمن مسار تحريري واضح.",
     create: "إنشاء مقالة", explore: "استعراض المنصات", active: "حالة المنظومة", ready: "البنية الأساسية جاهزة",
     platforms: "منصة مسجلة", destinations: "وجهات تحريرية", connectors: "موصلات نشر مختبرة", drafts: "مقالات قيد العمل",
@@ -65,7 +66,7 @@ const t = {
   },
   en: {
     workspace: "Main workspace", overview: "Overview", articles: "Articles", registry: "Platforms & magazines",
-    research: "Research & sources", settings: "Settings", help: "Help", search: "Search anything...",
+    research: "Research & sources", visibility: "AI visibility", settings: "Settings", help: "Help", search: "Search anything...",
     eyebrow: "EDITORIAL OPERATIONS", title: "Editorial workspace", subtitle: "Move from an idea to a sourced, publication-ready article through a clear editorial workflow.",
     create: "Create article", explore: "Explore platforms", active: "SYSTEM STATUS", ready: "Foundation is ready",
     platforms: "Registered platforms", destinations: "Editorial destinations", connectors: "Verified publishers", drafts: "Articles in progress",
@@ -213,7 +214,8 @@ export default function App() {
     { id: "home" as const, label: copy.overview, icon: LayoutDashboard },
     { id: "articles" as const, label: copy.articles, icon: FileText },
     { id: "registry" as const, label: copy.registry, icon: Globe2 },
-    { id: "research-settings" as const, label: copy.research, icon: SlidersHorizontal }
+    { id: "research-settings" as const, label: copy.research, icon: SlidersHorizontal },
+    { id: "ai-visibility" as const, label: copy.visibility, icon: Activity }
   ];
   const destinationCount = platforms.filter(p => p.category === "editorial").length;
 
@@ -298,6 +300,7 @@ export default function App() {
             </div>
           </div>
         </section>}
+        {view === "ai-visibility" && <AIVisibilityPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" locale={locale}/>}
         {view === "research-settings" && <section className="page-section">
           <PageHeading eyebrow="SYSTEM CONFIGURATION" title={copy.settingsTitle} subtitle={copy.settingsSub}/>
           <SpotlightCard theme={theme} className="surface-card budget-panel" spotlightColor={theme==="light"?"#b88c54":"#d6ae78"} intensity={0.1} spotlightSize={340}>
