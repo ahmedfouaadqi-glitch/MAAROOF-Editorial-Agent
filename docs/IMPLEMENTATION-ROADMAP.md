@@ -89,6 +89,7 @@
 - [ ] Verify current submission rules, exclusivity, rights, accepted formats, and official submission routes for every candidate magazine.
 - [ ] Implement publication profiles in the admin UI (domain, language, region, audience, topic fit, route, rules, account status).
 - [ ] Build pitch-first and manuscript-submission workflows with editor-response states.
+- [x] Add workspace-scoped backend records for magazine pitches, approval, submission, editor response, acceptance, rejection, withdrawal, and manual publication status; enforce approval and exclusivity gates. Frontend inbox, actual sending, and external publication verification remain pending.
 - [ ] Build the first authorized CMS publishing adapter for a user-owned WordPress/Ghost site.
 - [ ] Add Playwright + Chromium isolated runtime only for permitted destinations where no suitable API exists.
 - [ ] Implement media library, image rights/credits, crops, hero images, alt text, video covers, and subtitles.
