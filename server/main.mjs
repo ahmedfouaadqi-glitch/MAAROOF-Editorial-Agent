@@ -122,7 +122,7 @@ const server = createServer(async (req, res) => {
       return send(res, 200, { article });
     }
 
-    const editorialDraftRoute = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/draft$/);
+    const editorialDraftRoute = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/draft$/);
     if (editorialDraftRoute && req.method === "GET") {
       const state = await store.read();
       return send(res, 200, { draft: getEditorialDraft(state, decodeURIComponent(editorialDraftRoute[1]), decodeURIComponent(editorialDraftRoute[2])) });
