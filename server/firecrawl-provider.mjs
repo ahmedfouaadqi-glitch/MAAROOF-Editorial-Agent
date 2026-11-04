@@ -26,11 +26,16 @@ export function validateScrapeTarget(input) {
 }
 
 function mapSearchRows(payload) {
-  if (Array.isArray(payload?.web)) return payload.web;
   if (Array.isArray(payload?.data?.web)) return payload.data.web;
+  if (Array.isArray(payload?.web)) return payload.web;
+  if (Array.isArray(payload?.data?.results)) return payload.data.results;
   if (Array.isArray(payload?.results)) return payload.results;
   if (Array.isArray(payload?.data)) return payload.data;
   return [];
+}
+function safeHostname(value) {
+  if (typeof value !== "string" || !value) return "";
+  try { return new URL(value).hostname; } catch { return ""; }
 }
 
 export function createFirecrawlProvider({
@@ -84,7 +89,7 @@ export function createFirecrawlProvider({
           url: item.url,
           title: item.title,
           snippet: item.description || item.snippet || item.markdown || "",
-          publisher: item.metadata?.sourceURL ? new URL(item.metadata.sourceURL).hostname : "",
+          publisher: safeHostname(item.metadata?.sourceURL) || safeHostname(item.url),
           publishedAt: item.metadata?.publishedTime || item.publishedDate || null
         }))
       };
