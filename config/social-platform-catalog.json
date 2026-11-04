@@ -1,0 +1,261 @@
+{
+  "version": 1,
+  "principle": "One verified editorial source can produce platform-native variants; never blindly cross-post identical copy.",
+  "publishingSafety": {
+    "defaultMode": "draft_only",
+    "publishEnabledByDefault": false,
+    "requireAccountAuthorization": true,
+    "requirePlatformCapabilityCheck": true,
+    "requireUserApprovalBeforeExternalPublish": true,
+    "verifyPublicationAfterSubmit": true,
+    "captchaAndMfa": "pause_and_request_user_handoff",
+    "browserAutomation": "Use only where platform terms, account permissions, and a tested adapter allow it; otherwise use official API or manual handoff."
+  },
+  "platforms": [
+    {
+      "id": "linkedin",
+      "name": "LinkedIn",
+      "contentTypes": [
+        "text",
+        "image",
+        "document_carousel",
+        "native_video",
+        "article"
+      ],
+      "editorialProfile": {
+        "voice": "professional, evidence-led, experience-based",
+        "opening": "specific insight, tension, or business-relevant finding",
+        "body": "context, reasoning, evidence, implications; use short readable paragraphs",
+        "cta": "invite a professional perspective, discussion, or relevant next step",
+        "hashtags": "few and directly relevant",
+        "linkPolicy": "Use a descriptive link introduction; do not assume links are penalized."
+      },
+      "mediaProfile": [
+        "square_or_landscape_image",
+        "document_pdf",
+        "native_video"
+      ],
+      "publishing": {
+        "preferredMethod": "official_api",
+        "fallbackMethod": "manual_handoff",
+        "status": "adapter_not_implemented"
+      }
+    },
+    {
+      "id": "facebook",
+      "name": "Facebook Pages",
+      "contentTypes": [
+        "text",
+        "image",
+        "album",
+        "native_video",
+        "reel",
+        "link"
+      ],
+      "editorialProfile": {
+        "voice": "accessible, community-oriented, explanatory",
+        "opening": "clear relevance to the audience",
+        "body": "conversational explanation, useful detail, and local or community context when relevant",
+        "cta": "ask for a response, share, message, or visit when appropriate",
+        "hashtags": "optional and restrained",
+        "linkPolicy": "Keep the post understandable without requiring a click."
+      },
+      "mediaProfile": [
+        "square_or_portrait_image",
+        "album",
+        "vertical_video",
+        "landscape_video"
+      ],
+      "publishing": {
+        "preferredMethod": "official_api",
+        "fallbackMethod": "manual_handoff",
+        "status": "adapter_not_implemented",
+        "accountConstraint": "Page publishing; personal-profile publishing is not assumed."
+      }
+    },
+    {
+      "id": "instagram",
+      "name": "Instagram",
+      "contentTypes": [
+        "image",
+        "carousel",
+        "reel",
+        "story",
+        "caption"
+      ],
+      "editorialProfile": {
+        "voice": "visual-first, concise, brand-consistent",
+        "opening": "short hook that complements the visual",
+        "body": "caption adds context rather than repeating text already embedded in the image or video",
+        "cta": "save, share, comment, visit profile, or use an eligible link surface",
+        "hashtags": "small, relevant set; never keyword stuffing",
+        "linkPolicy": "Do not assume ordinary feed captions provide clickable links."
+      },
+      "mediaProfile": [
+        "portrait_4_5",
+        "square_1_1",
+        "vertical_9_16",
+        "carousel_assets"
+      ],
+      "publishing": {
+        "preferredMethod": "official_api",
+        "fallbackMethod": "manual_handoff",
+        "status": "adapter_not_implemented",
+        "accountConstraint": "Professional account and eligible permissions required; Stories and other formats require capability-specific checks."
+      }
+    },
+    {
+      "id": "x",
+      "name": "X",
+      "contentTypes": [
+        "short_text",
+        "image",
+        "video",
+        "thread",
+        "poll"
+      ],
+      "editorialProfile": {
+        "voice": "direct, timely, compact",
+        "opening": "lead with the claim, update, or question",
+        "body": "one main idea per post; split complex explanations into a coherent thread",
+        "cta": "ask a focused question or point to a useful source",
+        "hashtags": "only when they improve discovery or context",
+        "linkPolicy": "Write a complete standalone post even when attaching a link."
+      },
+      "mediaProfile": [
+        "single_image",
+        "multi_image",
+        "short_video"
+      ],
+      "publishing": {
+        "preferredMethod": "official_api",
+        "fallbackMethod": "manual_handoff",
+        "status": "adapter_not_implemented",
+        "accountConstraint": "API access tier, rate limits, and media constraints must be checked."
+      }
+    },
+    {
+      "id": "threads",
+      "name": "Threads",
+      "contentTypes": [
+        "text",
+        "image",
+        "video",
+        "reply_chain"
+      ],
+      "editorialProfile": {
+        "voice": "conversational, human, discussion-led",
+        "opening": "observation, question, or clear point of view",
+        "body": "short connected thoughts; avoid press-release formatting",
+        "cta": "invite genuine replies and follow-up discussion",
+        "hashtags": "use sparingly and only where supported/useful",
+        "linkPolicy": "Give enough context for the post to stand alone."
+      },
+      "mediaProfile": [
+        "image",
+        "short_video"
+      ],
+      "publishing": {
+        "preferredMethod": "official_api",
+        "fallbackMethod": "manual_handoff",
+        "status": "adapter_not_implemented",
+        "accountConstraint": "Account eligibility and API permissions must be checked."
+      }
+    },
+    {
+      "id": "tiktok",
+      "name": "TikTok",
+      "contentTypes": [
+        "short_video",
+        "photo_post",
+        "caption",
+        "script"
+      ],
+      "editorialProfile": {
+        "voice": "native, immediate, authentic, spoken-language friendly",
+        "opening": "spoken and visual hook in the opening seconds",
+        "body": "scene-by-scene script with on-screen text, narration, and shot guidance",
+        "cta": "one natural action, not a stack of promotional requests",
+        "hashtags": "topic-specific; trends only when genuinely relevant",
+        "linkPolicy": "Do not treat caption links as a guaranteed traffic path."
+      },
+      "mediaProfile": [
+        "vertical_9_16_video",
+        "cover_frame",
+        "subtitles"
+      ],
+      "publishing": {
+        "preferredMethod": "official_api",
+        "fallbackMethod": "manual_handoff",
+        "status": "adapter_not_implemented",
+        "accountConstraint": "Direct-post API access, app audit, scopes, and posting controls may be required."
+      }
+    },
+    {
+      "id": "youtube",
+      "name": "YouTube",
+      "contentTypes": [
+        "long_video",
+        "shorts",
+        "title",
+        "description",
+        "chapters",
+        "community_post"
+      ],
+      "editorialProfile": {
+        "voice": "searchable, informative, audience-retentive",
+        "opening": "promise a clear viewer outcome",
+        "body": "video outline or script with sections, examples, and retention-aware progression",
+        "cta": "subscribe or continue to a relevant resource when appropriate",
+        "hashtags": "limited and descriptive",
+        "linkPolicy": "Use description links with clear labels and context."
+      },
+      "mediaProfile": [
+        "thumbnail",
+        "landscape_video",
+        "vertical_short",
+        "captions"
+      ],
+      "publishing": {
+        "preferredMethod": "official_api",
+        "fallbackMethod": "manual_handoff",
+        "status": "adapter_not_implemented",
+        "accountConstraint": "OAuth scopes, quota, upload processing, and visibility state must be verified."
+      }
+    },
+    {
+      "id": "pinterest",
+      "name": "Pinterest",
+      "contentTypes": [
+        "standard_pin",
+        "video_pin",
+        "idea_pin_if_supported"
+      ],
+      "editorialProfile": {
+        "voice": "descriptive, evergreen, intent-oriented",
+        "opening": "clear subject and user benefit",
+        "body": "keyword-aware description that explains what the destination offers",
+        "cta": "save or visit the destination",
+        "hashtags": "not a substitute for descriptive keywords",
+        "linkPolicy": "Attach and validate the destination URL where the format supports it."
+      },
+      "mediaProfile": [
+        "vertical_2_3_image",
+        "vertical_video",
+        "destination_url"
+      ],
+      "publishing": {
+        "preferredMethod": "official_api",
+        "fallbackMethod": "manual_handoff",
+        "status": "adapter_not_implemented"
+      }
+    }
+  ],
+  "selectionRules": [
+    "Recommend only platforms relevant to the brand's audience, geography, objective, language, and available media.",
+    "Separate editorial suitability from technical publishability.",
+    "Show account and format eligibility before offering a publish action.",
+    "Do not list a platform as ready-to-publish until its adapter, authorization, and capability checks pass.",
+    "When direct publishing is unavailable, offer an export package or manual handoff instead of pretending to publish."
+  ]
+}
