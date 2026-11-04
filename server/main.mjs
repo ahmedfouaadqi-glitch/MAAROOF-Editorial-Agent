@@ -1,0 +1,134 @@
+import { createServer } from "node:http";
+import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
+import { JsonStore } from "./store.mjs";
+import { DEFAULT_LIMITS, validateLimits, reserveBudget, releaseReservation, commitReservation } from "./research-budget.mjs";
+
+const port = Number(process.env.PORT || 8787);
+const host = process.env.HOST || "127.0.0.1";
+const adminToken = process.env.ADMIN_API_TOKEN || "";
+const allowedOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+const dataFile = resolve(process.env.DATA_FILE || "./data/editorial-agent.json");
+const store = new JsonStore(dataFile);
+
+function send(res, status, payload) {
+  res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+  res.end(JSON.stringify(payload));
+}
+function readJson(req) {
+  return new Promise((resolveBody, reject) => {
+    let body = "";
+    req.on("data", chunk => {
+      body += chunk;
+      if (body.length > 64 * 1024) {
+        reject(Object.assign(new Error("Request body too large"), { status: 413 }));
+        req.destroy();
+      }
+    });
+    req.on("end", () => {
+      try { resolveBody(body ? JSON.parse(body) : {}); }
+      catch { reject(Object.assign(new Error("Invalid JSON body"), { status: 400 })); }
+    });
+    req.on("error", reject);
+  });
+}
+function requireAdmin(req) {
+  if (!adminToken) throw Object.assign(new Error("ADMIN_API_TOKEN is not configured"), { status: 503 });
+  if (req.headers.authorization !== `Bearer ${adminToken}`) throw Object.assign(new Error("Unauthorized"), { status: 401 });
+}
+function validateScope(body) {
+  if (typeof body.workspaceId !== "string" || !body.workspaceId.trim() || body.workspaceId.length > 128) {
+    throw Object.assign(new Error("workspaceId is required"), { status: 400 });
+  }
+  if (typeof body.taskId !== "string" || !body.taskId.trim() || body.taskId.length > 128) {
+    throw Object.assign(new Error("taskId is required"), { status: 400 });
+  }
+}
+
+const server = createServer(async (req, res) => {
+  const origin = req.headers.origin;
+  if (origin && origin === allowedOrigin) res.setHeader("access-control-allow-origin", origin);
+  res.setHeader("vary", "Origin");
+  res.setHeader("access-control-allow-methods", "GET,POST,PUT,OPTIONS");
+  res.setHeader("access-control-allow-headers", "content-type,authorization");
+  if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
+
+  try {
+    const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+    if (req.method === "GET" && url.pathname === "/health") {
+      return send(res, 200, { ok: true, service: "maaroof-editorial-api", persistence: "local-json", integrations: { supabase: false, firecrawl: false } });
+    }
+
+    requireAdmin(req);
+
+    if (req.method === "GET" && url.pathname === "/api/v1/admin/research-limits") {
+      const state = await store.read();
+      return send(res, 200, { limits: state.limits || DEFAULT_LIMITS });
+    }
+    if (req.method === "PUT" && url.pathname === "/api/v1/admin/research-limits") {
+      const body = await readJson(req);
+      const checked = validateLimits(body.limits);
+      if (!checked.valid) return send(res, 400, { error: "Invalid limits", details: checked.errors });
+      const result = await store.transact(state => {
+        state.limits = { ...body.limits };
+        return state.limits;
+      });
+      return send(res, 200, { limits: result, saved: true });
+    }
+
+    const reservationMatch = url.pathname.match(/^\/api\/v1\/tasks\/([^/]+)\/research-reservations$/);
+    if (reservationMatch && req.method === "POST") {
+      const body = await readJson(req);
+      validateScope(body);
+      const result = await store.transact(state => reserveBudget(state, {
+        ...body, taskId: decodeURIComponent(reservationMatch[1])
+      }));
+      return send(res, result.allowed ? 200 : 429, result);
+    }
+
+    const reservationAction = url.pathname.match(/^\/api\/v1\/tasks\/([^/]+)\/research-reservations\/([^/]+)\/(release|commit)$/);
+    if (reservationAction && req.method === "POST") {
+      const body = await readJson(req);
+      validateScope(body);
+      const input = { ...body, taskId: decodeURIComponent(reservationAction[1]), reservationId: decodeURIComponent(reservationAction[2]) };
+      const result = await store.transact(state => reservationAction[3] === "release" ? releaseReservation(state, input) : commitReservation(state, input));
+      return send(res, 200, result);
+    }
+
+    const usageMatch = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/research-usage$/);
+    if (usageMatch && req.method === "GET") {
+      const state = await store.read();
+      const task = state.tasks[decodeURIComponent(usageMatch[2])];
+      if (!task || task.workspaceId !== decodeURIComponent(usageMatch[1])) return send(res, 404, { error: "Task not found" });
+      return send(res, 200, { usage: task.usage, reservations: task.reservations, limits: state.limits });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/v1/sources") {
+      const body = await readJson(req);
+      validateScope(body);
+      if (typeof body.url !== "string" || body.url.length > 2048) return send(res, 400, { error: "A source URL is required" });
+      let parsed;
+      try { parsed = new URL(body.url); } catch { return send(res, 400, { error: "Invalid source URL" }); }
+      if (!["http:", "https:"].includes(parsed.protocol)) return send(res, 400, { error: "Only HTTP(S) source URLs are accepted" });
+      const source = {
+        id: randomUUID(), workspaceId: body.workspaceId, taskId: body.taskId,
+        url: parsed.toString(), title: typeof body.title === "string" ? body.title.slice(0, 300) : "",
+        notes: typeof body.notes === "string" ? body.notes.slice(0, 4000) : "",
+        submittedBy: "admin", retrievedAt: new Date().toISOString(),
+        acquisition: "user-supplied-reference", fetched: false
+      };
+      await store.transact(state => { state.sources.push(source); });
+      return send(res, 201, { source, fetched: false, note: "Source URL registered only. No crawler or remote fetch was executed." });
+    }
+
+    return send(res, 404, { error: "Not found" });
+  } catch (error) {
+    return send(res, error.status || 500, { error: error.message || "Internal server error" });
+  }
+});
+
+await store.init();
+server.listen(port, host, () => {
+  console.log(`MAAROOF Editorial API listening on http://${host}:${port}`);
+  console.log("Supabase: disabled | Firecrawl: disabled | Persistence: local JSON");
+});
