@@ -12,6 +12,9 @@ import { createMagazineSubmission, listMagazineSubmissions, transitionMagazineSu
 import { buildEditorialOutline, getEditorialDraft, updateEditorialDraft } from "./editorial-drafts.mjs";
 import { runMeteredResearchSearch } from "./research-search-service.mjs";
 import { createBraveSearchProvider } from "./brave-search-provider.mjs";
+import { createFirecrawlProvider } from "./firecrawl-provider.mjs";
+import { runMeteredResearchScrape } from "./research-scrape-service.mjs";
+import { runResearchInspection } from "./research-inspection.mjs";
 import { checkEditorialDraftOriginality, getEditorialApproval, recordEditorialReview } from "./editorial-approval.mjs";
 import { getCurrentMediaReview, recordMediaReview } from "./editorial-media.mjs";
 import { createOpenAICompatibleProvider } from "./model-provider.mjs";
@@ -23,9 +26,12 @@ const adminToken = process.env.ADMIN_API_TOKEN || "";
 const allowedOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
 const dataFile = resolve(process.env.DATA_FILE || "./data/editorial-agent.json");
 const store = new JsonStore(dataFile);
-const searchProvider = process.env.RESEARCH_SEARCH_PROVIDER === "brave"
-  ? createBraveSearchProvider()
-  : null;
+const firecrawlProvider = createFirecrawlProvider();
+const searchProvider = process.env.RESEARCH_SEARCH_PROVIDER === "firecrawl"
+  ? firecrawlProvider
+  : process.env.RESEARCH_SEARCH_PROVIDER === "brave"
+    ? createBraveSearchProvider()
+    : null;
 const modelProvider = process.env.ENABLE_MODEL_GENERATION === "true"
   ? createOpenAICompatibleProvider()
   : null;
@@ -79,7 +85,7 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     if (req.method === "GET" && url.pathname === "/health") {
-      return send(res, 200, { ok: true, service: "maaroof-editorial-api", persistence: "local-json", integrations: { supabase: false, firecrawl: false, liveSearch: Boolean(searchProvider), searchProvider: searchProvider?.id || null, modelGeneration: Boolean(modelProvider), model: modelProvider?.model || null } });
+      return send(res, 200, { ok: true, service: "maaroof-editorial-api", persistence: "local-json", integrations: { supabase: false, firecrawl: Boolean(firecrawlProvider), liveSearch: Boolean(searchProvider), searchProvider: searchProvider?.id || null, modelGeneration: Boolean(modelProvider), model: modelProvider?.model || null } });
     }
 
     requireAdmin(req);
@@ -103,7 +109,7 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/api/v1/admin/research-limits") {
       const state = await store.read();
-      return send(res, 200, { limits: state.limits || DEFAULT_LIMITS });
+      return send(res, 200, { limits: { ...DEFAULT_LIMITS, ...(state.limits || {}) } });
     }
     if (req.method === "PUT" && url.pathname === "/api/v1/admin/research-limits") {
       const body = await readJson(req);
@@ -265,6 +271,58 @@ const server = createServer(async (req, res) => {
         store, provider: searchProvider, workspaceId, taskId, input: body
       });
       if (!outcome.allowed) return send(res, 429, { error: "Per-article search limit reached", quota: outcome.quota });
+      return send(res, 200, outcome);
+    }
+
+    const scrapeCollection = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/research\\/scrapes$/);
+    if (scrapeCollection && req.method === "GET") {
+      const workspaceId = decodeURIComponent(scrapeCollection[1]);
+      const taskId = decodeURIComponent(scrapeCollection[2]);
+      const state = await store.read();
+      const task = state.tasks?.[taskId];
+      if (!task || task.workspaceId !== workspaceId || !task.article) return send(res, 404, { error: "Editorial task not found" });
+      return send(res, 200, {
+        scrapes: (state.researchScrapes || []).filter(item => item.workspaceId === workspaceId && item.taskId === taskId),
+        usage: task.usage || { scrape: 0 },
+        limit: { ...DEFAULT_LIMITS, ...(state.limits || {}) }.scrapesPerArticle
+      });
+    }
+    if (scrapeCollection && req.method === "POST") {
+      const body = await readJson(req);
+      const workspaceId = decodeURIComponent(scrapeCollection[1]);
+      const taskId = decodeURIComponent(scrapeCollection[2]);
+      const headerId = req.headers["idempotency-key"];
+      const operationId = typeof headerId === "string" ? headerId : body.operationId;
+      const outcome = await runMeteredResearchScrape({
+        store, provider: firecrawlProvider, workspaceId, taskId, input: body, operationId
+      });
+      if (!outcome.allowed) return send(res, 429, { error: "Per-article Firecrawl scrape limit reached", quota: outcome.quota });
+      return send(res, 200, outcome);
+    }
+
+    const inspectionCollection = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/research\\/inspections$/);
+    if (inspectionCollection && req.method === "GET") {
+      const workspaceId = decodeURIComponent(inspectionCollection[1]);
+      const taskId = decodeURIComponent(inspectionCollection[2]);
+      const state = await store.read();
+      const task = state.tasks?.[taskId];
+      if (!task || task.workspaceId !== workspaceId || !task.article) return send(res, 404, { error: "Editorial task not found" });
+      return send(res, 200, {
+        inspections: (state.researchInspections || []).filter(item => item.workspaceId === workspaceId && item.taskId === taskId),
+        usage: task.usage || { inspect: 0 },
+        limit: { ...DEFAULT_LIMITS, ...(state.limits || {}) }.inspectionsPerArticle
+      });
+    }
+    if (inspectionCollection && req.method === "POST") {
+      const body = await readJson(req);
+      const workspaceId = decodeURIComponent(inspectionCollection[1]);
+      const taskId = decodeURIComponent(inspectionCollection[2]);
+      const headerId = req.headers["idempotency-key"];
+      const operationId = typeof headerId === "string" ? headerId : body.operationId;
+      const outcome = await runResearchInspection({
+        store, workspaceId, taskId, sourceId: body.sourceId, operationId
+      });
+      if (!outcome.allowed) return send(res, 429, { error: "Per-article inspection limit reached", quota: outcome.quota });
       return send(res, 200, outcome);
     }
 
