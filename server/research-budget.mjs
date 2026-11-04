@@ -1,11 +1,11 @@
 export const DEFAULT_LIMITS = Object.freeze({
-  crawlUrlsPerArticle: 3,
+  sourceUrlsPerArticle: 3,
   searchesPerArticle: 5,
   inspectionsPerArticle: 5
 });
 
 const KEY_BY_OPERATION = {
-  crawl: "crawlUrls",
+  source: "sourceUrls",
   search: "searches",
   inspect: "inspections"
 };
@@ -23,7 +23,7 @@ export function ensureTask(state, taskId, workspaceId) {
   if (!state.tasks[taskId]) {
     state.tasks[taskId] = {
       workspaceId,
-      usage: { crawl: 0, search: 0, inspect: 0 },
+      usage: { source: 0, search: 0, inspect: 0 },
       reservations: {},
       createdAt: new Date().toISOString()
     };
@@ -39,7 +39,7 @@ export function ensureTask(state, taskId, workspaceId) {
 
 export function reserveBudget(state, { taskId, workspaceId, operation, units = 1, reservationId }) {
   if (!KEY_BY_OPERATION[operation]) {
-    const error = new Error("operation must be crawl, search, or inspect");
+    const error = new Error("operation must be source, search, or inspect");
     error.status = 400;
     throw error;
   }
