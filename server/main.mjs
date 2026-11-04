@@ -5,6 +5,7 @@ import { JsonStore } from "./store.mjs";
 import { DEFAULT_LIMITS, validateLimits, reserveBudget, releaseReservation, commitReservation } from "./research-budget.mjs";
 import { createEditorialTask, listEditorialTasks, advanceEditorialTask } from "./editorial-tasks.mjs";
 import { registerClaim, listClaims, checkOriginality } from "./editorial-evidence.mjs";
+import { createEntity, listEntities, scanKnownEntities, createEntityRelationship, listEntityRelationships } from "./editorial-entities.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "127.0.0.1";
@@ -148,6 +149,37 @@ const server = createServer(async (req, res) => {
       validateScope(body);
       const claim = await store.transact(state => registerClaim(state, body));
       return send(res, 201, { claim });
+    }
+
+    const entitiesMatch = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/entities$/);
+    if (entitiesMatch && req.method === "GET") {
+      const workspaceId = decodeURIComponent(entitiesMatch[1]);
+      const taskId = decodeURIComponent(entitiesMatch[2]);
+      const state = await store.read();
+      return send(res, 200, listEntities(state, workspaceId, taskId));
+    }
+    if (req.method === "POST" && url.pathname === "/api/v1/entities") {
+      const body = await readJson(req);
+      validateScope(body);
+      const entity = await store.transact(state => createEntity(state, body));
+      return send(res, 201, { entity });
+    }
+    if (req.method === "POST" && url.pathname === "/api/v1/entities/scan") {
+      const body = await readJson(req);
+      validateScope(body);
+      const result = await store.transact(state => scanKnownEntities(state, body));
+      return send(res, 200, { result });
+    }
+    if (req.method === "GET" && url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/entity-relationships$/)) {
+      const match = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/entity-relationships$/);
+      const state = await store.read();
+      return send(res, 200, { relationships: listEntityRelationships(state, decodeURIComponent(match[1]), decodeURIComponent(match[2])) });
+    }
+    if (req.method === "POST" && url.pathname === "/api/v1/entity-relationships") {
+      const body = await readJson(req);
+      validateScope(body);
+      const relationship = await store.transact(state => createEntityRelationship(state, body));
+      return send(res, 201, { relationship });
     }
 
     if (req.method === "POST" && url.pathname === "/api/v1/originality/check") {
