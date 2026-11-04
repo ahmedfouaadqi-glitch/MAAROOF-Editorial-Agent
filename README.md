@@ -86,3 +86,8 @@ No Firecrawl or automated crawler is used. Source URLs are manually registered a
 - Attach manually transcribed excerpts to claims with explicit supporting, contradicting, contextual, or unclear stances.
 - Surface conflicting evidence at claim level without automatically deciding which source is correct.
 - Metadata completeness is not source reliability; all evidence remains manually recorded and unverified until independently checked.
+
+## Publishing destination registries
+- [Magazine and editorial publication registry](docs/MAGAZINE-PUBLICATION-REGISTRY.md) and its machine-readable catalogue at `config/magazine-publication-registry.json`.
+- [Platform-native social publishing](docs/PLATFORM-NATIVE-SOCIAL-PUBLISHING.md) and its machine-readable catalogue at `config/social-platform-catalog.json`.
+- Editorial magazines, self-publishing systems, CMS products, social networks, communities, research repositories, and data sources are maintained as distinct destination types. Candidate listing does not imply an active adapter or publication permission.
