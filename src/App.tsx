@@ -9,11 +9,12 @@ import {
 import SpotlightCard from "./components/SpotlightCard";
 import EditorialEvidencePanel from "./components/EditorialEvidencePanel";
 import AIVisibilityPanel from "./components/AIVisibilityPanel";
+import MagazineSubmissionsPanel from "./components/MagazineSubmissionsPanel";
 import { DEFAULT_RESEARCH_BUDGET, validateResearchBudgetLimits, type ResearchBudgetLimits } from "./domain/research-budget";
 import { categoryLabels, modeLabels, platforms, readinessLabels, type PlatformCategory } from "./data/platforms";
 import { adapterRegistry } from "./data/adapter-registry";
 
-type View = "home" | "articles" | "registry" | "research-settings" | "ai-visibility";
+type View = "home" | "articles" | "registry" | "research-settings" | "ai-visibility" | "magazine-submissions";
 type Article = { id: string; topic: string; language: string; objective: string; stage: string; createdAt: string };
 type Locale = "ar" | "en";
 const NEXT_STAGE: Record<string, string> = { intake: "planning", planning: "research", research: "entity-analysis", "entity-analysis": "outline", outline: "drafting", drafting: "source-review", "source-review": "originality-review", "originality-review": "media-review", "media-review": "editorial-approval", "editorial-approval": "ready-to-publish" };
@@ -131,7 +132,7 @@ export default function App() {
 
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
   useEffect(() => {
-    if (view !== "articles" || !adminToken.trim()) return;
+    if ((view !== "articles" && view !== "magazine-submissions") || !adminToken.trim()) return;
     let cancelled = false;
     fetch(`${apiBase}/api/v1/workspaces/main-workspace/articles`, { headers: { authorization: `Bearer ${adminToken}` } })
       .then(async response => {
@@ -213,6 +214,7 @@ export default function App() {
   const navItems = [
     { id: "home" as const, label: copy.overview, icon: LayoutDashboard },
     { id: "articles" as const, label: copy.articles, icon: FileText },
+    { id: "magazine-submissions" as const, label: locale === "ar" ? "تقديمات المجلات" : "Magazine submissions", icon: BookOpenText },
     { id: "registry" as const, label: copy.registry, icon: Globe2 },
     { id: "research-settings" as const, label: copy.research, icon: SlidersHorizontal },
     { id: "ai-visibility" as const, label: copy.visibility, icon: Activity }
@@ -301,6 +303,7 @@ export default function App() {
           </div>
         </section>}
         {view === "ai-visibility" && <AIVisibilityPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" locale={locale}/>}
+        {view === "magazine-submissions" && <MagazineSubmissionsPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" articles={articles} publications={platforms.filter(p=>p.category==="editorial")} locale={locale}/> }
         {view === "research-settings" && <section className="page-section">
           <PageHeading eyebrow="SYSTEM CONFIGURATION" title={copy.settingsTitle} subtitle={copy.settingsSub}/>
           <SpotlightCard theme={theme} className="surface-card budget-panel" spotlightColor={theme==="light"?"#b88c54":"#d6ae78"} intensity={0.1} spotlightSize={340}>
