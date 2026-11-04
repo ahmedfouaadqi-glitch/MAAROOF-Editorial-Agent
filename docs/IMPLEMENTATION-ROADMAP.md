@@ -18,11 +18,11 @@
 - [x] Enforce source URL registration limits atomically with source insertion.
 - [x] Add idempotent reservation, commit, and release operations for search/inspection quotas.
 - [ ] Connect a selected external search provider if live research is later required; no Firecrawl or crawler integration is planned.
-- [ ] Implement claim-to-evidence mapping and evidence quality review.
+- [x] Implement claim-to-source linking with workspace/task isolation and source-link coverage reporting.\n- [ ] Implement evidence quality review (source credibility, recency, and whether the source actually supports each claim).
 - [ ] Implement entity and search-intent extraction.
 - [ ] Implement outline and bilingual article draft assembly.
-- [ ] Implement exact and near-duplicate originality checks.
-- [ ] Add deterministic tests for the remaining editorial engines.
+- [x] Add deterministic exact-match and token-overlap near-duplicate checks against previously submitted workspace text.\n- [ ] Add semantic, cross-language, and external-corpus originality checks; these require validated embeddings/models and a wider corpus.
+- [x] Add deterministic tests for evidence linking, workspace isolation, Arabic normalization, and exact-match detection.\n- [ ] Add deterministic tests for the remaining editorial engines.
 - [ ] Add model-provider interface only after engine contracts are tested.
 
 ## Track C — Independent execution services
@@ -51,7 +51,7 @@
 - [x] Connect article creation and article listing to the standalone Node API.
 - [x] Add controlled one-stage-at-a-time article progression in the UI.
 - [x] Retain platform registry, capability inspector, and backend research settings.
-- [ ] Add authenticated user/workspace switching and role-based navigation.
+- [ ] Add authenticated user/workspace switching and role-based navigation.\n- [x] Add article-level evidence workspace UI for manual sources, claim linking, and local originality checks.
 - [ ] Add functional notifications, file/media upload, editorial evidence workspace, and approval inbox.
 - [ ] Add browser-level responsive and accessibility tests.
 
