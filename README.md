@@ -3,22 +3,47 @@
 Lovable-compatible editorial production and verified publishing platform.
 
 ## Architecture constraints
-- Frontend: React + Vite + TypeScript, Tailwind CSS, shadcn/ui, React Router.
-- Data and identity: Supabase PostgreSQL, Auth, Storage, and RLS.
-- Application services: independent Node.js REST services and durable jobs.
-- Browser publishing: isolated Playwright + Chromium runtime; never run browser automation in the frontend.
-- AI: provider-agnostic gateway. No paid model calls in tests without explicit approval.
+- Frontend: React + Vite + TypeScript, Tailwind CSS, React Router.
+- Database/authentication: intentionally deferred in the current implementation track. Supabase is not being configured in this phase.
+- Application services: independent Node.js REST services and durable jobs (planned; not implemented yet).
+- Browser publishing: isolated Playwright + Chromium runtime (planned; not implemented yet). Browser automation must never run in the frontend.
+- AI: provider-agnostic gateway (planned). No paid model calls are made by the current foundation.
 - MAAROOF AI remains a separate system; integration is through scoped, authenticated APIs only.
 
-## Initial implementation status
-This repository was empty at project start. This commit initializes the project documentation only. The implementation is staged on a dedicated feature branch after initialization.
+## Current implementation
+- Arabic RTL dashboard shell.
+- Searchable and filterable registry for the 17 platforms supplied by the user.
+- Platform profiles with conservative capability declarations, policy constraints, official documentation links where identified, and per-platform verification checklists.
+- Editorial workflow TypeScript contracts for intake, planning, research, entity analysis, drafting, evidence review, originality review, media review, editorial approval, publishing, and publication verification.
+- Fail-closed publishing gate: registry metadata cannot authorize publishing. Every adapter remains blocked until implementation, policy, account, credentials, human approval (when required), and idempotency checks pass.
+- Vitest test cases for registry completeness and fail-closed publishing behavior.
 
 ## Platform registry policy
-Platforms are classified by their actual publishing workflow and content purpose. A platform being listed does not imply that it accepts promotional articles or supports automated publishing. Official APIs are preferred; browser automation is enabled only after platform-specific validation and policy review. Manual handoff is supported.
+The 17 listed entries are not all magazines. The registry separates editorial destinations, professional networks, communities, encyclopedic knowledge bases, research repositories, code hosts, and data sources. A listed platform is not presumed to accept promotional articles or automated publishing.
+
+Official APIs are preferred where appropriate and authorized. Browser automation is considered only after platform-specific policy review and controlled testing. Manual handoff remains available for destinations where automated publishing is unsupported or inappropriate.
+
+## Deliberately not implemented yet
+- Supabase, database persistence, authentication, and RLS (deferred per current implementation instruction).
+- Live AI model calls, paid research, and provider credentials.
+- Real platform publishing adapters.
+- Playwright browser runtime and persistent authenticated sessions.
+- MAAROOF AI API integration.
+- External publication verification.
+
+## Local development
+```bash
+npm install
+npm run dev
+npm run typecheck
+npm test
+npm run build
+```
 
 ## Safety and reliability
 - Never bypass CAPTCHA, MFA, access controls, or platform safeguards.
 - Never report publication success without external verification.
 - Use idempotency and publication reconciliation to prevent duplicate submissions.
-- Encrypt browser session material and keep credentials away from model prompts.
-- Enforce workspace scoping in APIs and database RLS.
+- Keep credentials and API secrets out of model prompts and frontend bundles.
+- Do not enable a platform adapter until its policy, account access, and end-to-end behavior have been verified.
+- Do not use research repositories, Q&A communities, or data archives as generic promotional publishing destinations.
