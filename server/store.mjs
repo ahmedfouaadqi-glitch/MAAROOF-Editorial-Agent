@@ -3,10 +3,11 @@ import { dirname } from "node:path";
 
 const EMPTY = {
   version: 1,
-  limits: { sourceUrlsPerArticle: 3, searchesPerArticle: 5, inspectionsPerArticle: 5 },
+  limits: { sourceUrlsPerArticle: 3, scrapesPerArticle: 3, searchesPerArticle: 5, inspectionsPerArticle: 5 },
   tasks: {},
   sources: [],
-  researchSearches: []
+  researchSearches: [],
+  researchScrapes: []
 };
 
 export class JsonStore {
@@ -15,7 +16,27 @@ export class JsonStore {
 
   async init() {
     await mkdir(dirname(this.filePath), { recursive: true });
-    try { await readFile(this.filePath, "utf8"); }
+    try {
+      const raw = await readFile(this.filePath, "utf8");
+      const state = JSON.parse(raw);
+      let changed = false;
+      state.limits = { ...EMPTY.limits, ...(state.limits || {}) };
+      state.researchScrapes ||= [];
+      state.researchSearches ||= [];
+      state.sources ||= [];
+      state.tasks ||= {};
+      for (const task of Object.values(state.tasks)) {
+        task.usage ||= {};
+        for (const operation of ["source", "scrape", "search", "inspect"]) {
+          if (!Number.isSafeInteger(task.usage[operation]) || task.usage[operation] < 0) {
+            task.usage[operation] = 0;
+            changed = true;
+          }
+        }
+        task.reservations ||= {};
+      }
+      if (changed || !raw.includes('"scrapesPerArticle"') || !raw.includes('"researchScrapes"')) await this.#write(state);
+    }
     catch (error) {
       if (error.code !== "ENOENT") throw error;
       await this.#write(EMPTY);
