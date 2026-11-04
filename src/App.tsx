@@ -72,7 +72,7 @@ export default function App() {
         <div className="panel-heading"><div><h2>Research & Firecrawl Limits</h2><p>حدود استهلاك البحث والكشط والفحص لكل مقالة على حدة.</p></div><span className="count-pill">Admin controls</span></div>
         <div className="budget-notice"><LockKeyhole size={16}/><span>هذه القيم هي إعدادات واجهة أولية. لن تُعتبر حدوداً تشغيلية آمنة حتى يقرأها الخادم ويطبقها قبل كل استدعاء لمزوّد البحث أو Firecrawl.</span></div>
         <div className="budget-grid">
-          <label className="budget-field"><span>روابط الكشط لكل مقالة</span><small>عدد عناوين URL التي يسمح بإرسالها إلى عملية Scrape.</small><input type="number" min="0" max="10000" step="1" value={budget.crawlUrlsPerArticle} onChange={e=>setBudget(v=>({...v,crawlUrlsPerArticle:Number(e.target.value)}))}/></label>
+          <label className="budget-field"><span>روابط الكشط لكل مقالة</span><small>إجمالي عدد عناوين URL التي يمكن كشطها، حتى لو جُمعت في طلب واحد.</small><input type="number" min="0" max="10000" step="1" value={budget.crawlUrlsPerArticle} onChange={e=>setBudget(v=>({...v,crawlUrlsPerArticle:Number(e.target.value)}))}/></label>
           <label className="budget-field"><span>عمليات البحث لكل مقالة</span><small>عدد استدعاءات Search المسموح بها.</small><input type="number" min="0" max="10000" step="1" value={budget.searchesPerArticle} onChange={e=>setBudget(v=>({...v,searchesPerArticle:Number(e.target.value)}))}/></label>
           <label className="budget-field"><span>عمليات الفحص لكل مقالة</span><small>عدد عمليات Inspect/Extraction المسموح بها.</small><input type="number" min="0" max="10000" step="1" value={budget.inspectionsPerArticle} onChange={e=>setBudget(v=>({...v,inspectionsPerArticle:Number(e.target.value)}))}/></label>
         </div>
