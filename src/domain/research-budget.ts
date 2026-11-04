@@ -1,13 +1,13 @@
-export type ResearchOperation = "crawl" | "search" | "inspect";
+export type ResearchOperation = "source" | "search" | "inspect";
 
 export interface ResearchBudgetLimits {
-  crawlUrlsPerArticle: number;
+  sourceUrlsPerArticle: number;
   searchesPerArticle: number;
   inspectionsPerArticle: number;
 }
 
 export interface ResearchUsage {
-  crawl: number;
+  source: number;
   search: number;
   inspect: number;
 }
@@ -22,7 +22,7 @@ export interface ResearchBudgetDecision {
 }
 
 export const DEFAULT_RESEARCH_BUDGET: Readonly<ResearchBudgetLimits> = Object.freeze({
-  crawlUrlsPerArticle: 3,
+  sourceUrlsPerArticle: 3,
   searchesPerArticle: 5,
   inspectionsPerArticle: 5
 });
@@ -43,13 +43,13 @@ export function getResearchLimit(
   limits: ResearchBudgetLimits,
   operation: ResearchOperation
 ): number {
-  if (operation === "crawl") return limits.crawlUrlsPerArticle;
+  if (operation === "source") return limits.sourceUrlsPerArticle;
   if (operation === "search") return limits.searchesPerArticle;
   return limits.inspectionsPerArticle;
 }
 
 /**
- * Per-task budget guard. For crawl, reserve the number of target URLs, not the
+ * Per-task budget guard. For source, reserve the number of target URLs, not the
  * number of HTTP requests. Search and inspect reserve one unit per operation.
  * This in-memory implementation is suitable for a single-process prototype.
  * Production workers must inject a durable atomic store to coordinate replicas.
@@ -74,7 +74,7 @@ export class ResearchBudgetLedger {
 
   getUsage(taskId: string): ResearchUsage {
     const current = this.usage.get(taskId);
-    return current ? { ...current } : { crawl: 0, search: 0, inspect: 0 };
+    return current ? { ...current } : { source: 0, search: 0, inspect: 0 };
   }
 
   reserve(taskId: string, operation: ResearchOperation, units = 1): ResearchBudgetDecision {
