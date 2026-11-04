@@ -31,6 +31,8 @@ const modelProvider = process.env.ENABLE_MODEL_GENERATION === "true"
   : null;
 const configuredModelTokens = Number(process.env.MODEL_MAX_OUTPUT_TOKENS || 3000);
 const modelMaxOutputTokens = Number.isSafeInteger(configuredModelTokens) && configuredModelTokens >= 256 && configuredModelTokens <= 8192 ? configuredModelTokens : 3000;
+const configuredModelRequests = Number(process.env.MODEL_REQUESTS_PER_ARTICLE || 2);
+const modelRequestsPerArticle = Number.isSafeInteger(configuredModelRequests) && configuredModelRequests >= 1 && configuredModelRequests <= 10 ? configuredModelRequests : 2;
 
 function send(res, status, payload) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
@@ -185,12 +187,24 @@ const server = createServer(async (req, res) => {
       return send(res, 200, { submission, externalAction: "none" });
     }
 
+    const modelUsageRoute = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/model-usage$/);
+    if (modelUsageRoute && req.method === "GET") {
+      const workspaceId = decodeURIComponent(modelUsageRoute[1]);
+      const taskId = decodeURIComponent(modelUsageRoute[2]);
+      const state = await store.read();
+      const task = state.tasks?.[taskId];
+      if (!task || task.workspaceId !== workspaceId || !task.article) return send(res, 404, { error: "Editorial task not found" });
+      const attempts = (state.modelUsage || []).filter(item => item.workspaceId === workspaceId && item.taskId === taskId);
+      const totalTokens = attempts.reduce((sum, item) => sum + (item.usage?.totalTokens || 0), 0);
+      return send(res, 200, { attempts, usage: { requests: attempts.length, requestLimit: modelRequestsPerArticle, totalTokens, estimatedCostUsd: null } });
+    }
+
     const draftGenerationRoute = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/draft\/generate$/);
     if (draftGenerationRoute && req.method === "POST") {
       const workspaceId = decodeURIComponent(draftGenerationRoute[1]);
       const taskId = decodeURIComponent(draftGenerationRoute[2]);
       const result = await runEditorialDraftGeneration({
-        store, provider: modelProvider, workspaceId, taskId, maxTokens: modelMaxOutputTokens
+        store, provider: modelProvider, workspaceId, taskId, maxTokens: modelMaxOutputTokens, maxRequests: modelRequestsPerArticle
       });
       return send(res, 200, result);
     }
