@@ -79,3 +79,10 @@ No Firecrawl or automated crawler is used. Source URLs are manually registered a
 - Match registered aliases against claim text and link matching claims to entities.
 - Record explicit directed relationships between entities and optionally attach claim IDs as unverified support.
 - Current matching is deterministic alias matching, not automatic named-entity recognition or global identity resolution.
+
+
+### Editorial research baseline
+- Record source metadata, publication and effective dates, methodology, jurisdiction, and a reasoned manual quality assessment.
+- Attach manually transcribed excerpts to claims with explicit supporting, contradicting, contextual, or unclear stances.
+- Surface conflicting evidence at claim level without automatically deciding which source is correct.
+- Metadata completeness is not source reliability; all evidence remains manually recorded and unverified until independently checked.
