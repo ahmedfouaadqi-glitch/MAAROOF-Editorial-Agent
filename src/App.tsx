@@ -13,7 +13,33 @@ export default function App() {
   const [activeView, setActiveView] = useState<"registry" | "research-settings">("registry");
   const [budget, setBudget] = useState<ResearchBudgetLimits>({ ...DEFAULT_RESEARCH_BUDGET });
   const [budgetNotice, setBudgetNotice] = useState("");
+  const [adminToken, setAdminToken] = useState("");
+  const [budgetBusy, setBudgetBusy] = useState(false);
+  const apiBase = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8787").replace(/\\/$/, "");
   const budgetValidation = validateResearchBudgetLimits(budget);
+  async function saveBudget() {
+    if (!budgetValidation.valid || !adminToken.trim()) return;
+    setBudgetBusy(true); setBudgetNotice("");
+    try {
+      const response = await fetch(`${apiBase}/api/v1/admin/research-limits`, { method: "PUT", headers: { "content-type": "application/json", authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ limits: budget }) });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "تعذر حفظ الإعدادات");
+      setBudget(payload.limits);
+      setBudgetNotice("تم حفظ الحدود في خدمة API المستقلة.");
+    } catch (error) { setBudgetNotice(error instanceof Error ? error.message : "تعذر الاتصال بالخدمة الخلفية."); }
+    finally { setBudgetBusy(false); }
+  }
+  async function loadBudget() {
+    if (!adminToken.trim()) return;
+    setBudgetBusy(true); setBudgetNotice("");
+    try {
+      const response = await fetch(`${apiBase}/api/v1/admin/research-limits`, { headers: { authorization: `Bearer ${adminToken}` } });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "تعذر تحميل الإعدادات");
+      setBudget(payload.limits); setBudgetNotice("تم تحميل الحدود المحفوظة من الخدمة الخلفية.");
+    } catch (error) { setBudgetNotice(error instanceof Error ? error.message : "تعذر الاتصال بالخدمة الخلفية."); }
+    finally { setBudgetBusy(false); }
+  }
   const selected = platforms.find((p) => p.id === selectedId);
   const adapter = selected ? adapterRegistry[selected.id] : undefined;
   const visible = useMemo(() => platforms.filter((p) =>
@@ -69,17 +95,18 @@ export default function App() {
       <section className="next-panel"><div className="next-icon"><Workflow/></div><div><strong>Editorial Workflow Contracts</strong><p>تم تعريف مراحل العمل وواجهات المحركات كعقود TypeScript مستقلة عن قاعدة البيانات. لم يتم ربطها بعد بنماذج مدفوعة أو تنفيذ نشر خارجي.</p></div><span className="contract-badge">Contracts defined</span></section>
       <footer>لا تُفعّل أي منصة قبل مراجعة شروطها، التحقق من الصلاحيات، اختبار المسودة، ثم التحقق من ظهور النتيجة خارج النظام. تصنيف القدرات لا يعني أن الموصل جاهز.</footer>
       </> : <section className="panel budget-admin">
-        <div className="panel-heading"><div><h2>Research & Firecrawl Limits</h2><p>حدود استهلاك البحث والكشط والفحص لكل مقالة على حدة.</p></div><span className="count-pill">Admin controls</span></div>
-        <div className="budget-notice"><LockKeyhole size={16}/><span>هذه القيم هي إعدادات واجهة أولية. لن تُعتبر حدوداً تشغيلية آمنة حتى يقرأها الخادم ويطبقها قبل كل استدعاء لمزوّد البحث أو Firecrawl.</span></div>
+        <div className="panel-heading"><div><h2>Research & Source Limits</h2><p>حدود استهلاك البحث وإضافة المصادر وفحصها لكل مقالة.</p></div><span className="count-pill">Admin controls</span></div>
+        <div className="budget-notice"><LockKeyhole size={16}/><span>تُحفظ الإعدادات في خدمة Node المستقلة. لا يوجد تكامل Supabase أو Firecrawl؛ إضافة الروابط تتم كمراجع يدوية دون جلب محتوى المواقع تلقائياً.</span></div>
+        <label className="budget-field admin-token-field"><span>مفتاح إدارة الخدمة الخلفية</span><small>أدخل ADMIN_API_TOKEN الذي أعددته في بيئة الخادم. لا يُحفظ في المتصفح.</small><input type="password" autoComplete="off" value={adminToken} onChange={e=>setAdminToken(e.target.value)} placeholder="ADMIN_API_TOKEN"/></label>
         <div className="budget-grid">
           <label className="budget-field"><span>روابط الكشط لكل مقالة</span><small>إجمالي عدد عناوين URL التي يمكن كشطها، حتى لو جُمعت في طلب واحد.</small><input type="number" min="0" max="10000" step="1" value={budget.crawlUrlsPerArticle} onChange={e=>setBudget(v=>({...v,crawlUrlsPerArticle:Number(e.target.value)}))}/></label>
           <label className="budget-field"><span>عمليات البحث لكل مقالة</span><small>عدد استدعاءات Search المسموح بها.</small><input type="number" min="0" max="10000" step="1" value={budget.searchesPerArticle} onChange={e=>setBudget(v=>({...v,searchesPerArticle:Number(e.target.value)}))}/></label>
           <label className="budget-field"><span>عمليات الفحص لكل مقالة</span><small>عدد عمليات Inspect/Extraction المسموح بها.</small><input type="number" min="0" max="10000" step="1" value={budget.inspectionsPerArticle} onChange={e=>setBudget(v=>({...v,inspectionsPerArticle:Number(e.target.value)}))}/></label>
         </div>
         {!budgetValidation.valid && <p className="budget-error">{budgetValidation.errors.join(" · ")}</p>}
-        <div className="budget-actions"><button className="filter" onClick={()=>{setBudget({...DEFAULT_RESEARCH_BUDGET});setBudgetNotice("أُعيدت القيم الافتراضية في هذه الجلسة.");}}><RotateCcw size={14}/> استعادة الافتراضي</button><button className="apply-budget" disabled={!budgetValidation.valid} onClick={()=>setBudgetNotice("تم تحديث القيم في واجهة هذه الجلسة فقط؛ لم تُحفظ في خدمة خلفية بعد.")}><Save size={14}/> تطبيق القيم</button></div>
+        <div className="budget-actions"><button className="filter" onClick={()=>{setBudget({...DEFAULT_RESEARCH_BUDGET});setBudgetNotice("أُعيدت القيم الافتراضية محلياً؛ اضغط حفظ لإرسالها للخادم.");}}><RotateCcw size={14}/> استعادة الافتراضي</button><button className="filter" disabled={!adminToken.trim() || budgetBusy} onClick={loadBudget}>تحميل المحفوظ</button><button className="apply-budget" disabled={!budgetValidation.valid || !adminToken.trim() || budgetBusy} onClick={saveBudget}><Save size={14}/> {budgetBusy?"جارٍ الحفظ...":"حفظ في الخادم"}</button></div>
         {budgetNotice && <p className="budget-feedback">{budgetNotice}</p>}
-        <div className="budget-rules"><h3>قواعد تطبيق الميزانية</h3><ul><li>العدادات مستقلة لكل مقالة/مهمة، ولا تتشارك الاستهلاك بين المقالات.</li><li>يُحجز الاستهلاك قبل إرسال الطلب، ولا يُرسل أي طلب بعد بلوغ الحد.</li><li>عند فشل الاستدعاء قبل إتمامه يمكن تحرير الحجز وفق نتيجة التنفيذ.</li><li>في بيئة الإنتاج يجب تطبيق الحجز ذرياً في خدمة خلفية مشتركة لمنع تجاوز الحد عند تشغيل عدة Workers.</li><li>تغيير الحد لا يمحو الاستهلاك السابق للمقالات قيد التنفيذ.</li></ul></div>
+        <div className="budget-rules"><h3>قواعد تطبيق الميزانية</h3><ul><li>العدادات مستقلة لكل مقالة/مهمة، ولا تتشارك الاستهلاك بين المقالات.</li><li>يُحجز الاستهلاك قبل إرسال الطلب، ولا يُرسل أي طلب بعد بلوغ الحد.</li><li>عند فشل الاستدعاء قبل إتمامه يمكن تحرير الحجز وفق نتيجة التنفيذ.</li><li>الخدمة الحالية تستخدم ملف JSON وحجزاً تسلسلياً داخل عملية Node واحدة؛ لا تشغّل أكثر من نسخة API على ملف البيانات نفسه.</li><li>تغيير الحد لا يمحو الاستهلاك السابق للمقالات قيد التنفيذ.</li></ul></div>
       </section>}
     </main>
   </div>;
