@@ -103,6 +103,15 @@ const server = createServer(async (req, res) => {
       return send(res, 200, { usage: task.usage, reservations: task.reservations, limits: state.limits });
     }
 
+    const sourceListMatch = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/sources$/);
+    if (sourceListMatch && req.method === "GET") {
+      const workspaceId = decodeURIComponent(sourceListMatch[1]);
+      const taskId = decodeURIComponent(sourceListMatch[2]);
+      const state = await store.read();
+      const sources = state.sources.filter(source => source.workspaceId === workspaceId && source.taskId === taskId);
+      return send(res, 200, { sources });
+    }
+
     if (req.method === "POST" && url.pathname === "/api/v1/sources") {
       const body = await readJson(req);
       validateScope(body);
