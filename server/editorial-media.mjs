@@ -7,7 +7,7 @@ function taskFor(state,workspaceId,taskId){
 function fingerprint(state,workspaceId,taskId){
  const draft=(state.editorialDrafts||[]).find(item=>item.workspaceId===workspaceId&&item.taskId===taskId);
  if(!draft)fail("Editorial draft not found",404);
- const text=[draft.title||"",draft.dek||"",draft.editorialAngle||"",...(draft.sections||[]).flatMap(s=>[s.heading||"",s.body||""]),draft.metaTitle||"",draft.metaDescription||""].join("\n");
+ const text=[draft.title||"",draft.dek||"",draft.editorialAngle||"",...(draft.sections||[]).flatMap(s=>[s.heading||"",s.body||"",...(s.evidenceIds||[]).map(id=>"evidence:"+id),...(s.claimIds||[]).map(id=>"claim:"+id)]),draft.metaTitle||"",draft.metaDescription||""].join("\n");
  return createHash("sha256").update(normalizeEditorialText(text)).digest("hex");
 }
 export function recordMediaReview(state,{workspaceId,taskId,decision,reviewerName,rationale,assets=[]}){
