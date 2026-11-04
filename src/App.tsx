@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import {
   Activity, ArrowDownLeft, ArrowLeft, ArrowUpLeft, BookOpenText, Check,
   CheckCircle2, ChevronDown, CircleHelp, Command, FileCheck2, FilePlus2,
@@ -14,6 +14,7 @@ import { adapterRegistry } from "./data/adapter-registry";
 type View = "home" | "articles" | "registry" | "research-settings";
 type Article = { id: string; topic: string; language: string; objective: string; stage: string; createdAt: string };
 type Locale = "ar" | "en";
+const NEXT_STAGE: Record<string, string> = { intake: "planning", planning: "research", research: "entity-analysis", "entity-analysis": "outline", outline: "drafting", drafting: "source-review", "source-review": "originality-review", "originality-review": "media-review", "media-review": "editorial-approval", "editorial-approval": "ready-to-publish" };
 const categories: Array<"all" | PlatformCategory> = ["all", "editorial", "professional", "community", "knowledge", "research", "developer", "web-data"];
 const stageLabels: Record<string, string> = {
   intake: "استلام الطلب", planning: "التخطيط", research: "البحث", "entity-analysis": "تحليل الكيانات",
@@ -113,6 +114,7 @@ export default function App() {
   const [objective, setObjective] = useState("analysis");
   const [articles, setArticles] = useState<Article[]>([]);
   const [articleNotice, setArticleNotice] = useState("");
+  const [advancingId, setAdvancingId] = useState<string | null>(null);
   const apiBase = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8787").replace(/\/$/, "");
   const copy = t[locale];
   const budgetValidation = validateResearchBudgetLimits(budget);
@@ -164,7 +166,7 @@ export default function App() {
     finally { setBusy(false); }
   }
 
-  async function createArticle(event: React.FormEvent<HTMLFormElement>) {
+  async function createArticle(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!topic.trim() || !adminToken.trim()) {
       setArticleNotice(locale === "ar" ? "أدخل مفتاح الإدارة وموضوع المقالة أولاً." : "Enter the admin token and article topic first.");
@@ -184,6 +186,24 @@ export default function App() {
       setArticleNotice(locale === "ar" ? "تم إنشاء المهمة في مرحلة الاستلام." : "Task created in the intake stage.");
     } catch (error) { setArticleNotice(error instanceof Error ? error.message : "تعذر الاتصال بالخدمة الخلفية."); }
     finally { setBusy(false); }
+  }
+
+  async function advanceArticle(article: Article) {
+    const nextStage = NEXT_STAGE[article.stage];
+    if (!nextStage || !adminToken.trim()) return;
+    setAdvancingId(article.id); setArticleNotice("");
+    try {
+      const response = await fetch(`${apiBase}/api/v1/workspaces/main-workspace/articles/${encodeURIComponent(article.id)}/stage`, {
+        method: "PUT",
+        headers: { "content-type": "application/json", authorization: `Bearer ${adminToken}` },
+        body: JSON.stringify({ nextStage })
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || "تعذر تحديث مرحلة المقالة");
+      setArticles(current => current.map(item => item.id === article.id ? { ...item, ...payload.article } : item));
+      setArticleNotice(locale === "ar" ? "تم الانتقال إلى المرحلة التالية." : "Article advanced to the next stage.");
+    } catch (error) { setArticleNotice(error instanceof Error ? error.message : "تعذر تحديث المرحلة."); }
+    finally { setAdvancingId(null); }
   }
 
   const navItems = [
@@ -255,7 +275,7 @@ export default function App() {
             </div>
           </div>
           <section className="surface-card article-list-card"><div className="section-heading"><div><span className="tiny-overline">WORK QUEUE</span><h2>{copy.recent}</h2></div><span className="count-badge">{articles.length}</span></div>
-            {articles.length === 0 ? <EmptyArticles copy={copy}/> : <div className="article-table">{articles.map(article=><div className="article-row" key={article.id}><div className="article-file-icon"><FileText size={17}/></div><div className="article-row-main"><b>{article.topic}</b><small>{article.language.toUpperCase()} · {new Date(article.createdAt).toLocaleDateString(locale === "ar" ? "ar-IQ" : "en-US")}</small></div><span className="stage-pill">{(locale==="ar"?stageLabels:enStageLabels)[article.stage] || article.stage}</span></div>)}</div>}
+            {articles.length === 0 ? <EmptyArticles copy={copy}/> : <div className="article-table">{articles.map(article=><div className="article-row" key={article.id}><div className="article-file-icon"><FileText size={17}/></div><div className="article-row-main"><b>{article.topic}</b><small>{article.language.toUpperCase()} · {new Date(article.createdAt).toLocaleDateString(locale === "ar" ? "ar-IQ" : "en-US")}</small></div><span className="stage-pill">{(locale==="ar"?stageLabels:enStageLabels)[article.stage] || article.stage}</span><button className="advance-button" disabled={!NEXT_STAGE[article.stage]||advancingId===article.id||!adminToken.trim()} onClick={()=>advanceArticle(article)}>{advancingId===article.id?copy.loading:(locale==="ar"?"التالي":"Advance")} <ArrowUpLeft size={12}/></button></div>)}</div>}{articleNotice&&<p className="inline-feedback">{articleNotice}</p>}
           </section>
         </section>}
         {view === "registry" && <section className="page-section">
@@ -297,7 +317,7 @@ export default function App() {
   </div>;
 }
 
-function PageHeading({eyebrow,title,subtitle,action}:{eyebrow:string;title:string;subtitle:string;action?:React.ReactNode}) {
+function PageHeading({eyebrow,title,subtitle,action}:{eyebrow:string;title:string;subtitle:string;action?:ReactNode}) {
   return <div className="page-heading"><div><span className="tiny-overline">{eyebrow}</span><h1>{title}</h1><p>{subtitle}</p></div>{action}</div>;
 }
 
