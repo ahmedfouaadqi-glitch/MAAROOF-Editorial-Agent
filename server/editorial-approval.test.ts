@@ -36,4 +36,13 @@ describe("version-bound editorial approval",()=>{
   f.state.tasks.t1.article.stage="drafting";
   expect(()=>recordEditorialReview(f.state,{workspaceId:f.workspaceId,taskId:f.taskId,decision:"changes-requested",reviewerName:"Editor",rationale:"Revise the evidence and improve the second section."})).toThrow("editorial-approval stage");
  });
+ it("returns requested revisions to drafting and blocks rejected articles",()=>{
+  const f=fixture();
+  const revision=recordEditorialReview(f.state,{workspaceId:f.workspaceId,taskId:f.taskId,decision:"changes-requested",reviewerName:"Editor",rationale:"Please clarify the source interpretation and revise the second section."});
+  expect(revision.article.stage).toBe("drafting");
+  f.state.tasks.t1.article.stage="editorial-approval";
+  const rejected=recordEditorialReview(f.state,{workspaceId:f.workspaceId,taskId:f.taskId,decision:"rejected",reviewerName:"Editor",rationale:"This story does not meet the publication's editorial requirements."});
+  expect(rejected.article.stage).toBe("blocked");
+ });
+
 });
