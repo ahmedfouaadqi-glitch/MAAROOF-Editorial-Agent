@@ -13,6 +13,7 @@ import MagazineSubmissionsPanel from "./components/MagazineSubmissionsPanel";
 import { DEFAULT_RESEARCH_BUDGET, validateResearchBudgetLimits, type ResearchBudgetLimits } from "./domain/research-budget";
 import { categoryLabels, modeLabels, platforms, readinessLabels, type PlatformCategory } from "./data/platforms";
 import { adapterRegistry } from "./data/adapter-registry";
+import { magazinePublications } from "./data/magazine-publications";
 
 type View = "home" | "articles" | "registry" | "research-settings" | "ai-visibility" | "magazine-submissions";
 type Article = { id: string; topic: string; language: string; objective: string; stage: string; createdAt: string };
@@ -303,7 +304,7 @@ export default function App() {
           </div>
         </section>}
         {view === "ai-visibility" && <AIVisibilityPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" locale={locale}/>}
-        {view === "magazine-submissions" && <MagazineSubmissionsPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" articles={articles} publications={platforms.filter(p=>p.category==="editorial")} locale={locale}/> }
+        {view === "magazine-submissions" && <MagazineSubmissionsPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" articles={articles} publications={magazinePublications} locale={locale}/> }
         {view === "research-settings" && <section className="page-section">
           <PageHeading eyebrow="SYSTEM CONFIGURATION" title={copy.settingsTitle} subtitle={copy.settingsSub}/>
           <SpotlightCard theme={theme} className="surface-card budget-panel" spotlightColor={theme==="light"?"#b88c54":"#d6ae78"} intensity={0.1} spotlightSize={340}>
