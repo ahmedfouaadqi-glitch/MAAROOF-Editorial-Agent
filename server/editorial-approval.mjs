@@ -19,7 +19,8 @@ export function editorialDraftFingerprint(draft){
  return createHash("sha256").update(normalizeEditorialText(buildDraftReviewText(draft))).digest("hex");
 }
 export function checkEditorialDraftOriginality(state,{workspaceId,taskId}){
- taskFor(state,workspaceId,taskId);
+ const task=taskFor(state,workspaceId,taskId);
+ if(task.article.stage!=="originality-review")fail("Originality check can only be recorded during the originality-review stage",409);
  const draft=draftFor(state,workspaceId,taskId);
  const text=buildDraftReviewText(draft);
  if(text.trim().length<30)fail("Draft must contain at least 30 characters before an originality check");
