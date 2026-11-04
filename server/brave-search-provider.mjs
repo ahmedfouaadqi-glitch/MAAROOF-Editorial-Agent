@@ -7,10 +7,9 @@ export function createBraveSearchProvider({apiKey=process.env.BRAVE_SEARCH_API_K
   id:"brave-web-search",
   async search(request){
    const body={q:request.query,count:Math.min(request.limit,20),safesearch:"moderate"};
-   if(request.country)body.country=request.country;
    if(request.language!=="auto")body.search_lang=request.language;
    const response=await fetchImpl(ENDPOINT,{
-    method:"POST",headers:{"Accept":"application/json","Content-Type":"application/json","X-Subscription-Token":apiKey},
+    method:"POST",headers:{"Accept":"application/json","Content-Type":"application/json","X-Subscription-Token":apiKey,...(request.country?{"x-loc-country":request.country}:{})},
     body:JSON.stringify(body),signal:AbortSignal.timeout(timeoutMs)
    }).catch(error=>{
     if(error?.name==="TimeoutError"||error?.name==="AbortError")throw providerError("Search provider timed out",504);
