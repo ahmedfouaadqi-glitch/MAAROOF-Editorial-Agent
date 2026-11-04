@@ -1,47 +1,50 @@
-# Implementation Roadmap (Supabase deferred)
+# Implementation Roadmap (No Supabase / No Firecrawl)
 
 ## Track A — Platform and editorial contracts
 - [x] React + Vite + TypeScript foundation.
 - [x] Import the 17 user-provided platform records.
 - [x] Separate editorial destinations from communities, repositories, and data sources.
 - [x] Add platform capability profiles and verification checklists.
-- [x] Add a fail-closed publication gate.
+- [x] Add a fail-closed publishing gate.
 - [x] Define editorial task, evidence, claim, draft, and engine interfaces.
 - [ ] Verify current API/publishing policies for each selected target.
 - [ ] Implement and test the first publishing adapter against a site owned by the user.
 
-## Track B — Editorial intelligence (provider-neutral)
-- [x] Implement manual source URL registration with workspace/task association and registration timestamp (content is not fetched).
-- [ ] Implement claim-to-evidence mapping.
-- [ ] Integrate an explicitly selected search provider if live search is required; no Firecrawl or crawler integration is planned.
-- [x] Add configurable research budget model with separate per-article source URL/search/inspect limits.
-- [x] Add an admin screen connected to persisted backend settings.
-- [x] Connect admin budget settings to the standalone Node API and persist them in local JSON.
-- [x] Enforce per-article source URL, search, and inspection reservations in the backend (no crawler is used).
-- [x] Add serialized atomic per-task accounting within one Node API process.
-- [ ] Move persistence to a multi-instance database/transaction store if horizontal scaling is required.
+## Track B — Editorial intelligence without automated crawling
+- [x] Implement manual source URL registration with workspace/task association and timestamps; do not fetch remote contents.
+- [x] Add configurable per-article source URL, search, and inspection quotas (3 / 5 / 5 defaults).
+- [x] Add an admin screen connected to the standalone Node API.
+- [x] Persist limits and task usage in a local JSON store.
+- [x] Enforce source URL registration limits atomically with source insertion.
+- [x] Add idempotent reservation, commit, and release operations for search/inspection quotas.
+- [ ] Connect a selected external search provider if live research is later required; no Firecrawl or crawler integration is planned.
+- [ ] Implement claim-to-evidence mapping and evidence quality review.
 - [ ] Implement entity and search-intent extraction.
-- [ ] Implement outline and bilingual article draft contracts.
-- [ ] Implement originality checks with exact and near-duplicate baselines.
-- [ ] Add deterministic unit tests without paid model calls.
+- [ ] Implement outline and bilingual article draft assembly.
+- [ ] Implement exact and near-duplicate originality checks.
+- [ ] Add deterministic tests for the remaining editorial engines.
 - [ ] Add model-provider interface only after engine contracts are tested.
 
 ## Track C — Independent execution services
-- [x] Standalone Node.js API service with admin bearer-token protection and no database dependency.
-- [ ] Replace shared admin token with real user/workspace authentication before production multi-tenant deployment.
-- [x] Idempotent research budget reservations and local JSON persistence.
-- [ ] Durable job state abstraction and idempotency for long-running editorial tasks.
-- [ ] Isolated Playwright + Chromium worker.
-- [ ] Login handoff and session expiry recovery.
-- [ ] Publication reconciliation and external verification.
+- [x] Standalone Node.js API with admin bearer-token protection.
+- [x] Serialized atomic JSON persistence within one API process.
+- [x] Workspace-scoped research usage and source-reference records.
+- [ ] Add real user authentication and authorization before production multi-tenant deployment.
+- [ ] Add durable editorial task/job lifecycle and recovery.
+- [ ] Add isolated Playwright + Chromium worker only for platforms where browser automation is permitted.
+- [ ] Add login handoff, session expiry recovery, and publication reconciliation.
 
-## Track D — Deferred integrations
-- [ ] Supabase is explicitly excluded from this implementation track.
+## Track D — Explicitly excluded / deferred
+- [x] Supabase excluded from this implementation.
+- [x] Firecrawl and automated crawling excluded.
 - [ ] MAAROOF AI scoped API integration.
-- [ ] Deployment, secrets management, monitoring, and cost ledger.
+- [ ] Production deployment, secrets management, monitoring, and cost ledger.
+- [ ] Multi-instance persistence and atomic cross-process quotas.
 
 ## Acceptance rules
 - A contract or UI status is not proof of a working engine.
+- A registered URL is not proof that its content was fetched or verified.
+- A quota reservation is not proof that a search provider ran.
 - A test fixture is not proof of live external behavior.
-- No platform is publish-enabled until the fail-closed gate can pass on a real authorized account.
+- No platform is publish-enabled until its policy, account, and end-to-end behavior have been verified.
 - No real publication test without explicit approval.
