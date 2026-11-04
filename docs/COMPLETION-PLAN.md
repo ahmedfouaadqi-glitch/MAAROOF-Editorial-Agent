@@ -1,114 +1,127 @@
 # MAAROOF Editorial Agent — Completion Plan
 
-This plan is the acceptance baseline for completing the product end to end. A checked code item means that its implementation exists and has passed the repository's automated checks; it does not imply that a live provider, account, or destination has been connected.
+This plan follows the requested browser-first editorial platform scope. A checked item means code exists; it does not imply a live provider, authorized account or external publication has been verified.
 
 ## Operating constraints
-
-- Keep the React + Vite + TypeScript frontend and standalone Node.js API.
-- Keep Supabase and Firecrawl out of this implementation.
-- Do not make paid model/search requests during CI or automated tests.
-- Keep API keys server-side and never place secrets in Vite variables or source control.
-- Never bypass CAPTCHA, MFA, paywalls, account restrictions, robots directives, or destination policy.
-- Never equate a search result with a verified source, a submitted pitch with acceptance, or an accepted manuscript with publication.
-- Do not merge to `main` or publish to a live destination without explicit authorization.
+- Keep React + Vite + TypeScript and the Lovable/GitHub-compatible frontend.
+- Supabase is excluded.
+- Firecrawl is optional, server-side and controlled by per-article quotas.
+- Article-writing LLM use is deferred; no model calls are part of the current phase.
+- Keep API keys and browser session material out of frontend code.
+- Never bypass CAPTCHA, MFA, account restrictions, robots directives, editorial policy or destination safeguards.
+- Never equate search results with verified sources, a submission with acceptance, or a button click with publication.
+- Do not merge to main or publish to a live destination without explicit authorization.
 
 ## Ordered completion phases
 
-### 0. Baseline, branch integrity, and quality gates
-- Confirm branch, PR head, default-branch diff, current CI, and repository configuration.
-- Run typecheck, unit tests, and production build after each functional milestone.
-- Verify that all new files are on the feature branch and that no unintended source changes remain on the default branch.
-- Acceptance: clean branch ownership, green CI on current PR head, and no undocumented behavior claims.
+### 0. Branch and quality gates
+- Confirm branch, PR head, current CI and repository configuration.
+- Run typecheck, unit tests and production build after each functional milestone.
+- Keep all implementation on the feature branch; do not merge without approval.
+- Acceptance: green CI on the current PR head and no unsupported completion claims.
 
-### 1. Research acquisition and source provenance
-- [x] Provider-neutral search contract with bounded inputs, result normalization, URL filtering, deduplication, and unverified provenance.
-- [x] Optional server-side Brave Web Search adapter; quota-metered API, stored history, and article UI for adding results as manual source references.
-- [ ] Enable a provider using operator-owned credentials and verify one controlled live request.
-- [ ] Add safe, policy-compliant page-content acquisition or a provider content-context adapter; protect against SSRF, private-network access, redirects, oversized responses, and unsupported content.
-- [ ] Add source freshness evaluation, corroboration records, canonical URL handling, and evidence lineage.
-- Acceptance: every fetched/search result retains provider, timestamp, URL, acquisition method, and verification state; failures are visible and metered.
+### 1. Research acquisition, Firecrawl and provenance
+- [x] Provider-neutral bounded search contract and optional Brave adapter.
+- [x] Firecrawl v2 server adapter for search and Markdown scraping.
+- [x] Per-article server-enforced quotas: 3 scrapes, 5 searches and 5 structure inspections by default; limits configurable through admin settings.
+- [x] Store retrieval time, provider, source URL and unverified status.
+- [x] Local structure inspection for word count, headings, links and structural warnings.
+- [ ] Verify live Firecrawl behavior using an operator-owned API key and an explicitly approved controlled test.
+- [ ] Strengthen destination allowlists and DNS/IP controls; current URL validation is not a complete DNS-rebinding defence.
+- [ ] Add canonical URL resolution, freshness evaluation, corroboration and immutable evidence lineage.
+- Acceptance: every search/scrape retains provider, timestamp, URL, acquisition method and verification state; no paid request is made by CI.
 
-### 2. Evidence, claims, entities, and research intelligence
-- [x] Article-scoped source, claim, entity, alias, and relationship registries.
-- [x] Manual excerpt-to-claim records with support/contradiction/context/unclear stances.
-- [x] Deterministic alias matching and conflict summaries.
-- [ ] Add model-assisted NER, entity resolution, multilingual search intent, and relation suggestions behind a provider interface and evaluation set.
-- [ ] Add human adjudication and immutable evidence review history.
-- Acceptance: model suggestions never become verified facts or relations without explicit review; workspace and article isolation are tested.
+### 2. GEO and editorial intelligence
+- [x] Manual sources, claims, source assessment, evidence excerpts and conflict summaries.
+- [x] Article-scoped entities, aliases, deterministic alias matching and explicit relationships.
+- [x] Arabic/English outline and editorial objective scaffolding.
+- [ ] Extend the PostSuggester design patterns into article briefs: language, goal, market, audience, publication fit, output structure and distinct editorial angle.
+- [ ] Implement evaluated entity extraction/resolution, related questions, search intent and semantic topic clusters.
+- [ ] Add evidence-backed GEO readiness diagnostics: entity coverage, evidence coverage, answerability, freshness, structure and editorial distinctiveness.
+- [ ] Keep GEO readiness separate from measured AI search visibility; keyword density alone is not GEO proof.
+- Acceptance: every factual assertion is linked to evidence or flagged; scoring exposes rubric and missing data.
 
-### 3. Article drafting, validation, and editorial approval
-- [x] Arabic/English deterministic outlines and human-editable draft persistence.
-- [x] Structural draft validation baseline and local exact/near-match originality checks.
-- [x] Add an opt-in OpenAI-compatible model adapter and evidence-constrained article drafting service with server-side secrets, explicit invocation, bounded output tokens, atomic per-article request limits, and usage records. No provider is selected or enabled by default.
-- [ ] Add model-assisted NER, entity resolution, multilingual search intent, and relation suggestions behind a provider interface and evaluation set.
-- [ ] Add draft-version snapshots, editorial review decisions, approval freshness, and fail-closed readiness checks.
-- [ ] Add SEO metadata, structured article variants, fact-check coverage, and publication export formats.
-- Acceptance: a draft cannot become ready-to-publish without a current approved review of the exact draft version and completed required checks.
+### 3. Human editing, originality and approval
+- [x] Human-editable article drafts and objective-based outline scaffold.
+- [x] Draft-bound source, originality, media and editorial approval gates.
+- [x] Deterministic exact-match and lexical overlap baseline.
+- [ ] Add semantic similarity and cross-language duplication checks with a validated multilingual corpus.
+- [ ] Compare repeated article angles, entities, claims and narrative structure across workspace, client and brand.
+- [ ] Add article version history and durable review records.
+- [ ] Complete SEO metadata and publication-specific article packaging.
+- Acceptance: same-brand topic overlap is not automatically a duplicate; repeated substance/angle is surfaced for review.
 
-### 4. Media and rights management
-- [ ] Add authenticated upload limits, MIME/content validation, safe file names, malware scanning integration point, and workspace isolation.
-- [ ] Record source, license, creator, attribution, consent/rights notes, crop variants, dimensions, and alt text.
-- [ ] Generate image variants and social thumbnails without overwriting source assets.
-- Acceptance: no asset can be attached to a public post without rights metadata and a human approval state.
+### 4. Media intelligence
+- [ ] Add authenticated upload with size, MIME and content validation, safe filenames and workspace isolation.
+- [ ] Analyze uploaded image content and rank contextual placement against article sections.
+- [ ] Support licensed/authorized image discovery, rights/creator/license/attribution records and human confirmation.
+- [ ] Generate captions, alt text, image dimensions and contextual insertion positions.
+- [ ] Upload and insert selected images through destination browser workflows.
+- Acceptance: each inserted visual has known source and rights state; no unknown-rights asset is silently published.
 
-### 5. CMS publishing
-- [ ] Implement WordPress REST and Ghost Admin API draft adapters using server-side secrets only.
-- [ ] Support create/update draft, idempotency keys, remote-ID persistence, retries, and reconciliation.
-- [ ] Add preview and explicit human publish approval; default remote status is draft.
-- Acceptance: integration tests use mocked APIs; live tests are performed only on an operator-owned test site with explicit authorization.
+### 5. Magazine and destination registry
+- [x] Preserve the user's 17 platform seed records.
+- [x] Separate editorial/self-publishing destinations from developer sites, Q&A communities, encyclopedias, research repositories and data archives.
+- [x] Add candidate editorial publications and submission policy metadata.
+- [ ] Verify current editorial guidelines, eligibility, rights, exclusivity, disclosure, word limits, image rules and submission path for each selected destination.
+- [ ] Add destination-specific browser adapters and capability tests.
+- [ ] Add manual handoff where automated submission is not allowed or not reliable.
+- Acceptance: every destination is tested independently; candidate status is never represented as guaranteed acceptance or an enabled publisher.
 
-### 6. Magazine submission workflow
-- [x] Magazine candidate registry and local pitch/submission lifecycle.
-- [x] Approval and exclusivity gates in the local workflow.
-- [ ] Restore the exact original publication list from the operator's source data.
-- [ ] Verify official policies, rights, exclusivity, format, and submission routes for selected publications.
-- [ ] Add export/send handoff and response tracking; no automated pitch send without explicit approval and credentials.
-- Acceptance: submission status is backed by an actual action record or clearly marked as a manual operator update.
+### 6. Browser Publishing Agent — core outstanding capability
+- [ ] Add independent Node.js Playwright + Chromium worker; never execute browser automation in the Vite frontend.
+- [ ] Build durable job steps and browser session lifecycle per workspace/account/destination.
+- [ ] Open destination website and detect login state.
+- [ ] Pause and display a secure user handoff for login, MFA and CAPTCHA; resume the same task after user completion.
+- [ ] Fill title/body, upload and position images, set categories/tags/byline/disclosure and preview.
+- [ ] Support user-approved publishing, draft-only and manual handoff modes according to destination policy.
+- [ ] Persist screenshots, step logs, external submission/publication IDs and final URL.
+- [ ] Handle expired sessions, network interruptions, timeouts and safe retries without duplicate posts.
+- [ ] Verify external result independently before marking submitted/published.
+- Acceptance: one selected, operator-authorized destination completes an end-to-end browser test. A submission is not considered accepted or published without external evidence.
 
-### 7. Social publishing
-- [x] Platform catalog and capability profiles.
-- [ ] Build platform-specific content variants, constraints, previews, alt text, and media rules.
-- [ ] Implement OAuth/account connections and API adapters for selected networks.
-- [ ] Add scheduling, rate-limit handling, retries, idempotency, post IDs, and post URL reconciliation.
-- Acceptance: live publishing remains disabled until each account, scope, policy, adapter, and verification flow passes an authorized test.
+### 7. Publishing orchestration
+- [x] Local magazine submission records, status model and human approval/exclusivity gates.
+- [ ] Durable job queue, locking, heartbeat, timeout, idempotency and retry policy.
+- [ ] Schedule posts/articles and prevent duplicate submissions across retries and destinations.
+- [ ] Record destination response, editor messages and revision requests.
+- [ ] Reconcile local status against external destination state.
+- Acceptance: retrying after an interruption never creates an unintended duplicate.
 
-### 8. Browser execution worker
-- [ ] Add a separate Playwright/Chromium worker with isolated browser contexts, storage-state encryption, timeouts, and job heartbeats.
-- [ ] Add user handoff for login, CAPTCHA, and MFA; never automate bypass.
-- [ ] Add safe-domain allowlists, navigation/download restrictions, session expiry handling, and publication reconciliation.
-- Acceptance: browser automation is restricted to permitted sites and never runs in the frontend or within the API request process.
+### 8. Workspace, identity and non-Supabase production foundation
+- [ ] Build real user authentication, workspace membership, roles and server-side authorization.
+- [ ] Complete workspace → client → brand → article → destination/account → publishing-job isolation.
+- [ ] Replace the shared admin bearer token for production use.
+- [ ] Replace single-process JSON with a self-managed transactional database and migrations; no Supabase dependency.
+- [ ] Add durable queue and object storage for uploaded images, drafts, screenshots and browser artifacts.
+- [ ] Encrypt external credentials and browser storage state; add secrets management, backups, restore, audit logs and rotation.
+- Acceptance: cross-workspace access, concurrent job, backup/restore and authorization tests pass.
 
-### 9. AI visibility and search discovery monitoring
-- [x] Manual workspace-scoped evidence ledger for crawler fetch, indexing, citations, training attestations, and referrals.
-- [ ] Add authenticated CDN/server log ingestion and provider-published crawler IP validation.
-- [ ] Add Search Console/Bing Webmaster OAuth adapters, canonical/robots/sitemap/schema audits, and AI-answer citation sampling.
-- [ ] Add alerting, evidence retention, and domain ownership controls.
-- Acceptance: crawler fetch, indexing, citation, and training remain separate evidence types with independent proof requirements.
+### 9. MAAROOF AI future API
+- [ ] Define scoped, authenticated, versioned REST endpoints for article requests, context exchange, validation, originality and publication state.
+- [ ] Accept explicit workspace/client/brand identifiers and only authorized context.
+- [ ] Return article versions, evidence references, quota usage, job state and verified publication URLs.
+- [ ] Add idempotency, rate limits, audit logs and optional webhooks.
+- Acceptance: no direct access to MAAROOF AI database; cross-workspace requests are denied.
 
-### 10. Identity, tenancy, jobs, and durable data
-- [ ] Replace the shared admin token as the production identity layer with authenticated users, roles, sessions, and workspace membership.
-- [ ] Bind every task, asset, credential, job, and destination to an authorized workspace identity.
-- [ ] Replace single-process local JSON for production with transactional shared persistence and migrations.
-- [ ] Add durable jobs, retries, idempotency, dead-letter handling, audit events, and recovery.
-- [ ] Add secret management, encryption-at-rest, key rotation, rate limiting, security headers, monitoring, backups, and restore tests.
-- Acceptance: concurrent multi-user tests, tenant-isolation tests, recovery tests, and security review pass before production deployment.
+### 10. Deferred: AI article writing
+- [ ] Revisit model provider selection only after human-authored workflow, cost controls, evidence contracts and article evaluations are complete.
+- [ ] Add evidence-constrained generation with no unsupported facts, quotes, figures or citations.
+- [ ] Add output-quality, bilingual and hallucination evaluation before enabling.
+- Acceptance: explicit product approval, provider credentials and a documented cost ceiling before any paid model call.
 
-### 11. End-to-end acceptance and release
-- [ ] Test the full lifecycle: create brief → search → register sources → review evidence → outline → draft → originality → media → approve → CMS draft → preview → explicit publish → external verification.
-- [ ] Test magazine pitch creation, approval, authorized handoff, editor response, acceptance, and external publication verification.
-- [ ] Test social variants, account authorization, scheduled publishing, and remote post reconciliation.
-- [ ] Test failure paths: quotas, invalid credentials, timeouts, duplicate requests, access denied, session expiry, partial publish, and external rollback/reconciliation.
-- [ ] Run responsive, accessibility, performance, dependency, secret, and security checks.
-- Acceptance: green CI and documented live acceptance evidence for each enabled destination. Any connector without credentials or an authorized target remains clearly marked as not live-enabled.
+### 11. Production acceptance
+- [ ] Test end-to-end: workspace → client/brand context → research → GEO brief → human article editing → source and duplication checks → media → approval → browser login handoff → destination input → publish/submit → external verification.
+- [ ] Test Arabic and English, failed provider calls, exhausted quotas, invalid credentials, CAPTCHA/MFA handoff, browser crashes, session expiry, retries and duplicate prevention.
+- [ ] Run security, performance, responsive, accessibility, dependency and secret scans.
+- Acceptance: green CI plus documented external verification for every enabled destination. Anything untested remains disabled.
 
-## External prerequisites that code cannot supply
+## External prerequisites
+1. Server-side Firecrawl key and approval for controlled live research requests.
+2. Authorized user accounts for any destination selected for browser publishing.
+3. Publication-specific policy/eligibility confirmation and any required editorial approval.
+4. Production host, self-managed database, encrypted secret store and durable job worker.
+5. Future MAAROOF AI API credentials/contract and workspace authorization rules.
+6. A later explicit decision and budget for model-assisted article writing.
 
-1. Search provider account/key and approval to make live search requests.
-2. An authorized model endpoint/key, or a scoped MAAROOF AI integration contract, before model-generated writing and NER can run.
-3. A user-owned WordPress or Ghost test site and scoped application credentials.
-4. OAuth app credentials and test accounts for each selected social network.
-5. The original magazine list and any private submission routes/rules that are not publicly documented.
-6. Workspace-owned domain access, CDN/server logs, and OAuth consent for Search Console/Bing.
-7. A production hosting environment, secret store, persistent database, and operator approval for deployment.
-
-No external prerequisite is assumed to exist until it is provided and verified.
+No prerequisite is assumed to exist until it is supplied and verified.
