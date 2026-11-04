@@ -45,6 +45,19 @@ describe("editorial entity intelligence", () => {
     })).toThrow("matching canonical name or alias");
   });
 
+  it("allows the same real-world label to be separately curated in another article", () => {
+    const state = fixture();
+    createEntity(state, {
+      workspaceId: "workspace-a", taskId: "task-a", canonicalName: "Maaroof",
+      type: "organization", disambiguationNote: "كيان محدد ضمن المقالة الأولى."
+    });
+    const second = createEntity(state, {
+      workspaceId: "workspace-a", taskId: "task-b", canonicalName: "Maaroof",
+      type: "organization", disambiguationNote: "نفس الاسم لكنه سجل مستقل للمقالة الثانية."
+    });
+    expect(second.taskId).toBe("task-b");
+  });
+
   it("scans only registered aliases and links matching claims", () => {
     const state = fixture();
     const entity = createEntity(state, {
