@@ -129,3 +129,41 @@ The current scanner is deliberately limited to exact normalized matches against 
 Metadata completeness is the proportion of seven descriptive fields supplied; it is not a source-trust score. Quality ratings are explicit human editorial judgments and require a written rationale. Dates describe the source or the period in which its information is effective; they are not inferred from a crawl. Conflicting evidence is flagged when an editor has recorded both supporting and contradicting excerpts for the same claim. The system does not decide which side is correct.
 
 All excerpts and source assessments are manually entered. No URL is fetched, no remote page is parsed, and no claim is independently verified by these endpoints. Evidence records remain `manually-transcribed-unverified`.
+
+
+## AI visibility evidence (admin)
+
+All endpoints require the configured admin bearer token.
+
+### List observations
+
+`GET /api/v1/admin/ai-visibility?workspaceId=main-workspace`
+
+Returns workspace-scoped events, summary counters, and limitations. Verified indexing/citation/training counters include only verified events. Crawler fetch counts are observations and do not imply index inclusion, citation, or training.
+
+### Record an observation
+
+`POST /api/v1/admin/ai-visibility/events`
+
+Example body:
+
+```json
+{
+  "workspaceId": "main-workspace",
+  "articleId": "optional-article-id",
+  "url": "https://example.com/article",
+  "eventType": "citation_verified",
+  "provider": "OpenAI",
+  "bot": "OAI-SearchBot",
+  "source": "manual",
+  "observedAt": "2026-11-04T07:00:00.000Z",
+  "evidenceUrl": "https://example.com/evidence",
+  "evidenceNote": "Captured answer visibly links the article URL",
+  "verified": true,
+  "verificationMethod": "admin_manual_review"
+}
+```
+
+Supported event types: `crawler_fetch`, `search_index_verified`, `citation_verified`, `training_attestation`, `referral_visit`.
+
+Verified indexing, citation, and training events require both `evidenceUrl` and `evidenceNote`. Training use must never be inferred from crawler access. The current API records manual evidence; automated access-log, Search Console, Bing Webmaster, and AI-answer integrations are not connected.
