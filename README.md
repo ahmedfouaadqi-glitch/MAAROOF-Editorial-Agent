@@ -93,4 +93,5 @@ No Firecrawl or automated crawler is used. Source URLs are manually registered a
 - Editorial magazines, self-publishing systems, CMS products, social networks, communities, research repositories, and data sources are maintained as distinct destination types. Candidate listing does not imply an active adapter or publication permission.
 
 - [AI visibility monitoring](docs/AI-VISIBILITY-MONITORING.md): separate evidence for AI crawler fetches, search indexing, answer citations, and explicit training attestations. Admin UI and workspace-scoped API event ledger are implemented; live log/search-console/AI-answer adapters remain pending.
-- [Implementation roadmap](docs/IMPLEMENTATION-ROADMAP.md): remaining magazine, social publishing, media, browser-agent, and AI visibility work.
+- [Implementation roadmap](docs/IMPLEMENTATION-ROADMAP.md): implementation checklist by track.
+- [Completion plan](docs/COMPLETION-PLAN.md): ordered end-to-end phases, acceptance criteria, and external prerequisites.
