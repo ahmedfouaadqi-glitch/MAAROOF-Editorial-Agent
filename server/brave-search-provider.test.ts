@@ -9,7 +9,9 @@ describe("Brave web search adapter",()=>{
   expect(result.results[0]).toMatchObject({title:"Result",url:"https://example.org",snippet:"Snippet",publisher:"example.org"});
   expect(fetchImpl.mock.calls[0][0]).toBe("https://api.search.brave.com/res/v1/web/search");
   expect(fetchImpl.mock.calls[0][1].method).toBe("POST");
-  expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({country:"IQ",search_lang:"ar",count:8});
+  expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({search_lang:"ar",count:8});
+  expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).not.toHaveProperty("country");
+  expect(fetchImpl.mock.calls[0][1].headers["x-loc-country"]).toBe("IQ");
   expect(fetchImpl.mock.calls[0][1].headers["X-Subscription-Token"]).toBe("server-only-secret");
  });
  it("maps quota and access failures to sanitized errors",async()=>{
