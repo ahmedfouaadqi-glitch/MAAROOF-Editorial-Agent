@@ -176,7 +176,7 @@ const server = createServer(async (req, res) => {
       return send(res, 200, { submission, externalAction: "none" });
     }
 
-    const searchCollection = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/research\\/searches$/);
+    const searchCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/research\/searches$/);
     if (searchCollection && req.method === "GET") {
       const workspaceId = decodeURIComponent(searchCollection[1]);
       const taskId = decodeURIComponent(searchCollection[2]);
