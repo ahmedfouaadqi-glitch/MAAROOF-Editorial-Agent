@@ -116,6 +116,6 @@ The baseline normalizes Unicode, common Arabic letter variants, diacritics, punc
 - `POST /api/v1/entity-relationships` — register a directed relationship between two article-scoped entities, optionally linked to supporting claim IDs.
 - `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/entity-relationships` — list registered relationships.
 
-Supported entity types: `person`, `organization`, `place`, `product`, `event`, `concept`, `unknown`. Canonical names and aliases are normalized for duplicate detection within a workspace. Entity relationships must reference two distinct entities and any supporting claims must belong to the same workspace and article.
+Supported entity types: `person`, `organization`, `place`, `product`, `event`, `concept`, `unknown`. Canonical names and aliases are normalized for duplicate detection within the same article; separate articles may curate their own entity records. Entity relationships must reference two distinct entities and any supporting claims must belong to the same workspace and article.
 
 The current scanner is deliberately limited to exact normalized matches against aliases entered by an operator. It does not perform named-entity recognition, discover new entities, resolve ambiguous identities across sources, infer relations from prose, or establish that a claim supports a relationship. Relationship evidence states remain `claim-linked-unverified` or `unsubstantiated`.
