@@ -10,6 +10,8 @@ import { assessSource, recordEvidence, listResearch } from "./editorial-research
 import { recordVisibilityEvent, listVisibilityEvents, summarizeVisibility } from "./ai-visibility.mjs";
 import { createMagazineSubmission, listMagazineSubmissions, transitionMagazineSubmission } from "./magazine-submissions.mjs";
 import { buildEditorialOutline, getEditorialDraft, updateEditorialDraft } from "./editorial-drafts.mjs";
+import { executeResearchSearch, validateSearchRequest } from "./research-provider.mjs";
+import { createBraveSearchProvider } from "./brave-search-provider.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "127.0.0.1";
@@ -17,6 +19,9 @@ const adminToken = process.env.ADMIN_API_TOKEN || "";
 const allowedOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
 const dataFile = resolve(process.env.DATA_FILE || "./data/editorial-agent.json");
 const store = new JsonStore(dataFile);
+const searchProvider = process.env.RESEARCH_SEARCH_PROVIDER === "brave"
+  ? createBraveSearchProvider()
+  : null;
 
 function send(res, status, payload) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
@@ -63,7 +68,7 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     if (req.method === "GET" && url.pathname === "/health") {
-      return send(res, 200, { ok: true, service: "maaroof-editorial-api", persistence: "local-json", integrations: { supabase: false, firecrawl: false } });
+      return send(res, 200, { ok: true, service: "maaroof-editorial-api", persistence: "local-json", integrations: { supabase: false, firecrawl: false, liveSearch: Boolean(searchProvider), searchProvider: searchProvider?.id || null } });
     }
 
     requireAdmin(req);
@@ -169,6 +174,49 @@ const server = createServer(async (req, res) => {
         note: body.note
       }));
       return send(res, 200, { submission, externalAction: "none" });
+    }
+
+    const searchCollection = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/research\\/searches$/);
+    if (searchCollection && req.method === "GET") {
+      const workspaceId = decodeURIComponent(searchCollection[1]);
+      const taskId = decodeURIComponent(searchCollection[2]);
+      const state = await store.read();
+      const task = state.tasks?.[taskId];
+      if (!task || task.workspaceId !== workspaceId || !task.article) return send(res, 404, { error: "Editorial task not found" });
+      const searches = (state.researchSearches || []).filter(item => item.workspaceId === workspaceId && item.taskId === taskId);
+      return send(res, 200, { searches, usage: task.usage || { search: 0 }, limitations: ["Search results are discovery leads, not verified evidence."] });
+    }
+    if (req.method === "POST" && searchCollection) {
+      if (!searchProvider) return send(res, 503, { error: "Live search is disabled. Configure RESEARCH_SEARCH_PROVIDER=brave and BRAVE_SEARCH_API_KEY on the server." });
+      const body = await readJson(req);
+      const workspaceId = decodeURIComponent(searchCollection[1]);
+      const taskId = decodeURIComponent(searchCollection[2]);
+      const checked = validateSearchRequest(body);
+      const state = await store.read();
+      const task = state.tasks?.[taskId];
+      if (!task || task.workspaceId !== workspaceId || !task.article) return send(res, 404, { error: "Editorial task not found" });
+      const reservationId = "search-" + randomUUID();
+      const reservation = await store.transact(current => reserveBudget(current, {
+        workspaceId, taskId, operation: "search", units: 1, reservationId
+      }));
+      if (!reservation.allowed) return send(res, 429, { error: "Per-article search limit reached", quota: reservation });
+      let result;
+      try {
+        result = await executeResearchSearch(checked, { provider: searchProvider });
+      } catch (error) {
+        // Count a provider attempt conservatively: a timeout may occur after the request reached the provider.
+        await store.transact(current => commitReservation(current, { workspaceId, taskId, reservationId }));
+        throw error;
+      }
+      await store.transact(current => {
+        commitReservation(current, { workspaceId, taskId, reservationId });
+        current.researchSearches ||= [];
+        current.researchSearches.push({
+          id: randomUUID(), workspaceId, taskId, ...result, reservationId,
+          recordedAt: new Date().toISOString()
+        });
+      });
+      return send(res, 200, { result, quota: reservation, verification: "unverified-search-results" });
     }
 
     const reservationMatch = url.pathname.match(/^\/api\/v1\/tasks\/([^/]+)\/research-reservations$/);
