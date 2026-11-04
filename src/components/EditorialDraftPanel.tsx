@@ -18,7 +18,7 @@ export default function EditorialDraftPanel({apiBase,token,workspaceId,taskId,lo
  {draft.sections.map((section,i)=><div key={section.id} style={{display:"grid",gap:8,marginTop:14}}><label className="budget-field"><span>{ar?"عنوان القسم":"Section heading"} {i+1}</span><input value={section.heading} onChange={e=>setDraft({...draft,sections:draft.sections.map(x=>x.id===section.id?{...x,heading:e.target.value}:x)})}/></label><p className="muted">{section.brief}</p><textarea rows={5} value={section.body} placeholder={ar?"أدخل نصاً محرراً ومدعوماً بالمصادر...":"Enter human-edited, source-supported copy..."} onChange={e=>setDraft({...draft,sections:draft.sections.map(x=>x.id===section.id?{...x,body:e.target.value}:x)})}/></div>)}
  <div className="form-pair"><label className="budget-field"><span>Meta title</span><input value={draft.metaTitle||""} onChange={e=>setDraft({...draft,metaTitle:e.target.value})}/></label><label className="budget-field"><span>Meta description</span><input value={draft.metaDescription||""} onChange={e=>setDraft({...draft,metaDescription:e.target.value})}/></label></div>
  <button className="primary-button" disabled={busy} onClick={save}><Save size={15}/>{ar?"حفظ المسودة":"Save draft"}</button>
- <p className="form-note">{ar?"المخطط حتمي فقط. لا يوجد اتصال بنموذج لغوي أو بحث حي في هذه المرحلة.":"Deterministic scaffold only. No LLM provider or live search is connected in this phase."}</p>
+ <p className="form-note">{ar?"المخطط حتمي فقط. البحث الحي اختياري ويُضبط من الخادم بصورة مستقلة؛ لم يتم ربط الكتابة بنموذج لغوي.":"Deterministic outline only. Live search is optional and enabled separately by server configuration; AI writing is not connected."}</p>
  </>}
  {notice&&<p className="inline-feedback">{notice}</p>}</section>;
 }
