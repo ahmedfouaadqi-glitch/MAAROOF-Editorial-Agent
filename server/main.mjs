@@ -151,7 +151,7 @@ const server = createServer(async (req, res) => {
       return send(res, 201, { claim });
     }
 
-    const entitiesMatch = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/entities$/);
+    const entitiesMatch = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/entities$/);
     if (entitiesMatch && req.method === "GET") {
       const workspaceId = decodeURIComponent(entitiesMatch[1]);
       const taskId = decodeURIComponent(entitiesMatch[2]);
@@ -170,8 +170,8 @@ const server = createServer(async (req, res) => {
       const result = await store.transact(state => scanKnownEntities(state, body));
       return send(res, 200, { result });
     }
-    if (req.method === "GET" && url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/entity-relationships$/)) {
-      const match = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/entity-relationships$/);
+    if (req.method === "GET" && url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/entity-relationships$/)) {
+      const match = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/entity-relationships$/);
       const state = await store.read();
       return send(res, 200, { relationships: listEntityRelationships(state, decodeURIComponent(match[1]), decodeURIComponent(match[2])) });
     }
