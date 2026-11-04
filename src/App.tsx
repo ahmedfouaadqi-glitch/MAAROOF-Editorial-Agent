@@ -251,7 +251,7 @@ export default function App() {
       </header>
 
       <div className="page-content">
-        {view === "home" && <HomeView copy={copy} articles={articles} onCreate={() => setView("articles")} onRegistry={() => setView("registry")} onViewAll={() => setView("articles")} locale={locale}/>}
+        {view === "home" && <HomeView copy={copy} articles={articles} onCreate={() => setView("articles")} onRegistry={() => setView("registry")} onViewAll={() => setView("articles")} locale={locale} theme={theme}/>}
         {view === "articles" && <section className="page-section">
           <PageHeading eyebrow="EDITORIAL WORKFLOW" title={copy.newTitle} subtitle={copy.newSub} action={<span className="status-chip"><span className="status-dot"/> API workspace</span>}/>
           <div className="article-layout">
@@ -321,7 +321,7 @@ function PageHeading({eyebrow,title,subtitle,action}:{eyebrow:string;title:strin
   return <div className="page-heading"><div><span className="tiny-overline">{eyebrow}</span><h1>{title}</h1><p>{subtitle}</p></div>{action}</div>;
 }
 
-function HomeView({copy,articles,onCreate,onRegistry,onViewAll,locale}:{copy:typeof t.ar;articles:Article[];onCreate:()=>void;onRegistry:()=>void;onViewAll:()=>void;locale:Locale}) {
+function HomeView({copy,articles,onCreate,onRegistry,onViewAll,locale,theme}:{copy:typeof t.ar;articles:Article[];onCreate:()=>void;onRegistry:()=>void;onViewAll:()=>void;locale:Locale;theme:"light"|"dark"}) {
   const metrics=[
     {label:copy.platforms,value:String(platforms.length).padStart(2,"0"),note:locale==="ar"?"ضمن سجل المنصات":"In platform registry",icon:Globe2},
     {label:copy.destinations,value:String(platforms.filter(p=>p.category==="editorial").length).padStart(2,"0"),note:locale==="ar"?"مجلات ومدونات":"Magazines & blogs",icon:BookOpenText},
@@ -332,7 +332,7 @@ function HomeView({copy,articles,onCreate,onRegistry,onViewAll,locale}:{copy:typ
   return <section className="home-view">
     <PageHeading eyebrow={copy.eyebrow} title={copy.title} subtitle={copy.subtitle} action={<span className="status-chip"><span className="status-dot"/>{copy.ready}</span>}/>
     <div className="hero-grid">
-      <SpotlightCard theme="light" className="hero-card" spotlightColor="#c9a477" intensity={0.13} spotlightSize={390} softness={0.75} borderGlow={0.25}>
+      <SpotlightCard theme={theme} className="hero-card" spotlightColor="#c9a477" intensity={0.13} spotlightSize={390} softness={0.75} borderGlow={0.25}>
         <div className="hero-copy"><div className="hero-kicker"><span className="hero-kicker-dot"/>{locale==="ar"?"منظومة تحريرية ذكية":"INTELLIGENT EDITORIAL SYSTEM"}</div><h2>{locale==="ar"?<>حوّل الفكرة إلى<br/><em>قصة موثّقة.</em></>:<>Turn ideas into<br/><em>verified stories.</em></>}</h2><p>{locale==="ar"?"من التخطيط والبحث إلى الكتابة والمراجعة والنشر المنضبط — في مساحة عمل واحدة.":"Plan, research, write, review, and publish responsibly — all in one workspace."}</p><div className="hero-actions"><button className="primary-button" onClick={onCreate}><Plus size={16}/>{copy.create}<ArrowLeft size={15}/></button><button className="secondary-button" onClick={onRegistry}>{copy.explore}<ArrowUpLeft size={14}/></button></div><div className="hero-trust"><span><CheckCircle2 size={14}/>{locale==="ar"?"مراجعة بشرية":"Human review"}</span><span><ShieldCheck size={14}/>{locale==="ar"?"نشر موثّق":"Verified publishing"}</span></div></div>
         <div className="hero-visual"><EditorialVector/></div>
         <div className="hero-bottomline"><span>MAAROOF / EDITORIAL OS</span><span>01 — 11 / WORKFLOW</span></div>
@@ -342,7 +342,7 @@ function HomeView({copy,articles,onCreate,onRegistry,onViewAll,locale}:{copy:typ
         <div className="quick-action-card surface-card"><span className="tiny-overline">{copy.quick}</span><button onClick={onCreate}><span className="quick-icon"><FilePlus2 size={16}/></span><span><b>{copy.newArticle}</b><small>{locale==="ar"?"ابدأ مهمة تحريرية جديدة":"Start an editorial task"}</small></span><ArrowUpLeft size={15}/></button><button onClick={onRegistry}><span className="quick-icon"><Library size={16}/></span><span><b>{copy.platformRegistry}</b><small>{locale==="ar"?"راجع وجهات النشر":"Review publishing destinations"}</small></span><ArrowUpLeft size={15}/></button></div>
       </div>
     </div>
-    <div className="metrics-grid">{metrics.map((item,i)=><SpotlightCard key={item.label} theme="light" className="metric-card" spotlightColor="#b98d5b" intensity={0.1} spotlightSize={200} borderGlow={0.12}><div className="metric-top"><span>{item.label}</span><item.icon size={17}/></div><strong>{item.value}</strong><small>{item.note}</small><span className="metric-index">0{i+1}</span></SpotlightCard>)}</div>
+    <div className="metrics-grid">{metrics.map((item,i)=><SpotlightCard key={item.label} theme={theme} className="metric-card" spotlightColor="#b98d5b" intensity={0.1} spotlightSize={200} borderGlow={0.12}><div className="metric-top"><span>{item.label}</span><item.icon size={17}/></div><strong>{item.value}</strong><small>{item.note}</small><span className="metric-index">0{i+1}</span></SpotlightCard>)}</div>
     <div className="home-lower-grid">
       <section className="surface-card pipeline-card"><div className="section-heading"><div><span className="tiny-overline">EDITORIAL PIPELINE</span><h2>{copy.workflow}</h2><p>{copy.workflowSub}</p></div><span className="pipeline-count">11 {locale==="ar"?"مرحلة":"stages"}</span></div><div className="pipeline-rail">{stages.map((stage,i)=><div className={i===0?"pipeline-step active":"pipeline-step"} key={stage}><span className="pipeline-step-dot">{i===0?"01":String(i+1).padStart(2,"0")}</span><small>{stage}</small>{i!==stages.length-1&&<i/>}</div>)}</div><div className="pipeline-caption"><span><i className="legend-dot active-dot"/> {locale==="ar"?"المرحلة المهيأة":"Defined stage"}</span><span><i className="legend-dot"/> {locale==="ar"?"محركات قيد التنفيذ":"Engines pending"}</span></div></section>
       <section className="surface-card recent-card"><div className="section-heading"><div><span className="tiny-overline">WORK QUEUE</span><h2>{copy.recent}</h2></div><button className="text-action" onClick={onViewAll}>{copy.viewAll}<ArrowUpLeft size={14}/></button></div>{articles.length===0?<EmptyArticles copy={copy}/>:<div className="recent-list">{articles.slice(0,4).map(article=><div className="recent-item" key={article.id}><span className="recent-file"><FileText size={16}/></span><span><b>{article.topic}</b><small>{(locale==="ar"?stageLabels:enStageLabels)[article.stage]||article.stage}</small></span><ArrowUpLeft size={14}/></div>)}</div>}</section>
