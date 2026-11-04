@@ -2,12 +2,14 @@ export type ResearchOperation = "source" | "scrape" | "search" | "inspect";
 
 export interface ResearchBudgetLimits {
   sourceUrlsPerArticle: number;
+  scrapesPerArticle: number;
   searchesPerArticle: number;
   inspectionsPerArticle: number;
 }
 
 export interface ResearchUsage {
   source: number;
+  scrape: number;
   search: number;
   inspect: number;
 }
@@ -23,6 +25,7 @@ export interface ResearchBudgetDecision {
 
 export const DEFAULT_RESEARCH_BUDGET: Readonly<ResearchBudgetLimits> = Object.freeze({
   sourceUrlsPerArticle: 3,
+  scrapesPerArticle: 3,
   searchesPerArticle: 5,
   inspectionsPerArticle: 5
 });
@@ -44,15 +47,15 @@ export function getResearchLimit(
   operation: ResearchOperation
 ): number {
   if (operation === "source") return limits.sourceUrlsPerArticle;
+  if (operation === "scrape") return limits.scrapesPerArticle;
   if (operation === "search") return limits.searchesPerArticle;
   return limits.inspectionsPerArticle;
 }
 
 /**
- * Per-task budget guard. For source, reserve the number of target URLs, not the
- * number of HTTP requests. Search and inspect reserve one unit per operation.
- * This in-memory implementation is suitable for a single-process prototype.
- * Production workers must inject a durable atomic store to coordinate replicas.
+ * Per-task budget guard. Source URLs, scrapes, searches and inspections are
+ * counted independently. This in-memory implementation is suitable only for
+ * a single-process prototype; production workers need a durable atomic store.
  */
 export class ResearchBudgetLedger {
   private readonly usage = new Map<string, ResearchUsage>();
