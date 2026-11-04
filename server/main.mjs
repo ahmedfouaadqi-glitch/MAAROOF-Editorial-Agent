@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { JsonStore } from "./store.mjs";
 import { DEFAULT_LIMITS, validateLimits, reserveBudget, releaseReservation, commitReservation } from "./research-budget.mjs";
 import { createEditorialTask, listEditorialTasks, advanceEditorialTask } from "./editorial-tasks.mjs";
+import { registerClaim, listClaims, checkOriginality } from "./editorial-evidence.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "127.0.0.1";
@@ -133,6 +134,27 @@ const server = createServer(async (req, res) => {
       const state = await store.read();
       const sources = state.sources.filter(source => source.workspaceId === workspaceId && source.taskId === taskId);
       return send(res, 200, { sources });
+    }
+
+    const claimsMatch = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/claims$/);
+    if (claimsMatch && req.method === "GET") {
+      const workspaceId = decodeURIComponent(claimsMatch[1]);
+      const taskId = decodeURIComponent(claimsMatch[2]);
+      const state = await store.read();
+      return send(res, 200, listClaims(state, workspaceId, taskId));
+    }
+    if (req.method === "POST" && url.pathname === "/api/v1/claims") {
+      const body = await readJson(req);
+      validateScope(body);
+      const claim = await store.transact(state => registerClaim(state, body));
+      return send(res, 201, { claim });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/v1/originality/check") {
+      const body = await readJson(req);
+      validateScope(body);
+      const result = await store.transact(state => checkOriginality(state, body));
+      return send(res, 200, { result });
     }
 
     if (req.method === "POST" && url.pathname === "/api/v1/sources") {
