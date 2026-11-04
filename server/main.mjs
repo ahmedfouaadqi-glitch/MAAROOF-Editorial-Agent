@@ -110,17 +110,26 @@ const server = createServer(async (req, res) => {
       let parsed;
       try { parsed = new URL(body.url); } catch { return send(res, 400, { error: "Invalid source URL" }); }
       if (!["http:", "https:"].includes(parsed.protocol)) return send(res, 400, { error: "Only HTTP(S) source URLs are accepted" });
-      const source = {
-        id: randomUUID(), workspaceId: body.workspaceId, taskId: body.taskId,
-        url: parsed.toString(), title: typeof body.title === "string" ? body.title.slice(0, 300) : "",
-        notes: typeof body.notes === "string" ? body.notes.slice(0, 4000) : "",
-        submittedBy: "admin", retrievedAt: new Date().toISOString(),
-        acquisition: "user-supplied-reference", fetched: false, quotaReservationId: `source-${sourceId}`
-      };
-      await store.transact(state => { state.sources.push(source); });
-      return send(res, 201, { source, fetched: false, note: "Source URL registered only. No crawler or remote fetch was executed." });
+      const sourceId = randomUUID();
+      const result = await store.transact(state => {
+        const quota = reserveBudget(state, {
+          workspaceId: body.workspaceId, taskId: body.taskId, operation: "source",
+          units: 1, reservationId: `source-${sourceId}`
+        });
+        if (!quota.allowed) return { quota, source: null };
+        const source = {
+          id: sourceId, workspaceId: body.workspaceId, taskId: body.taskId,
+          url: parsed.toString(), title: typeof body.title === "string" ? body.title.slice(0, 300) : "",
+          notes: typeof body.notes === "string" ? body.notes.slice(0, 4000) : "",
+          submittedBy: "admin", registeredAt: new Date().toISOString(),
+          acquisition: "user-supplied-reference", fetched: false, quotaReservationId: `source-${sourceId}`
+        };
+        state.sources.push(source);
+        return { quota, source };
+      });
+      if (!result.source) return send(res, 429, { error: "Per-article source URL limit reached", quota: result.quota });
+      return send(res, 201, { source: result.source, fetched: false, note: "Source URL registered only. No crawler or remote fetch was executed." });
     }
-
     return send(res, 404, { error: "Not found" });
   } catch (error) {
     return send(res, error.status || 500, { error: error.message || "Internal server error" });
