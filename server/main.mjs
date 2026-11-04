@@ -17,7 +17,6 @@ import { runMeteredResearchScrape } from "./research-scrape-service.mjs";
 import { runResearchInspection } from "./research-inspection.mjs";
 import { checkEditorialDraftOriginality, getEditorialApproval, recordEditorialReview } from "./editorial-approval.mjs";
 import { getCurrentMediaReview, recordMediaReview } from "./editorial-media.mjs";
-import { createOpenAICompatibleProvider } from "./model-provider.mjs";
 import { runEditorialDraftGeneration } from "./editorial-writing.mjs";
 
 const port = Number(process.env.PORT || 8787);
@@ -32,9 +31,9 @@ const searchProvider = process.env.RESEARCH_SEARCH_PROVIDER === "firecrawl"
   : process.env.RESEARCH_SEARCH_PROVIDER === "brave"
     ? createBraveSearchProvider()
     : null;
-const modelProvider = process.env.ENABLE_MODEL_GENERATION === "true"
-  ? createOpenAICompatibleProvider()
-  : null;
+// Article-writing model calls are deferred by product decision. Keep the service disabled
+// regardless of environment flags until a later, explicitly approved phase.
+const modelProvider = null;
 const configuredModelTokens = Number(process.env.MODEL_MAX_OUTPUT_TOKENS || 3000);
 const modelMaxOutputTokens = Number.isSafeInteger(configuredModelTokens) && configuredModelTokens >= 256 && configuredModelTokens <= 8192 ? configuredModelTokens : 3000;
 const configuredModelRequests = Number(process.env.MODEL_REQUESTS_PER_ARTICLE || 2);
