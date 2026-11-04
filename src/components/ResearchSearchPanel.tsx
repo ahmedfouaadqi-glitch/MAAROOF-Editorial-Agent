@@ -25,7 +25,7 @@ export default function ResearchSearchPanel({apiBase,token,workspaceId,taskId,la
  return <section className="surface-card evidence-panel" style={{marginTop:16}}>
   <div className="section-heading"><div><span className="tiny-overline">LIVE RESEARCH</span><h2>{ar?"البحث عن مصادر للمقالة":"Find article sources"}</h2><p>{ar?"بحث حي اختياري بمزود خارجي مضبوط في الخادم":"Optional live search through a server-configured provider"}</p></div><Globe2 size={18}/></div>
   <form className="evidence-form" onSubmit={search}>
-   <textarea required minLength={2} maxLength={500} rows={2} value={query} onChange={e=>setQuery(e.target.value)} placeholder={ar?"اكتب سؤال البحث أو الكلمات المفتاحية...":"Enter a research question or keywords..."}/>
+   <textarea required minLength={2} maxLength={400} rows={2} value={query} onChange={e=>setQuery(e.target.value)} placeholder={ar?"اكتب سؤال البحث أو الكلمات المفتاحية...":"Enter a research question or keywords..."}/>
    <div className="form-pair"><label>{ar?"لغة النتائج":"Result language"}<select value={language} disabled><option value="ar">العربية</option><option value="en">English</option></select></label><label>{ar?"السوق / الدولة":"Market / country"}<select value={country} onChange={e=>setCountry(e.target.value)}>{[["IQ","العراق / Iraq"],["AE","الإمارات / UAE"],["SA","السعودية / Saudi Arabia"],["US","United States"],["GB","United Kingdom"],["TR","Türkiye"],["JO","Jordan"],["EG","Egypt"]].map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label></div>
    <button className="primary-button" disabled={busy||!token.trim()}>{busy?<LoaderCircle size={15} className="spin"/>:<Search size={15}/>}{ar?"تنفيذ البحث":"Run search"}</button>
   </form>
