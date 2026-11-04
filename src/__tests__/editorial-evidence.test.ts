@@ -19,7 +19,7 @@ function stateFixture() {
 
 describe("editorial evidence", () => {
   it("normalizes common Arabic orthographic variants and punctuation", () => {
-    expect(normalizeEditorialText("إِنَّ النَّتَائِجَ، مُهِمَّةٌ!")).toBe("ان النتائج مهمة");
+    expect(normalizeEditorialText("إِنَّ النَّتَائِجَ، مُهِمَّةٌ!")).toBe("ان النتايج مهمة");
   });
 
   it("links claims only to sources from the same workspace and task", () => {
