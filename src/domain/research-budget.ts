@@ -1,4 +1,4 @@
-export type ResearchOperation = "source" | "search" | "inspect";
+export type ResearchOperation = "source" | "scrape" | "search" | "inspect";
 
 export interface ResearchBudgetLimits {
   sourceUrlsPerArticle: number;
@@ -74,7 +74,7 @@ export class ResearchBudgetLedger {
 
   getUsage(taskId: string): ResearchUsage {
     const current = this.usage.get(taskId);
-    return current ? { ...current } : { source: 0, search: 0, inspect: 0 };
+    return current ? { ...current } : { source: 0, scrape: 0, search: 0, inspect: 0 };
   }
 
   reserve(taskId: string, operation: ResearchOperation, units = 1): ResearchBudgetDecision {
