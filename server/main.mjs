@@ -274,7 +274,7 @@ const server = createServer(async (req, res) => {
       return send(res, 200, outcome);
     }
 
-    const scrapeCollection = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/research\\/scrapes$/);
+    const scrapeCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/research\/scrapes$/);
     if (scrapeCollection && req.method === "GET") {
       const workspaceId = decodeURIComponent(scrapeCollection[1]);
       const taskId = decodeURIComponent(scrapeCollection[2]);
@@ -300,7 +300,7 @@ const server = createServer(async (req, res) => {
       return send(res, 200, outcome);
     }
 
-    const inspectionCollection = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/research\\/inspections$/);
+    const inspectionCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/research\/inspections$/);
     if (inspectionCollection && req.method === "GET") {
       const workspaceId = decodeURIComponent(inspectionCollection[1]);
       const taskId = decodeURIComponent(inspectionCollection[2]);
@@ -468,5 +468,5 @@ const server = createServer(async (req, res) => {
 await store.init();
 server.listen(port, host, () => {
   console.log(`MAAROOF Editorial API listening on http://${host}:${port}`);
-  console.log("Supabase: disabled | Firecrawl: disabled | Persistence: local JSON");
+  console.log(`Supabase: disabled | Firecrawl: ${firecrawlProvider ? "enabled" : "disabled"} | Persistence: local JSON`);
 });
