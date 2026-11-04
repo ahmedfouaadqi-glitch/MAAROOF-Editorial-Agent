@@ -183,6 +183,17 @@ Each provider attempt consumes one per-article search quota. Provider failures a
 
 The adapter is disabled by default. No credentials, live requests, or paid API calls are part of CI. Provider plans and pricing can change; check the provider dashboard before enabling it.
 
+## Opt-in model-assisted article drafting
+
+- `POST /api/v1/workspaces/:workspaceId/tasks/:taskId/draft/generate` — explicitly request a model-assisted draft while the article is in the `drafting` stage.
+- `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/model-usage` — list per-article generation attempts and token counts.
+
+The feature is disabled by default. Enable it only on the server with `ENABLE_MODEL_GENERATION=true`, `MODEL_API_BASE_URL`, `MODEL_API_KEY`, and `MODEL_NAME`. The adapter uses an OpenAI-compatible chat-completions endpoint; local HTTP is allowed only for loopback development, while remote endpoints must use HTTPS. The API key is never exposed to the browser. `MODEL_MAX_OUTPUT_TOKENS` defaults to 3000 and `MODEL_REQUESTS_PER_ARTICLE` defaults to 2 (configurable from 1 to 10).
+
+Generation requires an outline, assessed sources, claims linked to sources, and manually recorded evidence excerpts. The model receives only those records; it does not fetch remote pages. Every generated section must return evidence IDs and claim IDs already present in the article, and the service rejects unknown or mismatched references. Model attempts are reserved atomically before the outbound call and retained as usage records on success, provider failure, invalid output, or stale-draft conflict. Token usage is stored when returned. Cost remains null because provider/model pricing is not configured by this service.
+
+Model generation is invoked only by an explicit user action. Tests use mocked providers and do not make live or paid requests. Generated text is still an unverified draft and requires source review, originality checking, media review, and human editorial approval. No model is selected or enabled by default.
+
 ## Editorial outline and draft workspace
 - `POST /api/v1/workspaces/:workspaceId/tasks/:taskId/draft` — create or regenerate an objective-based structural outline.
 - `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/draft` — retrieve the saved outline/draft.
