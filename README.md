@@ -7,7 +7,7 @@ Lovable-compatible editorial production and verified publishing platform.
 - No Supabase or managed database is used. The current API prototype persists JSON locally.
 - Application service: independent Node.js HTTP API with serialized, atomic single-process JSON writes. It is not horizontally scalable.
 - Browser publishing: isolated Playwright + Chromium runtime (planned; not implemented yet). Browser automation must never run in the frontend.
-- AI: provider-agnostic gateway (planned). No paid model calls are made by the current foundation.
+- AI: optional OpenAI-compatible server-side adapter for evidence-constrained article drafting. Disabled by default; explicit user action is required, and per-article requests are capped. No model provider or API key is selected in the repository.
 - MAAROOF AI remains a separate system; integration is through scoped, authenticated APIs only.
 
 ## Current implementation
@@ -31,7 +31,7 @@ See [API route documentation](docs/API.md) for task creation, source registratio
 - Supabase and managed database services.
 - Firecrawl, automated crawling, remote URL fetching, and scraping services.
 - Optional Brave Web Search adapter is available behind server-only configuration. It remains disabled unless RESEARCH_SEARCH_PROVIDER=brave and BRAVE_SEARCH_API_KEY are set; explicit search requests are quota-metered, and results are labeled unverified. Builds and tests do not send search requests.
-- Paid model calls and provider credentials.
+- No model credentials or provider are supplied; live model generation remains disabled until the operator configures server-only settings. CI uses mocked providers and makes no model calls.
 - Real publishing adapters, Playwright runtime, MAAROOF AI integration, and external publication verification.
 
 ## Local development
@@ -72,7 +72,7 @@ The API defaults to `http://127.0.0.1:8787`. Set `HOST=0.0.0.0` only when the se
 - Do not use research repositories, Q&A communities, or data archives as generic promotional publishing destinations.
 
 ## Research acquisition policy
-No Firecrawl or automated crawler is used. Source URLs are manually registered and are not fetched. Search and inspection quotas are reserved by backend API endpoints, but no live search or inspection provider is currently connected.
+No Firecrawl or automated crawler is used. Source URLs remain manually registered and are not fetched. An optional Brave search adapter is available when server-side credentials are configured; search results remain unverified discovery leads. Content fetching and independent source verification are not yet implemented.
 
 ### Entity intelligence baseline
 - Register article-scoped people, organizations, places, products, events, concepts, or unknown entities with aliases and a disambiguation note.
