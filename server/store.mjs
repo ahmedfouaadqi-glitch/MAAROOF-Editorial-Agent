@@ -3,7 +3,7 @@ import { dirname } from "node:path";
 
 const EMPTY = {
   version: 1,
-  limits: { crawlUrlsPerArticle: 3, searchesPerArticle: 5, inspectionsPerArticle: 5 },
+  limits: { sourceUrlsPerArticle: 3, searchesPerArticle: 5, inspectionsPerArticle: 5 },
   tasks: {},
   sources: []
 };
