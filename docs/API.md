@@ -173,6 +173,16 @@ Verified indexing, citation, and training events require both `evidenceUrl` and 
 
 
 
+## Live article research search (optional server integration)
+- `POST /api/v1/workspaces/:workspaceId/tasks/:taskId/research/searches` — execute one quota-metered query when the optional search provider is configured.
+- `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/research/searches` — read stored search runs for the same task.
+
+The current adapter is Brave Web Search. Configure `RESEARCH_SEARCH_PROVIDER=brave` and `BRAVE_SEARCH_API_KEY` on the server only. The key is never sent to the browser. The service follows Brave's documented POST endpoint, sends the token in `X-Subscription-Token`, and supports Arabic/English query language. The selected two-letter country is sent as the `x-loc-country` request context header; it is a location hint, not a strict country-only filter. The query itself may include the target market to refine it.
+
+Each provider attempt consumes one per-article search quota. Provider failures are counted conservatively because a timeout may occur after the provider receives the request. Search results are saved with retrieval time and provider provenance, normalized to HTTP(S), and labeled `search-result-unverified`. They are discovery leads only. The remote page is not fetched or verified. The UI can register a result as an article source, which still remains a manual reference.
+
+The adapter is disabled by default. No credentials, live requests, or paid API calls are part of CI. Provider plans and pricing can change; check the provider dashboard before enabling it.
+
 ## Editorial outline and draft workspace
 - `POST /api/v1/workspaces/:workspaceId/tasks/:taskId/draft` — create or regenerate an objective-based structural outline.
 - `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/draft` — retrieve the saved outline/draft.
