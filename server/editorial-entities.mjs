@@ -37,7 +37,7 @@ export function createEntity(state, { workspaceId, taskId, canonicalName, type, 
   const labels = [...new Set([canonicalName, ...aliases].map(label => label.trim()))];
   const normalizedAliases = [...new Set(labels.map(normalizeEntityLabel).filter(Boolean))];
   state.entities ||= [];
-  const collision = state.entities.find(entity => entity.workspaceId === workspaceId && entity.normalizedAliases.some(alias => normalizedAliases.includes(alias)));
+  const collision = state.entities.find(entity => entity.workspaceId === workspaceId && entity.taskId === taskId && entity.normalizedAliases.some(alias => normalizedAliases.includes(alias)));
   if (collision) fail("An entity with a matching canonical name or alias already exists in this workspace", 409);
   const entity = {
     id: randomUUID(), workspaceId, taskId, canonicalName: canonicalName.trim(), type,
