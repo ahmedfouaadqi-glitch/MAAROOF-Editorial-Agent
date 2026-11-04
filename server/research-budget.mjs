@@ -56,8 +56,8 @@ export function reserveBudget(state, { taskId, workspaceId, operation, units = 1
   const task = ensureTask(state, taskId, workspaceId);
   if (task.reservations[reservationId]) {
     const existing = task.reservations[reservationId];
-    if (existing.operation !== operation || existing.units !== units) {
-      const error = new Error("Reservation ID was already used with different parameters");
+    if (existing.status === "released" || existing.operation !== operation || existing.units !== units) {
+      const error = new Error("Reservation ID is closed or was already used with different parameters");
       error.status = 409;
       throw error;
     }
