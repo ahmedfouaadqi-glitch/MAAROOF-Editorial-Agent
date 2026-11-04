@@ -23,8 +23,9 @@ export default function EditorialReviewPanel({apiBase,token,workspaceId,taskId,s
   await refresh();setNotice(ar?"تم تسجيل مراجعة الوسائط وحقوق الاستخدام.":"Media and usage-rights review recorded.");
  }catch(e){setNotice(e instanceof Error?e.message:"Media review failed");}finally{setBusy(false)}}
  async function saveEditorialReview(event:FormEvent){event.preventDefault();setBusy(true);setNotice("");try{
-  await request(root+"/approval",{method:"POST",body:JSON.stringify({decision,reviewerName:reviewer,rationale})});
-  await refresh();setNotice(ar?"تم تسجيل القرار التحريري على نسخة المقال الحالية.":"Editorial decision recorded against the current draft version.");
+  const result=await request(root+"/approval",{method:"POST",body:JSON.stringify({decision,reviewerName:reviewer,rationale})});
+  if(result.article?.stage)onStageChange?.(result.article.stage);
+  await refresh();setNotice(decision==="changes-requested"?(ar?"أُعيدت المقالة إلى الكتابة لإجراء التعديلات.":"Article returned to drafting for revisions."):decision==="rejected"?(ar?"أُغلقت المقالة بقرار الرفض.":"Article was closed as rejected."):(ar?"تم تسجيل القرار التحريري على نسخة المقال الحالية.":"Editorial decision recorded against the current draft version."));
  }catch(e){setNotice(e instanceof Error?e.message:"Editorial review failed");}finally{setBusy(false)}}
  const label=(key:string)=>({ "draft-missing":"المسودة غير موجودة","title-missing":"عنوان المقال مطلوب","insufficient-sections":"عدد الأقسام غير كافٍ","incomplete-sections":"توجد أقسام بلا نص","meta-title-missing":"Meta Title غير موجود","meta-description-missing":"Meta Description غير موجود","no-registered-sources":"لا توجد مصادر مسجلة","claims-without-sources":"ادعاءات بلا مصادر مرتبطة","claims-without-evidence-excerpts":"ادعاءات بلا مقتطفات أدلة","current-draft-originality-check-missing":"يلزم فحص أصالة النسخة الحالية","claims-missing":"لا توجد ادعاءات مسجلة","source-assessment-missing":"توجد مصادر بلا تقييم"} as Record<string,string>)[key]||key;
  return <section className="surface-card evidence-panel" style={{marginTop:16}}>
