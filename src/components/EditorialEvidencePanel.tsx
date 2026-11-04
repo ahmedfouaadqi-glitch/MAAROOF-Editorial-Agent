@@ -2,10 +2,11 @@ import { useEffect, useState, type FormEvent } from "react";
 import { FileCheck2, Link2, Plus, ScanSearch, ShieldAlert } from "lucide-react";
 import EditorialEntityPanel from "./EditorialEntityPanel";
 import EditorialResearchPanel from "./EditorialResearchPanel";
+import ResearchSearchPanel from "./ResearchSearchPanel";
 
 type Source = { id: string; url: string; title: string; notes: string; registeredAt: string; fetched: false };
 type Claim = { id: string; text: string; sourceIds: string[]; evidenceState: string; createdAt: string };
-type Props = { apiBase: string; token: string; workspaceId: string; article: { id: string; topic: string }; locale: "ar" | "en" };
+type Props = { apiBase: string; token: string; workspaceId: string; article: { id: string; topic: string; language?: string }; locale: "ar" | "en" };
 
 export default function EditorialEvidencePanel({ apiBase, token, workspaceId, article, locale }: Props) {
   const ar = locale === "ar";
@@ -111,6 +112,7 @@ export default function EditorialEvidencePanel({ apiBase, token, workspaceId, ar
           <button className="secondary-button" disabled={busy}><Plus size={14}/>{ar ? "حفظ الادعاء" : "Save claim"}</button>
         </form>
       </div>
+      <ResearchSearchPanel apiBase={apiBase} token={token} workspaceId={workspaceId} taskId={article.id} language={article.language === "en" ? "en" : "ar"} locale={locale}/>
       <div className="evidence-records">
         <h3>{ar ? "المصادر المسجلة" : "Registered sources"}</h3>
         {sources.length ? sources.map(source=><div className="evidence-record" key={source.id}><b>{source.title || source.url}</b><a href={source.url} target="_blank" rel="noreferrer">{source.url}</a><small>{ar ? "مرجع يدوي — غير مفحوص" : "Manual reference — not inspected"}</small></div>) : <p className="muted">{ar ? "لا توجد مصادر مسجلة." : "No sources registered."}</p>}
