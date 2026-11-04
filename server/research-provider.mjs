@@ -7,7 +7,9 @@ export function validateSearchRequest(input){
  if(!Number.isSafeInteger(limit)||limit<1||limit>MAX_RESULTS)fail("limit must be an integer from 1 to 20");
  const language=input.language??"auto";
  if(!["auto","ar","en"].includes(language))fail("language must be auto, ar, or en");
- return {query:input.query.trim(),limit,language,region:typeof input.region==="string"?input.region.trim().slice(0,80):""};
+ const country=typeof input.country==="string"?input.country.trim().toUpperCase():"IQ";
+ if(!/^[A-Z]{2}$/.test(country))fail("country must be a two-letter ISO country code");
+ return {query:input.query.trim(),limit,language,country,region:typeof input.region==="string"?input.region.trim().slice(0,80):""};
 }
 function normalizeResult(item,provider,retrievedAt){
  if(!item||typeof item.url!=="string"||typeof item.title!=="string")return null;
