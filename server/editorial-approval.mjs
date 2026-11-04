@@ -93,7 +93,11 @@ export function recordEditorialReview(state,{workspaceId,taskId,decision,reviewe
  };
  state.editorialReviews ||= [];
  state.editorialReviews.push(review);
- return {review,readiness:getEditorialApproval(state,workspaceId,taskId)};
+ if(decision==="changes-requested")task.article.stage="drafting";
+ if(decision==="rejected")task.article.stage="blocked";
+ task.article.updatedAt=new Date().toISOString();
+ task.article.reviewDecision=decision;
+ return {review,readiness:getEditorialApproval(state,workspaceId,taskId),article:{id:taskId,workspaceId,...task.article}};
 }
 export function assertCurrentEditorialApproval(state,workspaceId,taskId){
  const report=getEditorialApproval(state,workspaceId,taskId);
