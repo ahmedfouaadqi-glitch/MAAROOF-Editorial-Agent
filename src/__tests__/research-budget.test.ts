@@ -9,6 +9,7 @@ describe("research budget configuration", () => {
   it("starts with the requested conservative defaults", () => {
     expect(DEFAULT_RESEARCH_BUDGET).toEqual({
       sourceUrlsPerArticle: 3,
+      scrapesPerArticle: 3,
       searchesPerArticle: 5,
       inspectionsPerArticle: 5
     });
@@ -17,18 +18,22 @@ describe("research budget configuration", () => {
   it("rejects negative, fractional and excessively large limits", () => {
     expect(validateResearchBudgetLimits({
       sourceUrlsPerArticle: -1,
+      scrapesPerArticle: 2,
       searchesPerArticle: 1.5,
       inspectionsPerArticle: 10_001
     }).valid).toBe(false);
   });
 
-  it("enforces source, search and inspection limits independently per article", () => {
+  it("enforces source, scrape, search and inspection limits independently per article", () => {
     const ledger = new ResearchBudgetLedger();
     expect(ledger.reserve("article-a", "source", 3)).toMatchObject({ allowed: true, used: 3, limit: 3, remaining: 0 });
     expect(ledger.reserve("article-a", "source", 1)).toMatchObject({
       allowed: false, used: 3, limit: 3, remaining: 0, reason: "limit-reached"
     });
-    expect(ledger.reserve("article-a", "source", 0).reason).toBe("invalid-units");\n\n    for (let i = 0; i < 3; i++) expect(ledger.reserve("article-a", "scrape").allowed).toBe(true);\n    expect(ledger.reserve("article-a", "scrape").allowed).toBe(false);
+    expect(ledger.reserve("article-a", "source", 0).reason).toBe("invalid-units");
+
+    for (let i = 0; i < 3; i++) expect(ledger.reserve("article-a", "scrape").allowed).toBe(true);
+    expect(ledger.reserve("article-a", "scrape").allowed).toBe(false);
 
     for (let i = 0; i < 5; i++) expect(ledger.reserve("article-a", "search").allowed).toBe(true);
     expect(ledger.reserve("article-a", "search").allowed).toBe(false);
