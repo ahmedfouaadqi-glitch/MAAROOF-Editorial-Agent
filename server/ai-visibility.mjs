@@ -49,8 +49,8 @@ export function recordVisibilityEvent(state, input) {
   if (eventType === "crawler_fetch" && bot.botName === "Unknown" && source !== "manual") {
     throw Object.assign(new Error("Unrecognized crawler; do not classify an unknown request as an AI crawler"), { status: 400 });
   }
-  if (eventType === "training_attestation" && (!clean(input.evidenceUrl, 2048) || !clean(input.evidenceNote, 2000))) {
-    throw Object.assign(new Error("Training use requires explicit evidence URL and evidence note"), { status: 400 });
+  if ((eventType === "training_attestation" || (input.verified === true && ["search_index_verified", "citation_verified"].includes(eventType))) && (!clean(input.evidenceUrl, 2048) || !clean(input.evidenceNote, 2000))) {
+    throw Object.assign(new Error("Verified indexing, citation, or training claims require an evidence URL and verification note"), { status: 400 });
   }
   if (!Array.isArray(state.aiVisibilityEvents)) state.aiVisibilityEvents = [];
   const event = {
