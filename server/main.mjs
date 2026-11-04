@@ -12,6 +12,8 @@ import { createMagazineSubmission, listMagazineSubmissions, transitionMagazineSu
 import { buildEditorialOutline, getEditorialDraft, updateEditorialDraft } from "./editorial-drafts.mjs";
 import { runMeteredResearchSearch } from "./research-search-service.mjs";
 import { createBraveSearchProvider } from "./brave-search-provider.mjs";
+import { checkEditorialDraftOriginality, getEditorialApproval, recordEditorialReview } from "./editorial-approval.mjs";
+import { getCurrentMediaReview, recordMediaReview } from "./editorial-media.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "127.0.0.1";
@@ -174,6 +176,44 @@ const server = createServer(async (req, res) => {
         note: body.note
       }));
       return send(res, 200, { submission, externalAction: "none" });
+    }
+
+    const draftOriginalityRoute = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/originality\/check-draft$/);
+    if (draftOriginalityRoute && req.method === "POST") {
+      const workspaceId = decodeURIComponent(draftOriginalityRoute[1]);
+      const taskId = decodeURIComponent(draftOriginalityRoute[2]);
+      const result = await store.transact(state => checkEditorialDraftOriginality(state, { workspaceId, taskId }));
+      return send(res, 200, { result, scope: "current-draft-local-workspace-only" });
+    }
+
+    const editorialApprovalRoute = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/approval$/);
+    if (editorialApprovalRoute && req.method === "GET") {
+      const workspaceId = decodeURIComponent(editorialApprovalRoute[1]);
+      const taskId = decodeURIComponent(editorialApprovalRoute[2]);
+      const state = await store.read();
+      return send(res, 200, { approval: getEditorialApproval(state, workspaceId, taskId) });
+    }
+    if (editorialApprovalRoute && req.method === "POST") {
+      const body = await readJson(req);
+      const workspaceId = decodeURIComponent(editorialApprovalRoute[1]);
+      const taskId = decodeURIComponent(editorialApprovalRoute[2]);
+      const result = await store.transact(state => recordEditorialReview(state, { ...body, workspaceId, taskId }));
+      return send(res, 201, result);
+    }
+
+    const mediaReviewRoute = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/media-review$/);
+    if (mediaReviewRoute && req.method === "GET") {
+      const workspaceId = decodeURIComponent(mediaReviewRoute[1]);
+      const taskId = decodeURIComponent(mediaReviewRoute[2]);
+      const state = await store.read();
+      return send(res, 200, { mediaReview: getCurrentMediaReview(state, workspaceId, taskId) });
+    }
+    if (mediaReviewRoute && req.method === "POST") {
+      const body = await readJson(req);
+      const workspaceId = decodeURIComponent(mediaReviewRoute[1]);
+      const taskId = decodeURIComponent(mediaReviewRoute[2]);
+      const review = await store.transact(state => recordMediaReview(state, { ...body, workspaceId, taskId }));
+      return send(res, 201, { review, mediaReview: getCurrentMediaReview(await store.read(), workspaceId, taskId) });
     }
 
     const searchCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/research\/searches$/);
