@@ -2,8 +2,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { CheckCircle2, ClipboardCheck, Image, ShieldAlert, ShieldCheck, ScanSearch } from "lucide-react";
 type Approval={readyForApproval:boolean;blockers:string[];warnings:string[];approvedForCurrentDraft:boolean;latestReview?:{decision:string;reviewerName:string;rationale:string;current:boolean}|null;originality:{checked:boolean;outcome:string|null};evidence:{sourceCount:number;claimCount:number;evidenceExcerptCount:number;conflictingClaimCount:number}};
 type MediaState={reviewCurrent:boolean;approvedForCurrentDraft:boolean;review:{decision:string;reviewerName:string;rationale:string;assets:Array<{url:string;creator:string;license:string;attribution:string;altText:string;rightsConfirmed:boolean}>}|null};
-type Props={apiBase:string;token:string;workspaceId:string;taskId:string;stage:string;locale:"ar"|"en"};
-export default function EditorialReviewPanel({apiBase,token,workspaceId,taskId,stage,locale}:Props){
+type Props={apiBase:string;token:string;workspaceId:string;taskId:string;stage:string;locale:"ar"|"en";onStageChange?:(stage:string)=>void};
+export default function EditorialReviewPanel({apiBase,token,workspaceId,taskId,stage,locale,onStageChange}:Props){
  const ar=locale==="ar";const [approval,setApproval]=useState<Approval|null>(null);const [media,setMedia]=useState<MediaState|null>(null);
  const [reviewer,setReviewer]=useState("");const [rationale,setRationale]=useState("");const [decision,setDecision]=useState<"approved"|"changes-requested"|"rejected">("approved");
  const [mediaDecision,setMediaDecision]=useState<"approved"|"not-required"|"changes-requested">("not-required");
