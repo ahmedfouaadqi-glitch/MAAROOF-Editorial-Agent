@@ -5,6 +5,8 @@ const EMPTY = {
   version: 1,
   limits: { sourceUrlsPerArticle: 3, scrapesPerArticle: 3, searchesPerArticle: 5, inspectionsPerArticle: 5 },
   tasks: {},
+  editorialConversations: [],
+  conversationAttachments: [],
   sources: [],
   researchSearches: [],
   researchScrapes: [],
@@ -27,6 +29,8 @@ export class JsonStore {
       state.researchSearches ||= [];
       state.sources ||= [];
       state.tasks ||= {};
+      if (!Array.isArray(state.editorialConversations)) { state.editorialConversations = []; changed = true; }
+      if (!Array.isArray(state.conversationAttachments)) { state.conversationAttachments = []; changed = true; }
       for (const task of Object.values(state.tasks)) {
         task.usage ||= {};
         for (const operation of ["source", "scrape", "search", "inspect"]) {
@@ -37,7 +41,7 @@ export class JsonStore {
         }
         task.reservations ||= {};
       }
-      if (changed || !raw.includes('"scrapesPerArticle"') || !raw.includes('"researchScrapes"') || !raw.includes('"researchInspections"')) await this.#write(state);
+      if (changed || !raw.includes('"scrapesPerArticle"') || !raw.includes('"researchScrapes"') || !raw.includes('"researchInspections"') || !raw.includes('"editorialConversations"') || !raw.includes('"conversationAttachments"')) await this.#write(state);
     }
     catch (error) {
       if (error.code !== "ENOENT") throw error;

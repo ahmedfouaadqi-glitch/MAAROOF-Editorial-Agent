@@ -25,6 +25,10 @@ import { createMediaAsset, deleteMediaAsset, listMediaAssets, resolveMediaAssetF
 import { getGeoBrief, getGeoReadiness, updateGeoBrief } from "./editorial-geo.mjs";
 import { listEditorialBrands, listEditorialClients } from "./editorial-identities.mjs";
 import { createBrowserAgentClient } from "./browser-agent-client.mjs";
+import { createEditorialConversation, listEditorialConversations, getEditorialConversation, appendEditorialConversationMessage, updateEditorialConversationRun } from "./editorial-conversations.mjs";
+import { createConversationAttachment, listConversationAttachments, resolveConversationAttachmentFile, deleteConversationAttachment } from "./editorial-conversation-attachments.mjs";
+import { listEditorialTargets } from "./editorial-targets.mjs";
+import { createEditorialConversationProgress, runEditorialConversation } from "./editorial-conversation-runner.mjs";
 import {
   buildApprovedArticleForBrowser, getBrowserDestination, getBrowserSession,
   listBrowserDestinations, listBrowserSessions, registerBrowserDestination,
@@ -45,12 +49,11 @@ const searchProvider = process.env.RESEARCH_SEARCH_PROVIDER === "firecrawl"
   : process.env.RESEARCH_SEARCH_PROVIDER === "brave"
     ? createBraveSearchProvider()
     : null;
-// Article-writing model calls are deferred by product decision. Keep the service disabled
-// regardless of environment flags until a later, explicitly approved phase.
-const modelProvider = null;
-// Social adaptation is a separate, opt-in model path; it never connects to MAAROOF AI.
+// Independent OpenAI-compatible provider; secrets remain server-side and no MAAROOF AI link is used.
+const modelProvider = createOpenAICompatibleProvider();
+// Reuse the same independent provider for existing social adaptation when explicitly enabled.
 const platformContentProvider = process.env.PLATFORM_CONTENT_GENERATION_ENABLED === "true"
-  ? createOpenAICompatibleProvider()
+  ? modelProvider
   : null;
 const configuredModelTokens = Number(process.env.MODEL_MAX_OUTPUT_TOKENS || 3000);
 const modelMaxOutputTokens = Number.isSafeInteger(configuredModelTokens) && configuredModelTokens >= 256 && configuredModelTokens <= 8192 ? configuredModelTokens : 3000;
@@ -60,6 +63,19 @@ const modelRequestsPerArticle = Number.isSafeInteger(configuredModelRequests) &&
 function send(res, status, payload) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
   res.end(JSON.stringify(payload));
+}
+function sendAttachmentFile(res, filePath, asset) {
+  const filename = encodeURIComponent(asset.originalName || "attachment");
+  res.writeHead(200, {
+    "content-type": asset.mimeType,
+    "content-length": String(asset.sizeBytes),
+    "content-disposition": `inline; filename*=UTF-8''${filename}`,
+    "cache-control": "private, no-store",
+    "x-content-type-options": "nosniff"
+  });
+  const stream = createReadStream(filePath);
+  stream.on("error", () => res.destroy());
+  stream.pipe(res);
 }
 function readJson(req) {
   return new Promise((resolveBody, reject) => {
@@ -106,6 +122,107 @@ const server = createServer(async (req, res) => {
     }
 
     requireAdmin(req);
+
+    if (req.method === "GET" && url.pathname === "/api/v1/editorial-targets") {
+      return send(res, 200, { targets: listEditorialTargets() });
+    }
+
+    const conversationsCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/conversations$/);
+    if (conversationsCollection && req.method === "GET") {
+      const workspaceId = decodeURIComponent(conversationsCollection[1]);
+      return send(res, 200, { conversations: await listEditorialConversations(store, workspaceId) });
+    }
+    if (conversationsCollection && req.method === "POST") {
+      const body = await readJson(req);
+      const workspaceId = decodeURIComponent(conversationsCollection[1]);
+      const conversation = await createEditorialConversation(store, {
+        ...body, workspaceId, targetId: body.targetId, language: body.language || "ar"
+      });
+      return send(res, 201, { conversation });
+    }
+
+    const conversationMessages = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/conversations\/([^/]+)\/messages$/);
+    if (conversationMessages && req.method === "POST") {
+      const body = await readJson(req);
+      const workspaceId = decodeURIComponent(conversationMessages[1]);
+      const conversationId = decodeURIComponent(conversationMessages[2]);
+      const snapshot = await getEditorialConversation(store, workspaceId, conversationId);
+      const existing = typeof body.clientMessageId === "string"
+        ? snapshot.messages.find(message => message.clientMessageId === body.clientMessageId)
+        : null;
+      if (existing) {
+        const requestedAttachments = Array.isArray(body.attachmentIds) ? [...body.attachmentIds].sort() : [];
+        const existingAttachments = [...(existing.attachmentIds || [])].sort();
+        const requestedLanguage = body.language || snapshot.language;
+        if (existing.content !== (typeof body.content === "string" ? body.content.trim() : "") || JSON.stringify(existingAttachments) !== JSON.stringify(requestedAttachments) || existing.targetId !== (body.targetId || snapshot.targetId) || (existing.language || snapshot.language) !== requestedLanguage) {
+          return send(res, 409, { error: "clientMessageId was already used for different content." });
+        }
+        return send(res, 200, { message: existing, conversation: snapshot, replayed: true });
+      }
+      if (snapshot.activeRun && ["queued", "running"].includes(snapshot.activeRun.status)) {
+        return send(res, 409, { error: "Wait for the current editorial run to finish before sending another message." });
+      }
+      const runId = randomUUID();
+      const requestedLanguage = body.language || snapshot.language;
+      const initialProgress = createEditorialConversationProgress(requestedLanguage);
+      await updateEditorialConversationRun(store, {
+        workspaceId, conversationId, runId, status: "queued",
+        metadata: { ...initialProgress, queuedAt: new Date().toISOString() }
+      });
+      let message;
+      try {
+        message = await appendEditorialConversationMessage(store, {
+          workspaceId, conversationId, role: "user", content: body.content,
+          attachmentIds: body.attachmentIds || [], clientMessageId: body.clientMessageId,
+          targetId: body.targetId || snapshot.targetId, language: requestedLanguage
+        });
+      } catch (error) {
+        await updateEditorialConversationRun(store, {
+          workspaceId, conversationId, runId, status: "failed",
+          metadata: { ...initialProgress, error: "invalid-message", finishedAt: new Date().toISOString() }
+        }).catch(() => {});
+        throw error;
+      }
+      await updateEditorialConversationRun(store, {
+        workspaceId, conversationId, runId, status: "queued",
+        metadata: { ...initialProgress, queuedAt: new Date().toISOString(), userMessageId: message.id }
+      });
+      setImmediate(() => {
+        void runEditorialConversation({ store, provider: modelProvider, workspaceId, conversationId, runId, userMessageId: message.id, mediaDir })
+          .catch(error => console.error("Editorial conversation run failed:", error?.message || "unknown error"));
+      });
+      return send(res, 202, { accepted: true, runId, message, conversation: await getEditorialConversation(store, workspaceId, conversationId) });
+    }
+
+    const conversationAttachments = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/conversations\/([^/]+)\/attachments(?:\/([^/]+)(?:\/(file))?)?$/);
+    if (conversationAttachments) {
+      const workspaceId = decodeURIComponent(conversationAttachments[1]);
+      const conversationId = decodeURIComponent(conversationAttachments[2]);
+      const attachmentId = conversationAttachments[3] ? decodeURIComponent(conversationAttachments[3]) : "";
+      const action = conversationAttachments[4] || "";
+      if (!attachmentId && req.method === "GET") {
+        return send(res, 200, { attachments: await listConversationAttachments(store, workspaceId, conversationId) });
+      }
+      if (!attachmentId && req.method === "POST") {
+        const asset = await createConversationAttachment({ req, store, workspaceId, conversationId, mediaDir });
+        return send(res, 201, { attachment: asset });
+      }
+      if (attachmentId && action === "file" && req.method === "GET") {
+        const { asset, filePath } = await resolveConversationAttachmentFile({ store, workspaceId, conversationId, attachmentId, mediaDir });
+        return sendAttachmentFile(res, filePath, asset);
+      }
+      if (attachmentId && !action && req.method === "DELETE") {
+        return send(res, 200, await deleteConversationAttachment({ store, workspaceId, conversationId, attachmentId, mediaDir }));
+      }
+      return send(res, 405, { error: "Method not allowed" });
+    }
+
+    const conversationItem = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/conversations\/([^/]+)$/);
+    if (conversationItem && req.method === "GET") {
+      const workspaceId = decodeURIComponent(conversationItem[1]);
+      const conversationId = decodeURIComponent(conversationItem[2]);
+      return send(res, 200, { conversation: await getEditorialConversation(store, workspaceId, conversationId) });
+    }
 
     const browserDestinationsPath = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/browser-destinations$/);
     if (browserDestinationsPath && req.method === "GET") {

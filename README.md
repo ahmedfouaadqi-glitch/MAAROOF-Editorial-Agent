@@ -1,93 +1,51 @@
 # MAAROOF Editorial Agent
 
-Lovable-compatible editorial operations platform with a prototype user-controlled browser handoff; automated publication remains deferred.
+وكيل تحرير مستقل بواجهة محادثة ثنائية اللغة (العربية/الإنجليزية)، وسجل محادثات محلي، ومنتقي منصات ومجلات. لا يتصل هذا المشروع بـ MAAROOF AI ولا يستخدم Supabase.
 
-## Architecture constraints
-- Frontend: React + Vite + TypeScript, Tailwind CSS, React Router.
-- No Supabase. The current API prototype persists JSON locally.
-- Application service: independent Node.js HTTP API with serialized, atomic single-process JSON writes. It is not horizontally scalable.
-- Browser publishing: the UI/API can proxy to a private Playwright worker for operator-declared destinations, manual sign-in, screenshot interaction, and filling an already-approved article. The worker does not click submit/publish, sessions are in-memory and expire, and platform-specific adapters/result verification remain incomplete. Browser automation runs only in the worker, never in the frontend.
-- Full article-writing model calls remain disabled. Platform-specific social drafts are a separate opt-in capability using a server-side OpenAI-compatible provider; they do not call MAAROOF AI.
-- This project has no MAAROOF AI connection, API integration, shared database, or workspace data exchange.
+## ما يعمل حالياً
 
-## Current implementation
-- Responsive original yellow-and-black editorial workspace with custom line-vector dashboard, Arabic RTL default, bilingual controls, light/dark themes, and a side-drawer browser handoff that becomes full-screen on phones.
-- React Bits SpotlightCard integration for restrained pointer-reactive lighting.
-- Conservative platform capability profiles, policy constraints, and verification checklists.
-- Article task creation, deterministic Arabic/English outline scaffold, human editing, and controlled stage progression.
-- Per-article GEO editorial brief: editor-selected intent, specific target/supporting phrases, evidence-linked questions and registered entities, with descriptive readiness checks only (no keyword-volume data, ranking score, or visibility promise).
-- Platform-native social copy drafts for LinkedIn, Facebook Pages, Instagram, X, Threads, TikTok, YouTube, and Pinterest, with video script and media guidance fields; generation is disabled unless a separate provider is explicitly configured.
-- Workspace/article-scoped image and video upload, authenticated preview and delete; JPEG/PNG/WebP up to 15 MiB, MP4/WebM up to 100 MiB, 1 GiB local total. The model sees user descriptions only, not file bytes.
-- Article-level source/evidence workspace, claim links, entity registry, manual source assessment, and editorial/media approval gates.
-- Workspace-scoped exact-match and token-overlap checks across saved article and social drafts, grouped by client/brand identity and reported for human review; not semantic or cross-language duplicate detection, and different clients are not compared.
-- Admin quotas per article: manually registered source URLs 3, Firecrawl page scrapes 3, search operations 5, and structure inspections 5 by default.
-- Optional Firecrawl v2 server adapter, quota-metered scrape/search APIs, extracted Markdown storage, and unverified provenance.
-- Optional Brave Web Search adapter behind server-side configuration.
-- Structure inspection of scraped Markdown: word count, headings and inline links. It does not establish factual accuracy.
-- Local JSON persistence, workspace/task scoping and an interim shared admin bearer-token gate.
+- الواجهة الأساسية محادثة مع History، RTL/LTR، وهوية بصرية بالأصفر والأسود؛ صفحات لوحة العمل القديمة باقية كأدوات ثانوية.
+- منتقي موحد لثماني منصات اجتماعية وعدة وجهات نشر ومجلات، يعرض الهدف والنطاق والأسلوب والصيغ باللغتين.
+- سياق اختياري للعميل والعلامة التجارية مرتبط بالمحادثة، مع فحص تشابه محلي ضمن نطاق الهوية.
+- رفع وربط صور JPEG/PNG/WebP، فيديو MP4/WebM، وملفات PDF/DOCX/TXT بالمحادثة. استخراج النص من المستندات محلي، وإرسال الصور/إطارات الفيديو لمزود النموذج فقط عند إعداد المزود. لا يُفرّغ صوت الفيديو.
+- مشغل خلفي يحفظ مراحل التنفيذ ويعرض عشر خطوات في المحادثة. لا يدّعي إتمام البحث أو الكشط: مراحل Firecrawl Alexandria/استرجاع الصفحات/فحص الأدلة تُعلّم «لم تُنفذ» حتى يُجهز تكامل الاكتشاف المقيّد بالتكلفة.
+- صياغة مسودة ثنائية اللغة وموجز GEO يتضمن نية البحث، عبارة رئيسية، عبارات داعمة، أسئلة وكيانات؛ لا بيانات حجم بحث ولا ادعاء تحقق أو ترتيب.
+- فحص مطابقات نصية/تشابه لفظي مع المسودات المحفوظة للعميل أو العلامة، ويطلب مراجعة بشرية عند وجود تطابق. ليس فحصاً دلالياً ولا حكماً نهائياً على الأصالة.
+- تخزين JSON محلي وملفات محلية ضمن نموذج أولي أحادي العملية؛ هذا ليس تخزيناً إنتاجياً متعدد المستخدمين.
 
-See the [requested scope and implementation plan](docs/REQUESTED-SCOPE-AND-IMPLEMENTATION-PLAN.md), [API documentation](docs/API.md), [magazine registry](docs/MAGAZINE-PUBLICATION-REGISTRY.md), and [UI design system](docs/UI-DESIGN-SYSTEM.md).
+## مزود النموذج المستقل
 
-## Explicit exclusions and deferred work
-- Supabase and managed database services.
-- Model-based article writing, model-assisted NER and paid LLM calls until a later phase.
-- Production object storage, malware scanning, image pixel understanding, metadata stripping, media transformations, and cross-instance file sharing are not implemented; contextual selection uses the user's description only.
-- Durable account-session handoff, media attachment in the browser, platform-specific adapters, automated publishing, idempotent retries, and external publication verification.
-- Production identity authentication, durable multi-instance persistence, and production job orchestration.
-- Any MAAROOF AI integration or direct data connection is out of scope.
-- No destination is automatically publish-enabled. Destination policy and account authorization must be verified individually.
+تُحفظ مفاتيح المزود على الخادم فقط. عند ضبط `MODEL_API_BASE_URL` و`MODEL_API_KEY` و`MODEL_NAME`، يمكن للمحادثة إرسال الطلب وسياق المرفقات المختار إلى المزود المتوافق مع OpenAI. إذا لم تُضبط القيم، تُحفظ المحادثة ويظهر تنبيه واضح بأن التوليد غير متاح. لا تُضمّن المفاتيح في Vite أو في المتصفح، ولا يوجد تكامل MAAROOF AI.
 
-## Research provider configuration
-- Set FIRECRAWL_API_KEY on the server to enable page scraping.
-- Set RESEARCH_SEARCH_PROVIDER=firecrawl to use Firecrawl Search with the same server-side key.
-- Alternatively set RESEARCH_SEARCH_PROVIDER=brave and BRAVE_SEARCH_API_KEY to use Brave Search.
-- Search and scrape outputs remain unverified. A scraped page is a retrieved source, not proof of truth.
-- The admin can set per-article quotas. Defaults are 3 page scrapes, 5 search operations and 5 structural inspections. Manual reference registration has its own separate limit.
+## ما لم يكتمل
 
-No provider key is sent to Vite or the browser. Tests use mocked providers and do not execute live paid calls.
+- تكامل Firecrawl Alexandria داخل المحادثة: يجب أن يكتشف القدرة والسعر أولاً، ولا يستدعي أي قدرة مدفوعة قبل عرض التكلفة. خطوات البحث والكشط الحالية لا تعمل في مسار الدردشة.
+- تسليم أولي من بطاقة المسودة إلى درج المتصفح المعزول داخل إطار التطبيق: يسجل المستخدم الدخول، ينقر حقل العنوان/النص في المعاينة ثم يدرج النص من المسودة. يلزم تسجيل وجهة مرة واحدة؛ لا يوجد حتى الآن توجيه تلقائي من المنصة إلى الموقع أو اكتشاف آلي موثوق للحقول، ولا تُضغط أزرار الحفظ/النشر.
+- تحرير المسودة داخل الدردشة وإعادة تشغيل مراحل المراجعة، وإضافة الوسائط إلى محررات المواقع، ومعالجة أخطاء DOM الخاصة بكل منصة. لا يحدث نشر آلي ولا نقرة آلية على «نشر».
+- تخزين دائم قابل للتوسع، صلاحيات وعزل مستخدمين حقيقيان، طابور مهام مستدام، تخزين كائنات إنتاجي، فحص برمجيات ضارة، نسخ احتياطية وسجلات تدقيق.
+- تشابه دلالي وعابر للغات، وتحقق من الادعاءات أو بيانات كلمات مفتاحية/أحجام بحث حديثة.
 
-## Local development
-Requires Node.js 22 or newer.
+## تشغيل محلي
 
-1. Copy .env.example to .env.
-2. Set a strong, unique ADMIN_API_TOKEN.
-3. Start the API with npm install and npm run server.
-4. In a second terminal, run npm run dev.
-5. For browser handoff, set the same random 32+ character BROWSER_AGENT_TOKEN for both processes, run npm run browser:install once, then run npm run browser:worker in a third terminal. Keep the worker bound to 127.0.0.1.
-6. Validate with npm run typecheck, npm test and npm run build.
+يتطلب Node.js 22 أو أحدث.
 
-In the browser panel, the homepage host and its subdomains are allowlisted automatically. Add a separate editor or sign-in domain explicitly under advanced settings. Title/body selectors are optional and are needed only for one-step insertion of an approved article. Leaving them blank still allows a browser-only login/review session.
+1. انسخ `.env.example` إلى `.env`.
+2. عيّن `ADMIN_API_TOKEN` إلى سر عشوائي قوي.
+3. عيّن `MODEL_API_BASE_URL` و`MODEL_API_KEY` و`MODEL_NAME` إذا أردت تفعيل الصياغة عبر مزودك المستقل؛ لا تضع السر في متغيرات `VITE_*`.
+4. لميزة المتصفح، عيّن `BROWSER_AGENT_TOKEN` إلى سر عشوائي بطول 32 محرفاً أو أكثر؛ يستخدمه API والـworker نفسه.
+5. شغّل `npm install` ثم `npm run server`.
+6. في طرفية ثانية شغّل `npm run dev`.
+7. للـbrowser handoff، ثبّت Chromium مرة واحدة بـ`npm run browser:install`، ثم شغّل `npm run browser:worker` في طرفية ثالثة.
+8. تحقّق بواسطة `npm run typecheck` و`npm test` و`npm run build`.
 
-Open the browser assistant from the app's top bar. It stays beside the current page on desktop and uses the full screen on phones, so the user keeps the article context while signing in and reviewing.
+يعمل API افتراضياً على `http://127.0.0.1:8787` والواجهة على `http://localhost:5173`. البيانات في `./data/editorial-agent.json` والملفات في `./data/media`، وكلاهما محلي. لا تشغّل أكثر من نسخة API على ملف البيانات نفسه.
 
-The API defaults to http://127.0.0.1:8787. Set HOST=0.0.0.0 only when external access is required, and configure CORS_ORIGIN to the exact frontend origin. The JSON data file is written to ./data/editorial-agent.json and excluded from Git.
+## البحث والمتصفح
 
-## Security and scaling limitations
-- The shared admin bearer token is an interim operator gate, not production identity authentication.
-- Workspace identifiers are currently record-scoped; authenticated identity-to-workspace authorization is required before public multi-tenant deployment.
-- JSON persistence serializes writes within one Node process only. Do not run multiple instances against the same data file.
-- Firecrawl fetches remote URLs. Current validation rejects local/internal hostnames and literal IP targets, but is not a complete DNS-rebinding defence; stricter destination and provider-side controls remain necessary.
-- Serve the browser handoff UI/API over HTTPS outside local development; keep the browser worker on loopback/private networking and never expose its port publicly.
-- Keep secrets out of source control and frontend bundles.
-- Never bypass CAPTCHA, MFA, access controls or platform safeguards.
-- Never report publication success without external verification.
-- Do not use research repositories, Q&A communities, encyclopedias or data archives as generic promotional publishing destinations.
+- إعداد Firecrawl/Brave الحالي يخص مسارات البحث والمقالة الأقدم، ولا يستدعيه مشغل المحادثة. التكامل مع Alexandria ما زال بنداً مفتوحاً.
+- يستخدم browser handoff جلسة Playwright معزولة داخل العامل؛ لا يستعير تسجيل الدخول من Chrome الشخصي، ولا يخزن كلمات المرور أو يتجاوز CAPTCHA/MFA. الجلسات محفوظة بذاكرة العامل وتنتهي عند إغلاقها أو انتهائها.
+- لا يُبلغ عن نشر ناجح دون تحقق مستقل من الموقع الوجهة. لا تُفعّل وجهة للنشر دون مراجعة سياستها وصلاحية الحساب.
 
-## Platform classification
-The supplied 17-entry seed list is preserved, but not all entries are magazines:
-- Self-publishing/CMS: Medium, Substack, WordPress, Blogger, Ghost.
-- Developer/professional long-form: DEV Community, Hashnode, LinkedIn Articles.
-- Communities/Q&A: Reddit, Quora, Stack Exchange.
-- Encyclopedia/research repositories: Wikipedia, arXiv, PubMed Central.
-- Code/data/archive destinations: GitHub, Common Crawl, Hugging Face Datasets.
+## توثيق
 
-Additional editorial candidates are documented in the separate magazine registry. Candidate listing does not imply a working adapter, permission or guaranteed editorial acceptance.
-
-## Editorial truth rules
-- Search discovery is not source verification.
-- Scraped content is not a verified claim.
-- A source link is not proof that the source supports a claim.
-- A local originality no-match is not proof of originality.
-- Submission is not acceptance; acceptance is not publication.
-- A click is not proof of external publication.
-- Each destination requires a current policy check and a verified account/submission route before automation is enabled.
+راجع [الخطة](plan.md)، [قائمة الاستكمال](TODO.md)، [نطاق التنفيذ السابق](docs/REQUESTED-SCOPE-AND-IMPLEMENTATION-PLAN.md)، [توثيق API](docs/API.md)، [سجل المجلات](docs/MAGAZINE-PUBLICATION-REGISTRY.md)، و[نظام التصميم](docs/UI-DESIGN-SYSTEM.md).

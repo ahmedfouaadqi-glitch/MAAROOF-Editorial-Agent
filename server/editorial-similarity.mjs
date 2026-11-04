@@ -42,6 +42,10 @@ function socialDraftText(variant) {
   return [variant.title || "", variant.hook || "", variant.body || "", variant.callToAction || "", ...(variant.hashtags || []), variant.videoScript || "", variant.onScreenText || ""].filter(Boolean).join("\n");
 }
 
+function conversationDraftText(draft) {
+  return [draft.title || "", draft.hook || "", draft.body || "", draft.callToAction || "", ...(draft.hashtags || []), draft.videoScript || ""].filter(Boolean).join("\n");
+}
+
 function identityForTask(state, taskId) {
   const article = state.tasks?.[taskId]?.article || {};
   return {
@@ -104,6 +108,24 @@ export function collectWorkspaceEditorialContent(state, workspaceId, {
     });
   }
 
+  for (const draft of state.conversationDrafts || []) {
+    if (draft.workspaceId !== workspaceId) continue;
+    const text = conversationDraftText(draft);
+    if (wordCount(text) < 1) continue;
+    records.push({
+      taskId: draft.conversationId,
+      recordId: draft.id,
+      contentType: "conversation-draft",
+      title: draft.title || draft.targetName || "",
+      platformId: draft.targetId || "",
+      clientId: draft.clientId || null,
+      clientName: draft.clientName || null,
+      brandId: draft.brandId || null,
+      brandName: draft.brandName || null,
+      normalizedText: normalizeEditorialText(text)
+    });
+  }
+
   for (const check of state.originalityChecks || []) {
     if (check.workspaceId !== workspaceId || excludedChecks.has(check.taskId) || tasksWithDrafts.has(check.taskId)) continue;
     const normalizedText = typeof check.normalizedText === "string" ? normalizeEditorialText(check.normalizedText) : "";
@@ -158,7 +180,7 @@ export function compareWorkspaceEditorialContent(state, workspaceId, candidateTe
     ...(item.platformId ? { platformId: item.platformId } : {}),
     similarity: item.similarity == null ? 1 : Number(item.similarity.toFixed(4))
   }) : null;
-  const byType = Object.fromEntries(["article-draft", "social-draft", "previous-check"].map(type => [type, corpus.filter(item => item.contentType === type).length]));
+  const byType = Object.fromEntries(["article-draft", "social-draft", "conversation-draft", "previous-check"].map(type => [type, corpus.filter(item => item.contentType === type).length]));
   return {
     comparisonScope: clientId ? "same-client-plus-unassigned" : brandId ? "same-brand-plus-unassigned" : "unassigned-workspace-only",
     comparedContentCount: corpus.length,

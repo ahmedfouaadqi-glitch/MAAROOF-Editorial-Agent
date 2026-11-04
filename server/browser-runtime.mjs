@@ -91,7 +91,7 @@ export async function validatePublicUrl(input, approvedHosts, { resolveHost = lo
   return url;
 }
 
-const ACTIONS = new Set(["click", "type", "press", "scroll", "fill", "navigate"]);
+const ACTIONS = new Set(["click", "type", "paste", "press", "scroll", "fill", "navigate"]);
 const SAFE_KEYS = new Set(["Enter", "Tab", "Escape", "Backspace", "Delete", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Home", "End", "Space"]);
 const MAX_TEXT = 200_000;
 
@@ -199,6 +199,9 @@ export class BrowserSessionManager {
       } else if (input.type === "type") {
         if (typeof input.text !== "string" || input.text.length > 4000) fail("Typed text must be 1-4000 characters");
         await page.keyboard.type(input.text, { delay: 15 });
+      } else if (input.type === "paste") {
+        if (typeof input.text !== "string" || !input.text.length || input.text.length > MAX_TEXT) fail("Pasted text must be 1-200000 characters");
+        await page.keyboard.insertText(input.text);
       } else if (input.type === "press") {
         if (!SAFE_KEYS.has(input.key)) fail("Unsupported keyboard key");
         await page.keyboard.press(input.key);

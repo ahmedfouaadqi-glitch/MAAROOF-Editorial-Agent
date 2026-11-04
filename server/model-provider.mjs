@@ -13,15 +13,27 @@ export function createOpenAICompatibleProvider({baseUrl=process.env.MODEL_API_BA
  return {
   id:"openai-compatible",
   model,
-  async generateJSON({system,prompt,maxTokens=1800,temperature=0.2}){
+  async generateJSON({system,prompt,maxTokens=1800,temperature=0.2,images=[]}){
    if(typeof system!=="string"||system.length<10||system.length>12000)fail("Model system prompt must contain 10-12000 characters",400);
    if(typeof prompt!=="string"||prompt.trim().length<10||prompt.length>60000)fail("Model prompt must contain 10-60000 characters",400);
    if(!Number.isSafeInteger(maxTokens)||maxTokens<64||maxTokens>8192)fail("maxTokens must be from 64 to 8192",400);
-   if(typeof temperature!=="number"||temperature<0||temperature>1)fail("temperature must be between 0 and 1",400);
+   if(typeof temperature!=="number"||!Number.isFinite(temperature)||temperature<0||temperature>1)fail("temperature must be between 0 and 1",400);
+   if(!Array.isArray(images)||images.length>8)fail("At most 8 images may be included",400);
+   let imageBytes=0;
+   const messageContent=[{type:"text",text:prompt}];
+   for(const image of images){
+    if(!image||typeof image.mimeType!=="string"||!/^image\/(jpeg|png|webp)$/.test(image.mimeType))fail("Only JPEG, PNG or WebP image context is supported",400);
+    const bytes=Buffer.isBuffer(image.data)?image.data:Buffer.from(typeof image.data==="string"?image.data:"", "base64");
+    if(!bytes.length)fail("Image context must contain image bytes",400);
+    imageBytes+=bytes.length;
+    if(imageBytes>10*1024*1024)fail("Combined image context exceeds 10 MiB",413);
+    messageContent.push({type:"image_url",image_url:{url:`data:${image.mimeType};base64,${bytes.toString("base64")}`,detail:"auto"}});
+   }
    const response=await fetchImpl(endpoint,{
     method:"POST",
     headers:{"Authorization":"Bearer "+apiKey,"Content-Type":"application/json","Accept":"application/json"},
-    body:JSON.stringify({model,messages:[{role:"system",content:system},{role:"user",content:prompt}],temperature,max_tokens:maxTokens,response_format:{type:"json_object"}}),
+    redirect:"error",
+    body:JSON.stringify({model,messages:[{role:"system",content:system},{role:"user",content:images.length?messageContent:prompt}],temperature,max_tokens:maxTokens,response_format:{type:"json_object"}}),
     signal:AbortSignal.timeout(timeoutMs)
    }).catch(error=>{
     if(error?.name==="TimeoutError"||error?.name==="AbortError")throw fail("Model provider timed out",504);

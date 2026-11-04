@@ -4,7 +4,7 @@ import {
   CheckCircle2, ChevronDown, CircleHelp, FileCheck2, FilePlus2,
   FileText, Globe2, Home, Layers3, LayoutDashboard, Library, ListFilter,
   LockKeyhole, Menu, Moon, MoreHorizontal, Plus, Search,
-  ShieldCheck, SlidersHorizontal, Sparkles, Sun, Workflow, X, Zap
+  ShieldCheck, SlidersHorizontal, Sparkles, Sun, Workflow, X, Zap, MessageSquare
 } from "lucide-react";
 import SpotlightCard from "./components/SpotlightCard";
 import EditorialEvidencePanel from "./components/EditorialEvidencePanel";
@@ -13,16 +13,30 @@ import MagazineSubmissionsPanel from "./components/MagazineSubmissionsPanel";
 import EditorialDraftPanel from "./components/EditorialDraftPanel";
 import EditorialReviewPanel from "./components/EditorialReviewPanel";
 import BrowserPublishingPanel from "./components/BrowserPublishingPanel";
+import EditorialChatWorkspace, { type ChatTarget } from "./components/EditorialChatWorkspace";
+import type { EditorialChatBrowserDraft } from "./types/editorial-chat";
 import { DEFAULT_RESEARCH_BUDGET, validateResearchBudgetLimits, type ResearchBudgetLimits } from "./domain/research-budget";
 import { categoryLabels, modeLabels, platforms, readinessLabels, type PlatformCategory } from "./data/platforms";
 import { adapterRegistry } from "./data/adapter-registry";
 import { magazinePublications } from "./data/magazine-publications";
+import editorialTargetCatalog from "../config/editorial-targets.json";
 
-type View = "home" | "articles" | "registry" | "research-settings" | "ai-visibility" | "magazine-submissions";
+type View = "chat" | "home" | "articles" | "registry" | "research-settings" | "ai-visibility" | "magazine-submissions";
 type Article = { id: string; topic: string; language: string; objective: string; stage: string; createdAt: string; clientId?: string; clientName?: string; brandId?: string; brandName?: string };
 type Locale = "ar" | "en";
 const NEXT_STAGE: Record<string, string> = { intake: "planning", planning: "research", research: "entity-analysis", "entity-analysis": "outline", outline: "drafting", drafting: "source-review", "source-review": "originality-review", "originality-review": "media-review", "media-review": "editorial-approval", "editorial-approval": "ready-to-publish" };
 const categories: Array<"all" | PlatformCategory> = ["all", "editorial", "professional", "community", "knowledge", "research", "developer", "web-data"];
+const editorialFormatNamesEn: Record<string, string> = {
+  "منشور": "Post", "مقال": "Article", "صورة": "Image", "فيديو": "Video", "ألبوم": "Album",
+  "تعليق": "Caption", "قصة": "Story", "ريلز": "Reel", "منشور قصير": "Short post",
+  "سلسلة": "Thread", "سلسلة ردود": "Reply thread", "سيناريو فيديو": "Video script",
+  "نص شاشة": "On-screen text", "فيديو عمودي": "Vertical video", "عنوان": "Title",
+  "وصف": "Description", "مخطط فيديو": "Video outline", "وصف Pin": "Pin description",
+  "صورة عمودية": "Vertical image", "مقال طويل": "Long-form article", "نشرة": "Newsletter",
+  "تدوينة": "Blog post", "صفحة": "Page", "مقال مهني": "Professional article",
+  "تحليل": "Analysis", "رأي": "Opinion", "مقال تقني": "Technical article", "دليل": "Guide",
+  "مقال قيادي": "Leadership article", "تقرير": "Report", "سيناريو": "Script"
+};
 const stageLabels: Record<string, string> = {
   intake: "استلام الطلب", planning: "التخطيط", research: "البحث", "entity-analysis": "تحليل الكيانات",
   outline: "المخطط", drafting: "كتابة المسودة", "source-review": "مراجعة المصادر",
@@ -37,7 +51,7 @@ const enStageLabels: Record<string, string> = {
 };
 const t = {
   ar: {
-    workspace: "مساحة العمل الرئيسية", overview: "نظرة عامة", articles: "المقالات", registry: "المنصات والمجلات",
+    workspace: "مساحة العمل الرئيسية", chat: "المحادثة", overview: "نظرة عامة", articles: "المقالات", registry: "المنصات والمجلات",
     research: "البحث والمصادر", visibility: "رصد ظهور الذكاء الاصطناعي", settings: "الإعدادات", help: "المساعدة", search: "ابحث عن منصة أو مجلة...",
     eyebrow: "منظومة العمليات التحريرية", title: "مساحة العمل التحريرية", subtitle: "من الفكرة إلى مقال قابل للمراجعة، ضمن مسار تحريري واضح.",
     create: "إنشاء مقالة", explore: "استعراض المنصات", active: "حالة النموذج", ready: "نموذج أولي",
@@ -71,7 +85,7 @@ const t = {
     targetCount: "وجهات نشر محتملة", noClaims: "لا توجد عمليات نشر موثقة"
   },
   en: {
-    workspace: "Main workspace", overview: "Overview", articles: "Articles", registry: "Platforms & magazines",
+    workspace: "Main workspace", chat: "Conversation", overview: "Overview", articles: "Articles", registry: "Platforms & magazines",
     research: "Research & sources", visibility: "AI visibility", settings: "Settings", help: "Help", search: "Search platforms or magazines...",
     eyebrow: "EDITORIAL OPERATIONS", title: "Editorial workspace", subtitle: "Move from an idea to a review-ready article through a clear editorial workflow.",
     create: "Create article", explore: "Explore platforms", active: "PROTOTYPE STATUS", ready: "Prototype",
@@ -107,7 +121,7 @@ const t = {
 };
 
 export default function App() {
-  const [view, setView] = useState<View>("home");
+  const [view, setView] = useState<View>("chat");
   const [query, setQuery] = useState("");
   const [globalQuery, setGlobalQuery] = useState("");
   const [category, setCategory] = useState<"all" | PlatformCategory>("all");
@@ -120,6 +134,7 @@ export default function App() {
   const [locale, setLocale] = useState<Locale>("ar");
   const [mobileNav, setMobileNav] = useState(false);
   const [browserDrawerOpen, setBrowserDrawerOpen] = useState(false);
+  const [browserChatDraft, setBrowserChatDraft] = useState<EditorialChatBrowserDraft | null>(null);
   const browserOpenButtonRef = useRef<HTMLButtonElement>(null);
   const browserCloseButtonRef = useRef<HTMLButtonElement>(null);
   const [topic, setTopic] = useState("");
@@ -137,6 +152,13 @@ export default function App() {
   const [reviewArticleId, setReviewArticleId] = useState<string | null>(null);
   const apiBase = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8787").replace(/\/$/, "");
   const copy = t[locale];
+  const chatTargets: ChatTarget[] = editorialTargetCatalog.targets.map(target => ({
+    id: target.id, name: target.name, type: target.type as ChatTarget["type"],
+    description: locale === "ar" ? target.descriptionAr : target.descriptionEn,
+    scope: locale === "ar" ? target.scopeAr : target.scopeEn,
+    styleSummary: locale === "ar" ? target.styleSummaryAr : target.styleSummaryEn,
+    formats: locale === "ar" ? target.formats : target.formats.map(format => editorialFormatNamesEn[format] || format), selectable: target.selectable
+  }));
   const normalizeIdentityName=(value:string)=>value.normalize("NFKC").toLocaleLowerCase().trim().replace(/\s+/g," ");
   const selectedClientOption=clientOptions.find(item=>normalizeIdentityName(item.name)===normalizeIdentityName(clientName));
   const clientSuggestions=clientOptions.map(item=>item.name);
@@ -250,6 +272,7 @@ export default function App() {
   }
 
   const navItems = [
+    { id: "chat" as const, label: copy.chat, icon: MessageSquare },
     { id: "home" as const, label: copy.overview, icon: LayoutDashboard },
     { id: "articles" as const, label: copy.articles, icon: FileText },
     { id: "magazine-submissions" as const, label: locale === "ar" ? "تقديمات المجلات" : "Magazine submissions", icon: BookOpenText },
@@ -258,7 +281,7 @@ export default function App() {
     { id: "ai-visibility" as const, label: copy.visibility, icon: Activity }
   ];
   const navGroups = [
-    { label: locale === "ar" ? "الإنتاج التحريري" : "EDITORIAL", items: navItems.filter(item => ["home", "articles", "magazine-submissions"].includes(item.id)) },
+    { label: locale === "ar" ? "الإنتاج التحريري" : "EDITORIAL", items: navItems.filter(item => ["chat", "home", "articles", "magazine-submissions"].includes(item.id)) },
     { label: locale === "ar" ? "الاستكشاف والأدلة" : "DISCOVERY & EVIDENCE", items: navItems.filter(item => ["registry", "ai-visibility"].includes(item.id)) },
     { label: locale === "ar" ? "الإدارة" : "MANAGEMENT", items: navItems.filter(item => ["research-settings"].includes(item.id)) }
   ];
@@ -266,7 +289,7 @@ export default function App() {
 
   return <div className={`app-shell ${theme === "dark" ? "theme-dark" : "theme-light"} ${browserDrawerOpen ? "browser-drawer-open" : ""}`} dir={locale === "ar" ? "rtl" : "ltr"} lang={locale}>
     <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
-      <button className="brand" onClick={() => { setView("home"); setMobileNav(false); }} aria-label={locale==="ar"?"الرئيسية - معروف":"MAAROOF home"}>
+      <button className="brand" onClick={() => { setView("chat"); setMobileNav(false); }} aria-label={locale==="ar"?"المحادثة التحريرية":"Editorial conversation"}>
         <span className="brand-mark"><BrandMark /></span>
         <span className="brand-copy"><strong>MAAROOF</strong><small>EDITORIAL AGENT</small></span>
         <span className="brand-version">BETA</span>
@@ -295,14 +318,15 @@ export default function App() {
         </div>
         <div className="topbar-actions">
           <label className="global-search"><Search size={15}/><input value={globalQuery} onChange={e=>setGlobalQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){setQuery(globalQuery);setCategory("all");setView("registry");}}} placeholder={copy.search} aria-label={copy.search}/></label>
-          <button ref={browserOpenButtonRef} className={`browser-open-button ${browserDrawerOpen ? "active" : ""}`} onClick={() => setBrowserDrawerOpen(true)} aria-expanded={browserDrawerOpen} aria-controls="browser-agent-panel" aria-label={locale === "ar" ? "فتح مساعد النشر في لوحة جانبية" : "Open publishing assistant side panel"} title={locale === "ar" ? "فتح جلسة المتصفح بجانب مساحة العمل" : "Open the browser beside your workspace"}><Globe2 size={16}/><span>{locale === "ar" ? "المتصفح" : "Browser"}</span><i/></button>
+          {view !== "chat" && <button ref={browserOpenButtonRef} className={`browser-open-button ${browserDrawerOpen ? "active" : ""}`} onClick={() => { setBrowserChatDraft(null); setBrowserDrawerOpen(true); }} aria-expanded={browserDrawerOpen} aria-controls="browser-agent-panel" aria-label={locale === "ar" ? "فتح مساعد النشر في لوحة جانبية" : "Open publishing assistant side panel"} title={locale === "ar" ? "فتح جلسة المتصفح بجانب مساحة العمل" : "Open the browser beside your workspace"}><Globe2 size={16}/><span>{locale === "ar" ? "المتصفح" : "Browser"}</span><i/></button>}
           <button className="top-icon" onClick={() => setLocale(locale === "ar" ? "en" : "ar")} title={copy.langToggle}><span className="language-code">{locale === "ar" ? "EN" : "ع"}</span></button>
           <button className="top-icon" onClick={() => setTheme(theme === "light" ? "dark" : "light")} title={theme === "light" ? copy.dark : copy.light}>{theme === "light" ? <Moon size={17}/> : <Sun size={17}/>}</button>
           <div className="top-avatar">M</div>
         </div>
       </header>
 
-      <div className="page-content">
+      <div className={`page-content ${view === "chat" ? "chat-page" : ""}`}>
+        {view === "chat" && <EditorialChatWorkspace apiBase={apiBase} token={adminToken} workspaceId="main-workspace" locale={locale} targets={chatTargets} onOpenSettings={() => setView("research-settings")} onPrepareBrowser={draft=>{setBrowserChatDraft(draft);setBrowserDrawerOpen(true);}}/>}
         {view === "home" && <HomeView copy={copy} articles={articles} onCreate={() => setView("articles")} onRegistry={() => setView("registry")} onViewAll={() => setView("articles")} locale={locale} theme={theme}/>}
         {view === "articles" && <section className="page-section">
           <PageHeading eyebrow={locale === "ar" ? "مسار العمل التحريري" : "EDITORIAL WORKFLOW"} title={copy.newTitle} subtitle={copy.newSub} action={<span className="status-chip"><span className="status-dot"/>{locale==="ar"?"قرار النشر بيدك":"You control publishing"}</span>}/>
@@ -381,7 +405,7 @@ export default function App() {
           <div className="agent-drawer-brand"><span className="agent-drawer-mark"><BrandMark/></span><div><span className="tiny-overline">{locale==="ar"?"جلسة تفاعلية":"INTERACTIVE SESSION"}</span><h2 id="browser-drawer-title">{locale==="ar"?"مساعد المتصفح":"Browser assistant"}</h2><p>{locale==="ar"?"افتح الوجهة، سجّل الدخول بنفسك، وراجع قبل المتابعة.":"Open a destination, sign in yourself, and review before continuing."}</p></div></div>
           <button ref={browserCloseButtonRef} className="top-icon agent-drawer-close" onClick={()=>setBrowserDrawerOpen(false)} aria-label={locale==="ar"?"إغلاق اللوحة":"Close panel"}><X size={17}/></button>
         </header>
-        <div className="agent-drawer-content"><BrowserPublishingPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" articles={articles} locale={locale} onOpenSettings={()=>{setBrowserDrawerOpen(false);setView("research-settings");}}/></div>
+        <div className="agent-drawer-content"><BrowserPublishingPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" articles={articles} locale={locale} chatDraft={browserChatDraft} onOpenSettings={()=>{setBrowserDrawerOpen(false);setView("research-settings");}}/></div>
     </aside>}
   </div>;
 }

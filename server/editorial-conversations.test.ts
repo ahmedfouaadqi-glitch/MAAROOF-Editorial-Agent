@@ -1,0 +1,87 @@
+import { describe, expect, it, vi } from "vitest";
+import {
+  appendEditorialConversationMessage,
+  claimEditorialConversationRun,
+  createEditorialConversation,
+  getEditorialConversation,
+  listEditorialConversations,
+  updateEditorialConversationRun
+} from "./editorial-conversations.mjs";
+
+function initialState() {
+  return {
+    clients: [], brands: [], conversationAttachments: [], editorialConversations: [] as any[]
+  };
+}
+function makeStore(state = initialState()) {
+  return {
+    state,
+    read: vi.fn(async () => structuredClone(state)),
+    transact: vi.fn(async (mutator: (value: typeof state) => unknown) => mutator(state))
+  };
+}
+
+describe("editorial conversations", () => {
+  it("creates, lists and gets a conversation scoped to its workspace and target", async () => {
+    const store = makeStore();
+    const conversation = await createEditorialConversation(store, {
+      workspaceId: "workspaceA", targetId: "instagram", targetName: "Instagram", title: "Brand launch", language: "en",
+      clientName: "Client A", brandName: "Brand A"
+    });
+    expect(conversation).toMatchObject({
+      workspaceId: "workspaceA", title: "Brand launch", targetId: "instagram", targetName: "Instagram",
+      clientName: "Client A", brandName: "Brand A", status: "open", messages: [], activeRun: null
+    });
+    expect(await listEditorialConversations(store, "workspaceA")).toHaveLength(1);
+    expect(await listEditorialConversations(store, "workspaceB")).toHaveLength(0);
+    await expect(getEditorialConversation(store, "workspaceB", conversation.id)).rejects.toMatchObject({ status: 404 });
+    expect(await getEditorialConversation(store, "workspaceA", conversation.id)).toEqual(conversation);
+  });
+
+  it("rejects unsafe target IDs, invalid identities and oversized titles", async () => {
+    const store = makeStore();
+    await expect(createEditorialConversation(store, { workspaceId: "workspaceA", targetId: "https://example.com" })).rejects.toMatchObject({ status: 400 });
+    await expect(createEditorialConversation(store, { workspaceId: "workspaceA", targetId: "medium", brandName: "x" })).rejects.toMatchObject({ status: 400 });
+    await expect(createEditorialConversation(store, { workspaceId: "workspaceA", targetId: "medium", title: "x".repeat(161) })).rejects.toMatchObject({ status: 400 });
+    expect(store.state.editorialConversations).toHaveLength(0);
+  });
+
+  it("validates attachment ownership and supports idempotent message append", async () => {
+    const store = makeStore();
+    const conversation = await createEditorialConversation(store, { workspaceId: "workspaceA", targetId: "medium" });
+    store.state.conversationAttachments.push(
+      { id: "assetA", workspaceId: "workspaceA", conversationId: conversation.id, originalName: "brief.txt", kind: "document", mimeType: "text/plain", sizeBytes: 12, createdAt: "2026-11-04T00:00:00.000Z" },
+      { id: "assetOtherConversation", workspaceId: "workspaceA", conversationId: "other", originalName: "other.png" },
+      { id: "assetOtherWorkspace", workspaceId: "workspaceB", conversationId: conversation.id, originalName: "foreign.png" }
+    );
+    await expect(appendEditorialConversationMessage(store, { workspaceId: "workspaceA", conversationId: conversation.id, role: "tool", content: "x" })).rejects.toMatchObject({ status: 400 });
+    for (const attachmentId of ["missing", "assetOtherConversation", "assetOtherWorkspace"]) {
+      await expect(appendEditorialConversationMessage(store, { workspaceId: "workspaceA", conversationId: conversation.id, role: "user", content: "Please review this asset", attachmentIds: [attachmentId] })).rejects.toMatchObject({ status: 404 });
+    }
+    const args = { workspaceId: "workspaceA", conversationId: conversation.id, role: "user", content: "Review this text file", attachmentIds: ["assetA"], clientMessageId: "client-msg-1", language: "en" };
+    const first = await appendEditorialConversationMessage(store, args);
+    const duplicate = await appendEditorialConversationMessage(store, args);
+    expect(duplicate.id).toBe(first.id);
+    expect(duplicate.replayed).toBe(true);
+    expect(duplicate.attachments).toEqual(first.attachments);
+    expect(first.language).toBe("en");
+    expect(store.state.editorialConversations[0].language).toBe("en");
+    expect(first.attachments).toMatchObject([{ id: "assetA", originalName: "brief.txt", kind: "document" }]);
+    expect(store.state.editorialConversations[0].messages).toHaveLength(1);
+    await expect(appendEditorialConversationMessage(store, { ...args, content: "Different text" })).rejects.toMatchObject({ status: 409 });
+  });
+
+  it("creates and updates run state while preventing concurrent or reopened runs", async () => {
+    const store = makeStore();
+    const conversation = await createEditorialConversation(store, { workspaceId: "workspaceA", targetId: "medium" });
+    expect(await updateEditorialConversationRun(store, { workspaceId: "workspaceA", conversationId: conversation.id, runId: "run-1", status: "queued" })).toMatchObject({ id: "run-1", status: "queued" });
+    expect(await claimEditorialConversationRun(store, { workspaceId: "workspaceA", conversationId: conversation.id, runId: "run-1" })).toBe(true);
+    expect(await claimEditorialConversationRun(store, { workspaceId: "workspaceA", conversationId: conversation.id, runId: "run-1" })).toBe(false);
+    await updateEditorialConversationRun(store, { workspaceId: "workspaceA", conversationId: conversation.id, runId: "run-1", status: "running", metadata: { phase: "draft" } });
+    await expect(updateEditorialConversationRun(store, { workspaceId: "workspaceA", conversationId: conversation.id, runId: "run-2", status: "running" })).rejects.toMatchObject({ status: 409 });
+    await updateEditorialConversationRun(store, { workspaceId: "workspaceA", conversationId: conversation.id, runId: "run-1", status: "completed" });
+    await expect(updateEditorialConversationRun(store, { workspaceId: "workspaceA", conversationId: conversation.id, runId: "run-1", status: "running" })).rejects.toMatchObject({ status: 409 });
+    await expect(updateEditorialConversationRun(store, { workspaceId: "workspaceB", conversationId: conversation.id, runId: "run-2", status: "running" })).rejects.toMatchObject({ status: 404 });
+    expect((await getEditorialConversation(store, "workspaceA", conversation.id)).activeRun).toMatchObject({ id: "run-1", status: "completed" });
+  });
+});

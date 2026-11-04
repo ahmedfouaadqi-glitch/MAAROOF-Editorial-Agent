@@ -16,7 +16,7 @@ function fakePage() {
     setDefaultTimeout: vi.fn(),
     screenshot: vi.fn().mockResolvedValue(Buffer.from("image")),
     mouse: { click: vi.fn().mockResolvedValue(undefined), wheel: vi.fn().mockResolvedValue(undefined) },
-    keyboard: { type: vi.fn().mockResolvedValue(undefined), press: vi.fn().mockResolvedValue(undefined) },
+    keyboard: { type: vi.fn().mockResolvedValue(undefined), insertText: vi.fn().mockResolvedValue(undefined), press: vi.fn().mockResolvedValue(undefined) },
     locator: vi.fn(() => locator),
     locatorMock: locator
   };
@@ -88,9 +88,11 @@ describe("Browser Agent runtime", () => {
     });
     await manager.act(session.id, "workspace-a", { type: "click", x: 240, y: 300 });
     await manager.act(session.id, "workspace-a", { type: "type", text: "user@example.org" });
+    await manager.act(session.id, "workspace-a", { type: "paste", text: "A prepared editorial draft." });
     await manager.act(session.id, "workspace-a", { type: "press", key: "Tab" });
     expect(fake.page.mouse.click).toHaveBeenCalledWith(240, 300);
     expect(fake.page.keyboard.type).toHaveBeenCalledWith("user@example.org", { delay: 15 });
+    expect(fake.page.keyboard.insertText).toHaveBeenCalledWith("A prepared editorial draft.");
     expect((await manager.screenshot(session.id, "workspace-a")).base64).toBe(Buffer.from("image").toString("base64"));
   });
 
