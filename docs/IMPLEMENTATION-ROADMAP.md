@@ -88,7 +88,7 @@
 - [ ] Restore and reconcile the exact original user-provided magazine list when its source file/list is available; do not invent missing titles.
 - [ ] Verify current submission rules, exclusivity, rights, accepted formats, and official submission routes for every candidate magazine.
 - [ ] Implement publication profiles in the admin UI (domain, language, region, audience, topic fit, route, rules, account status).
-- [ ] Build pitch-first and manuscript-submission workflows with editor-response states.
+- [x] Add a pitch-first magazine submission inbox UI connected to the workspace-scoped API, with article/publication selection, draft creation, approval, exclusivity gating, editor-response states, and manual lifecycle controls. Actual sending and external publication verification remain pending.
 - [x] Add workspace-scoped backend records for magazine pitches, approval, submission, editor response, acceptance, rejection, withdrawal, and manual publication status; enforce approval and exclusivity gates. Frontend inbox, actual sending, and external publication verification remain pending.
 - [ ] Build the first authorized CMS publishing adapter for a user-owned WordPress/Ghost site.
 - [ ] Add Playwright + Chromium isolated runtime only for permitted destinations where no suitable API exists.
