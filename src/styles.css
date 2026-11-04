@@ -101,3 +101,6 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .research-evidence>small{font-size:8px;color:var(--muted)}
 .research-evidence>p{font-size:9px;line-height:1.7;color:var(--muted-strong)}
 @media(max-width:600px){.research-workspace{padding:12px}.research-metrics{grid-template-columns:1fr 1fr}.research-metrics>div:last-child{grid-column:1/-1}}
+
+/* Magazine submission workspace */
+.article-form input:not([type="checkbox"]){width:100%;border:1px solid var(--line-strong);border-radius:7px;background:var(--surface-soft);padding:10px 11px;color:var(--text);font-size:10px;outline:0}.article-form input:not([type="checkbox"]):focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}.article-form input[type="checkbox"]{width:15px;height:15px;accent-color:var(--accent);flex-shrink:0}.submission-card{min-width:0}.submission-card .secondary-button{font-size:9px;padding:7px 9px}
