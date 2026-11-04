@@ -41,15 +41,20 @@ function validateOutput(output,outline,claims,evidence){
  })):[];
  return {title,dek:typeof output.dek==="string"?output.dek.trim().slice(0,600):"",metaTitle,metaDescription,sections,entities,keywords,editorialAngle:typeof output.editorialAngle==="string"?output.editorialAngle.trim().slice(0,1000):""};
 }
-function buildPrompts(task,draft,claims,evidence,sources){
+function buildPrompts(task,draft,claims,evidence,sources,entities){
  const context={
   article:{topic:task.article.topic,language:task.article.language,objective:task.article.objective},
   outline:draft.sections.map(({heading,brief})=>({heading,brief})),
+  geoBrief:draft.geoBrief?{
+   intent:draft.geoBrief.intent,primaryQuery:draft.geoBrief.primaryQuery,supportingTerms:draft.geoBrief.supportingTerms,
+   targetQuestions:draft.geoBrief.targetQuestions.map(item=>({question:item.question,sectionHeading:draft.sections.find(section=>section.id===item.sectionId)?.heading||"",evidenceIds:item.evidenceIds})),
+   targetEntities:entities.filter(entity=>draft.geoBrief.targetEntityIds.includes(entity.id)).map(entity=>({canonicalName:entity.canonicalName,aliases:entity.aliases,disambiguationNote:entity.disambiguationNote}))
+  }:null,
   claims:claims.map(item=>({id:item.id,text:item.text,sourceIds:item.sourceIds})),
   evidence:evidence.map(item=>({id:item.id,claimId:item.claimId,excerpt:item.excerpt,locator:item.locator,stance:item.stance,verificationState:item.verificationState,sourceId:item.sourceId})),
   sources:sources.map(item=>({id:item.id,title:item.title,url:item.url,publisher:item.research?.publisher||"",publishedAt:item.research?.publishedAt||null,qualityRating:item.research?.qualityRating||"unassessed",assessmentMode:item.research?.assessmentMode||"unassessed"}))
  };
- const system="You are a careful editorial drafting engine. Write in the article language. Do not invent facts, dates, quotations, statistics, named entities, or source details. Treat all provided evidence excerpts as operator-transcribed and unverified, not as independently proven facts. Use only supplied claim IDs and evidence IDs. Every section must include at least one evidenceIds entry chosen from the supplied evidence records; do not fabricate IDs. Use claimIds only when directly relevant to the section. Where evidence is unclear or contradictory, describe the uncertainty and do not resolve it without proof. Return only one valid JSON object with keys: title, dek, editorialAngle, metaTitle, metaDescription, sections (each: heading, body, evidenceIds, claimIds), entities (each: name,type,relevance), keywords (each: term,intent,role). Sections must preserve the same count and order as the outline. Never claim that any source was independently verified.";
+ const system="You are a careful editorial drafting engine. Write in the article language. Do not invent facts, dates, quotations, statistics, named entities, or source details. Treat all provided evidence excerpts as operator-transcribed and unverified, not as independently proven facts. Use only supplied claim IDs and evidence IDs. Every section must include at least one evidenceIds entry chosen from the supplied evidence records; do not fabricate IDs. Use claimIds only when directly relevant to the section. Where evidence is unclear or contradictory, describe the uncertainty and do not resolve it without proof. When a GEO brief is supplied, use its target phrases, questions, and registered entities only when natural and supported; do not keyword-stuff or invent search demand, and do not imply rankings or answer-engine visibility. Return only one valid JSON object with keys: title, dek, editorialAngle, metaTitle, metaDescription, sections (each: heading, body, evidenceIds, claimIds), entities (each: name,type,relevance), keywords (each: term,intent,role). Sections must preserve the same count and order as the outline. Never claim that any source was independently verified.";
  const prompt="Draft this article using only the supplied editorial context. Do not add citations that are not in the evidence IDs. Output JSON only.\n\nEDITORIAL CONTEXT:\n"+JSON.stringify(context);
  return {system,prompt};
 }
@@ -75,11 +80,12 @@ export async function runEditorialDraftGeneration({store,provider,workspaceId,ta
  const sources=(snapshot.sources||[]).filter(item=>item.workspaceId===workspaceId&&item.taskId===taskId);
  const claims=(snapshot.claims||[]).filter(item=>item.workspaceId===workspaceId&&item.taskId===taskId);
  const evidence=(snapshot.researchEvidence||[]).filter(item=>item.workspaceId===workspaceId&&item.taskId===taskId);
+ const entities=(snapshot.entities||[]).filter(item=>item.workspaceId===workspaceId&&item.taskId===taskId);
  if(!sources.length||!claims.length||!evidence.length)fail("Register sources, claims, and evidence excerpts before AI drafting",409);
  if(sources.some(item=>!item.research))fail("Assess all registered sources before AI drafting",409);
  if(claims.some(claim=>!claim.sourceIds?.length||!evidence.some(item=>item.claimId===claim.id)))fail("Every claim needs a linked source and an evidence excerpt before AI drafting",409);
  const initialFingerprint=editorialDraftFingerprint(draft);
- const prompts=buildPrompts(task,draft,claims,evidence,sources);
+ const prompts=buildPrompts(task,draft,claims,evidence,sources,entities);
  const usageId=randomUUID();
  await store.transact(state=>{
   const currentTask=state.tasks?.[taskId];

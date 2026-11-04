@@ -96,7 +96,11 @@ Claim body:
 A source can only be linked when it belongs to the same workspace and article. The API labels a linked claim as `source-linked-unverified`; this means only that a reference was attached. It does not mean the source was opened, checked, or proven to support the claim. Coverage is the percentage of claims with at least one linked source, not an accuracy score.
 
 ## Deterministic originality baseline
-- `POST /api/v1/originality/check` — compare submitted text with prior text checks from other articles in the same workspace.
+- `POST /api/v1/originality/check` — compare submitted text with saved article drafts, saved social drafts, and eligible prior checks in the same workspace.
+- `GET /api/v1/workspaces/:workspaceId/clients` — list client identities used by article tasks.
+- `GET /api/v1/workspaces/:workspaceId/brands` — list brand identities; optionally filter with `?clientId=...`.
+
+`POST /api/v1/workspaces/:workspaceId/articles` accepts optional `clientName` and `brandName`. Names are created or reused within the workspace after Unicode normalization, case folding, and whitespace normalization; a brand is associated with the selected client, or is standalone when no client is supplied. The created task stores both IDs and display names. This registry supports content grouping only; it is not a user-authentication or authorization boundary.
 
 Body:
 ```json
@@ -107,7 +111,9 @@ Body:
 }
 ```
 
-The baseline normalizes Unicode, common Arabic letter variants, diacritics, punctuation, and whitespace, then checks SHA-256 exact matches and token-set Jaccard overlap (near-match threshold 0.82). It stores only the normalized text and fingerprint in the local JSON store so later checks can compare against it. This is a deterministic heuristic, not semantic similarity or plagiarism detection. It does not check external websites, translated paraphrases, or text never submitted to this endpoint. Do not treat `no-match-found` as proof of originality.
+The baseline normalizes Unicode, common Arabic letter variants, diacritics, punctuation, and whitespace, then reports exact normalized matches and token-set Jaccard overlaps (near-match threshold 0.82; near matches require at least eight normalized tokens). It includes current saved article drafts and saved social drafts within the same client; sibling brands under that client are compared and identified separately. Standalone brands are compared to the same brand. Legacy records without identity are compared only with other unassigned records, and may be surfaced as `legacy-unassigned` when a task has an identity. Content assigned to another client is excluded. Prior originality-check text is included only when that task has no current saved article draft. The response identifies the matched record type, task, title, platform, identity relationship, and similarity for human review. Each check stores its normalized text, fingerprint, and match summary in the local JSON store. Current article content and its own social variants are excluded when checking that article.
+
+When a new social variant is created, it is checked against other article drafts and saved social variants for the same client (including sibling brands), or the same standalone brand; legacy unassigned items are also surfaced separately. Its source article is excluded. A match blocks saving and shows the matched content type/title and identity relationship. This remains a deterministic lexical heuristic, not semantic similarity or plagiarism detection. It does not compare separate workspaces or different clients, detect translated paraphrases, or search external/unrecorded content. Topic overlap alone should not be treated as duplication; review the angle and claims. Do not treat `no-match-found` as proof of originality.
 
 
 ## Entity intelligence registry
@@ -202,6 +208,43 @@ Model generation is invoked only by an explicit user action. Tests use mocked pr
 
 The outline generator is deterministic and creates section prompts only. It does not generate factual prose, perform live research, or call an LLM. All draft operations verify that the task belongs to the requested workspace.
 
+## GEO editorial brief and readiness checklist
+
+- `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/geo-brief` — read the saved intent, query phrases, questions, entity selection, and current checklist.
+- `PUT /api/v1/workspaces/:workspaceId/tasks/:taskId/geo-brief` — save the editor-authored brief on an existing article draft.
+- `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/geo-readiness` — recompute descriptive phrase, question, entity, angle, and source-freshness checks from saved records.
+
+The `PUT` body accepts `intent` (`informational`, `commercial`, `transactional`, `navigational`, or `local`), `primaryQuery`, up to 12 `supportingTerms`, up to 12 `targetQuestions` (`question`, optional `sectionId`, and up to 8 article-scoped `evidenceIds` each), and up to 20 article-scoped `targetEntityIds`. Every selected section, evidence record, and entity is validated against the same workspace and article. Question-to-section mapping, recorded excerpts, and registered entities are editor supplied; no keyword research, entity discovery, evidence verification, or semantic fact check is performed.
+
+Readiness is a checklist (`incomplete` or `ready-for-editor-review`), not a numerical score. Exact phrase occurrence counts are descriptive only; missing phrases are not an instruction to repeat them. The response reports whether questions map to non-empty sections with supporting excerpts, whether selected entities are mentioned and linked to recorded claim evidence, and whether source dates are present. It does not verify that an answer is correct, that a source is current, or that a page will rank or be cited. If an article-generation or platform-adaptation provider is later enabled, the saved brief is passed as editorial guidance with explicit no-stuffing/no-invention instructions. Article prose generation remains disabled by default.
+
+## Platform-native social drafts
+
+- `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/platform-variants` — list saved platform-specific drafts.
+- `POST /api/v1/workspaces/:workspaceId/tasks/:taskId/platform-variants` — create one distinct draft from the saved article for a selected platform.
+- `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/media` — list media metadata scoped to the same workspace and article.
+- `POST /api/v1/workspaces/:workspaceId/tasks/:taskId/media` — stream one binary image or video file into local media storage.
+- `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/media/:assetId/file` — stream an authenticated, scoped media file for preview.
+- `DELETE /api/v1/workspaces/:workspaceId/tasks/:taskId/media/:assetId` — remove its metadata and local file.
+
+POST body:
+```json
+{
+  "platformId": "linkedin",
+  "placement": "feed post"
+}
+```
+
+Supported IDs: `linkedin`, `facebook`, `instagram`, `x`, `threads`, `tiktok`, `youtube`, and `pinterest`. Drafts are stored with `draft-only` status, retain their source-draft timestamp and require human review. Before storage, normalized exact/near matching checks saved social drafts and other article drafts for the same client (including sibling brands) or the same standalone brand; legacy unassigned items are also surfaced. It excludes the source article itself and different clients. This is only a heuristic; it is not semantic or cross-language duplicate detection and does not check external content or other workspaces. The request may include up to 12 `mediaAssetIds` selected by the user. The model receives only their descriptions and may return matching IDs in `selectedMediaIds`; file bytes are never sent. A saved GEO brief may guide platform wording by intent, target questions and selected entities, but the model is instructed not to stuff phrases or invent claims. The response explicitly returns `publishingEnabled: false`; this endpoint does not connect an account or publish anything. Video-oriented variants can include a script, on-screen text, shot plan and media brief.
+
+### Media upload contract
+
+Send the raw file bytes as the request body with `Content-Type` set to `image/jpeg`, `image/png`, `image/webp`, `video/mp4`, or `video/webm`; pass `X-File-Name` and `X-Media-Description` as URL-encoded UTF-8 header values. The description is required for both images (used as alt text) and videos (used as a caption/context). Images are limited to 15 MiB each, videos to 100 MiB each, and local storage to 1 GiB total. The server validates the declared MIME against a file signature, generates the actual disk name, stores files outside the web root with restrictive permissions, and returns no storage path. SVG and other unlisted formats are rejected.
+
+Files and metadata are stored locally (`MEDIA_DIR`, default `./data/media`) for this prototype; this is not durable object storage, antivirus scanning, EXIF removal, semantic image recognition, or production multi-instance storage. The shared admin bearer token remains an interim gate, so workspace path scoping is not a substitute for real user/workspace authorization. Review usage rights before publication. No file bytes are sent to any model or MAAROOF AI.
+
+Generation is off by default. To enable it intentionally, set `PLATFORM_CONTENT_GENERATION_ENABLED=true` and configure `MODEL_API_BASE_URL`, `MODEL_API_KEY`, and `MODEL_NAME` on the server. This invokes the configured OpenAI-compatible provider only on an explicit POST request and may incur provider charges. Tests use mocked providers. This capability is independent of MAAROOF AI; no MAAROOF AI API, database, or workspace is accessed.
+
 ## Draft-bound review, media rights, and final approval
 
 - `POST /api/v1/workspaces/:workspaceId/tasks/:taskId/originality/check-draft` — record a local originality result for the saved draft during the `originality-review` stage.
@@ -238,6 +281,20 @@ Status update body:
 
 Statuses: `draft`, `approved`, `submitted`, `editor-replied`, `accepted`, `rejected`, `published`, `withdrawn`. A submission can only be recorded after explicit approval and an exclusivity confirmation. Acceptance and publication are separate states. The API only records operator-reported actions; it does not send pitches, upload manuscripts, contact editors, or verify publication externally. A `published` status is a manual record, not independent proof of a live URL.
 
+## Browser-assisted article handoff (no automated publish)
+
+All routes below require the admin bearer token and are scoped by `workspaceId`:
+- `GET /api/v1/workspaces/:workspaceId/browser-destinations` — list declared destination profiles.
+- `POST /api/v1/workspaces/:workspaceId/browser-destinations` — register a destination with `name`, HTTPS `homepage`, optional HTTPS `editorUrl`, `approvedHosts`, CSS `titleSelector` and `bodySelector`, plus `authorityConfirmed: true` and `policyReviewed: true`. These are operator declarations, not independent verification.
+- `GET /api/v1/workspaces/:workspaceId/browser-sessions` — list metadata for recorded worker sessions; cookies and browser contexts are never included.
+- `POST /api/v1/workspaces/:workspaceId/browser-sessions` with `{ "destinationId": "..." }` — open the configured editor/login page in the private browser worker.
+- `GET /api/v1/workspaces/:workspaceId/browser-sessions/:sessionId` — read session state; `GET .../:sessionId/screenshot` returns a no-store base64 JPEG screenshot.
+- `POST .../:sessionId/actions` — perform a bounded user-directed browser action (`click`, `type`, `press`, `scroll`, `fill`, or approved-host `navigate`).
+- `POST .../:sessionId/fill-article` with `{ "taskId": "..." }` — insert only the article title/body when the task is `ready-to-publish` and its current draft has a valid human editorial approval.
+- `DELETE /api/v1/workspaces/:workspaceId/browser-sessions/:sessionId` — close the session and clear its in-memory browser context.
+
+Run `npm run browser:install` once to install Chromium. Configure the same random 32+ character `BROWSER_AGENT_TOKEN` in the API and worker environments, keep the worker on loopback (`BROWSER_AGENT_HOST=127.0.0.1`), then run `npm run browser:worker` beside `npm run server`. The browser-agent token is server-side only; the API proxies to the worker and never returns the token. The current browser session and cookies live only in worker memory for at most one hour, with a limit of two concurrent sessions per workspace; restarting the worker ends all sessions. Users sign in and handle MFA/CAPTCHA themselves. Typed values pass through the authenticated API and worker in memory but are not persisted by this feature. Serve the frontend and API over HTTPS outside local development, and never expose the worker port publicly. The prototype does not attach uploaded media, click Save/Submit/Publish automatically, implement a verified platform adapter, or verify the public result URL. A user-controlled click remains possible inside the remote session; the app itself does not trigger publication.
+
 
 ## Firecrawl search, scraping, and source inspection
 
@@ -260,4 +317,3 @@ A successful scrape means content was retrieved, not that it is accurate, origin
 - GET /api/v1/workspaces/:workspaceId/tasks/:taskId/research/inspections — list inspections.
 
 The default quota is 5 inspections per article. An inspection reports word count, Markdown heading count, inline link count and structural warnings. It is a local deterministic check; it does not consume a Firecrawl request and does not establish source credibility or factual accuracy.
-

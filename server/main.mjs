@@ -1,5 +1,6 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
+import { createReadStream } from "node:fs";
 import { resolve } from "node:path";
 import { JsonStore } from "./store.mjs";
 import { DEFAULT_LIMITS, validateLimits, reserveBudget, releaseReservation, commitReservation } from "./research-budget.mjs";
@@ -18,13 +19,26 @@ import { runResearchInspection } from "./research-inspection.mjs";
 import { checkEditorialDraftOriginality, getEditorialApproval, recordEditorialReview } from "./editorial-approval.mjs";
 import { getCurrentMediaReview, recordMediaReview } from "./editorial-media.mjs";
 import { runEditorialDraftGeneration } from "./editorial-writing.mjs";
+import { generatePlatformVariant, listPlatformVariants } from "./platform-content.mjs";
+import { createOpenAICompatibleProvider } from "./model-provider.mjs";
+import { createMediaAsset, deleteMediaAsset, listMediaAssets, resolveMediaAssetFile } from "./editorial-media-assets.mjs";
+import { getGeoBrief, getGeoReadiness, updateGeoBrief } from "./editorial-geo.mjs";
+import { listEditorialBrands, listEditorialClients } from "./editorial-identities.mjs";
+import { createBrowserAgentClient } from "./browser-agent-client.mjs";
+import {
+  buildApprovedArticleForBrowser, getBrowserDestination, getBrowserSession,
+  listBrowserDestinations, listBrowserSessions, registerBrowserDestination,
+  removeBrowserSession, saveBrowserSession, updateBrowserSession
+} from "./browser-publishing.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "127.0.0.1";
 const adminToken = process.env.ADMIN_API_TOKEN || "";
 const allowedOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
 const dataFile = resolve(process.env.DATA_FILE || "./data/editorial-agent.json");
+const mediaDir = resolve(process.env.MEDIA_DIR || "./data/media");
 const store = new JsonStore(dataFile);
+const browserAgentRequest = createBrowserAgentClient();
 const firecrawlProvider = createFirecrawlProvider();
 const searchProvider = process.env.RESEARCH_SEARCH_PROVIDER === "firecrawl"
   ? firecrawlProvider
@@ -34,6 +48,10 @@ const searchProvider = process.env.RESEARCH_SEARCH_PROVIDER === "firecrawl"
 // Article-writing model calls are deferred by product decision. Keep the service disabled
 // regardless of environment flags until a later, explicitly approved phase.
 const modelProvider = null;
+// Social adaptation is a separate, opt-in model path; it never connects to MAAROOF AI.
+const platformContentProvider = process.env.PLATFORM_CONTENT_GENERATION_ENABLED === "true"
+  ? createOpenAICompatibleProvider()
+  : null;
 const configuredModelTokens = Number(process.env.MODEL_MAX_OUTPUT_TOKENS || 3000);
 const modelMaxOutputTokens = Number.isSafeInteger(configuredModelTokens) && configuredModelTokens >= 256 && configuredModelTokens <= 8192 ? configuredModelTokens : 3000;
 const configuredModelRequests = Number(process.env.MODEL_REQUESTS_PER_ARTICLE || 2);
@@ -77,17 +95,89 @@ const server = createServer(async (req, res) => {
   const origin = req.headers.origin;
   if (origin && origin === allowedOrigin) res.setHeader("access-control-allow-origin", origin);
   res.setHeader("vary", "Origin");
-  res.setHeader("access-control-allow-methods", "GET,POST,PUT,OPTIONS");
-  res.setHeader("access-control-allow-headers", "content-type,authorization,idempotency-key");
+  res.setHeader("access-control-allow-methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.setHeader("access-control-allow-headers", "content-type,authorization,idempotency-key,x-file-name,x-media-description");
   if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
 
   try {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     if (req.method === "GET" && url.pathname === "/health") {
-      return send(res, 200, { ok: true, service: "maaroof-editorial-api", persistence: "local-json", integrations: { supabase: false, firecrawl: Boolean(firecrawlProvider), liveSearch: Boolean(searchProvider), searchProvider: searchProvider?.id || null, modelGeneration: Boolean(modelProvider), model: modelProvider?.model || null } });
+      return send(res, 200, { ok: true, service: "maaroof-editorial-api", persistence: "local-json", integrations: { supabase: false, firecrawl: Boolean(firecrawlProvider), liveSearch: Boolean(searchProvider), searchProvider: searchProvider?.id || null, modelGeneration: Boolean(modelProvider), model: modelProvider?.model || null, browserAgentConfigured: (process.env.BROWSER_AGENT_TOKEN || "").length >= 32 } });
     }
 
     requireAdmin(req);
+
+    const browserDestinationsPath = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/browser-destinations$/);
+    if (browserDestinationsPath && req.method === "GET") {
+      const workspaceId = decodeURIComponent(browserDestinationsPath[1]);
+      const state = await store.read();
+      return send(res, 200, { destinations: listBrowserDestinations(state, workspaceId) });
+    }
+    if (browserDestinationsPath && req.method === "POST") {
+      const body = await readJson(req);
+      const workspaceId = decodeURIComponent(browserDestinationsPath[1]);
+      const destination = await store.transact(state => registerBrowserDestination(state, { ...body, workspaceId }));
+      return send(res, 201, { destination });
+    }
+
+    const browserSessionsPath = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/browser-sessions$/);
+    if (browserSessionsPath && req.method === "GET") {
+      const workspaceId = decodeURIComponent(browserSessionsPath[1]);
+      const state = await store.read();
+      return send(res, 200, { sessions: listBrowserSessions(state, workspaceId) });
+    }
+    if (browserSessionsPath && req.method === "POST") {
+      const body = await readJson(req);
+      const workspaceId = decodeURIComponent(browserSessionsPath[1]);
+      const state = await store.read();
+      const destination = getBrowserDestination(state, workspaceId, body.destinationId);
+      const response = await browserAgentRequest(`/internal/workspaces/${encodeURIComponent(workspaceId)}/sessions`, {
+        method: "POST",
+        body: { destinationId: destination.id, startUrl: destination.editorUrl, approvedHosts: destination.approvedHosts }
+      });
+      const session = await store.transact(current => saveBrowserSession(current, { ...response.session, workspaceId, destinationId: destination.id }));
+      return send(res, 201, { session, limitations: ["The browser session is held in worker memory and ends when it expires or closes.", "The user must submit the reviewed article manually; no publish button is automated."] });
+    }
+
+    const browserSessionPath = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/browser-sessions\/([^/]+)(?:\/(screenshot|actions|fill-article))?$/);
+    if (browserSessionPath) {
+      const workspaceId = decodeURIComponent(browserSessionPath[1]);
+      const sessionId = decodeURIComponent(browserSessionPath[2]);
+      const action = browserSessionPath[3] || "";
+      const state = await store.read();
+      const savedSession = getBrowserSession(state, workspaceId, sessionId);
+      const workerPath = `/internal/workspaces/${encodeURIComponent(workspaceId)}/sessions/${encodeURIComponent(sessionId)}`;
+      if (!action && req.method === "GET") {
+        const response = await browserAgentRequest(workerPath);
+        const session = await store.transact(current => updateBrowserSession(current, workspaceId, sessionId, response.session));
+        return send(res, 200, { session });
+      }
+      if (action === "screenshot" && req.method === "GET") {
+        return send(res, 200, await browserAgentRequest(`${workerPath}/screenshot`));
+      }
+      if (action === "actions" && req.method === "POST") {
+        const response = await browserAgentRequest(`${workerPath}/actions`, { method: "POST", body: await readJson(req) });
+        const session = await store.transact(current => updateBrowserSession(current, workspaceId, sessionId, response.session));
+        return send(res, 200, { session });
+      }
+      if (action === "fill-article" && req.method === "POST") {
+        const body = await readJson(req);
+        if (typeof body.taskId !== "string" || !body.taskId.trim() || body.taskId.length > 128) return send(res, 400, { error: "taskId is required" });
+        const destination = getBrowserDestination(state, workspaceId, savedSession.destinationId);
+        const approvedArticle = buildApprovedArticleForBrowser(state, { workspaceId, taskId: body.taskId, destination });
+        const response = await browserAgentRequest(`${workerPath}/fill-article`, { method: "POST", body: approvedArticle });
+        const session = await store.transact(current => updateBrowserSession(current, workspaceId, sessionId, response.session));
+        return send(res, 200, { session, publishingEnabled: false, note: "Only the approved article text was inserted. Review the remote editor and submit manually if desired." });
+      }
+      if (!action && req.method === "DELETE") {
+        let closeResult = { closed: true, alreadyClosed: true };
+        try { closeResult = await browserAgentRequest(workerPath, { method: "DELETE" }); }
+        catch (error) { if (error.status !== 404 && error.status !== 410) throw error; }
+        await store.transact(current => removeBrowserSession(current, workspaceId, sessionId));
+        return send(res, 200, closeResult);
+      }
+      return send(res, 405, { error: "Method not allowed" });
+    }
 
     if (req.method === "GET" && url.pathname === "/api/v1/admin/ai-visibility") {
       const workspaceId = url.searchParams.get("workspaceId") || "main-workspace";
@@ -119,6 +209,20 @@ const server = createServer(async (req, res) => {
         return state.limits;
       });
       return send(res, 200, { limits: result, saved: true });
+    }
+
+    const clientCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/clients$/);
+    if (clientCollection && req.method === "GET") {
+      const workspaceId = decodeURIComponent(clientCollection[1]);
+      const state = await store.read();
+      return send(res, 200, { clients: listEditorialClients(state, workspaceId) });
+    }
+    const brandCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/brands$/);
+    if (brandCollection && req.method === "GET") {
+      const workspaceId = decodeURIComponent(brandCollection[1]);
+      const clientId = url.searchParams.get("clientId");
+      const state = await store.read();
+      return send(res, 200, { brands: listEditorialBrands(state, workspaceId, clientId) });
     }
 
     const articleCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/articles$/);
@@ -250,6 +354,94 @@ const server = createServer(async (req, res) => {
       const taskId = decodeURIComponent(mediaReviewRoute[2]);
       const review = await store.transact(state => recordMediaReview(state, { ...body, workspaceId, taskId }));
       return send(res, 201, { review, mediaReview: getCurrentMediaReview(await store.read(), workspaceId, taskId) });
+    }
+
+    const mediaCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/media$/);
+    if (mediaCollection && req.method === "GET") {
+      const workspaceId = decodeURIComponent(mediaCollection[1]);
+      const taskId = decodeURIComponent(mediaCollection[2]);
+      const state = await store.read();
+      const assets = listMediaAssets(state, workspaceId, taskId).map(({ storageKey, ...asset }) => asset);
+      return send(res, 200, { assets });
+    }
+    if (mediaCollection && req.method === "POST") {
+      const asset = await createMediaAsset({
+        req,
+        store,
+        workspaceId: decodeURIComponent(mediaCollection[1]),
+        taskId: decodeURIComponent(mediaCollection[2]),
+        mediaDir
+      });
+      const { storageKey, ...publicAsset } = asset;
+      return send(res, 201, { asset: publicAsset });
+    }
+    const mediaFileRoute = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/media\/([^/]+)\/file$/);
+    if (mediaFileRoute && req.method === "GET") {
+      const { asset, filePath } = await resolveMediaAssetFile({
+        store, workspaceId: decodeURIComponent(mediaFileRoute[1]), taskId: decodeURIComponent(mediaFileRoute[2]),
+        assetId: decodeURIComponent(mediaFileRoute[3]), mediaDir
+      });
+      res.writeHead(200, {
+        "content-type": asset.mimeType,
+        "content-length": asset.sizeBytes,
+        "content-disposition": "inline",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store"
+      });
+      const stream = createReadStream(filePath);
+      stream.on("error", () => { if (!res.headersSent) send(res, 404, { error: "Media file is missing" }); else res.destroy(); });
+      return stream.pipe(res);
+    }
+    const mediaItemRoute = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/media\/([^/]+)$/);
+    if (mediaItemRoute && req.method === "DELETE") {
+      const result = await deleteMediaAsset({
+        store, workspaceId: decodeURIComponent(mediaItemRoute[1]), taskId: decodeURIComponent(mediaItemRoute[2]),
+        assetId: decodeURIComponent(mediaItemRoute[3]), mediaDir
+      });
+      return send(res, 200, result);
+    }
+
+    const geoBriefRoute = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/geo-brief$/);
+    if (geoBriefRoute && req.method === "GET") {
+      const state = await store.read();
+      return send(res, 200, getGeoBrief(state, decodeURIComponent(geoBriefRoute[1]), decodeURIComponent(geoBriefRoute[2])));
+    }
+    if (geoBriefRoute && req.method === "PUT") {
+      const body = await readJson(req);
+      const result = await store.transact(state => updateGeoBrief(state, {
+        ...body,
+        workspaceId: decodeURIComponent(geoBriefRoute[1]),
+        taskId: decodeURIComponent(geoBriefRoute[2])
+      }));
+      return send(res, 200, result);
+    }
+    const geoReadinessRoute = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/geo-readiness$/);
+    if (geoReadinessRoute && req.method === "GET") {
+      const state = await store.read();
+      return send(res, 200, getGeoReadiness(state, decodeURIComponent(geoReadinessRoute[1]), decodeURIComponent(geoReadinessRoute[2])));
+    }
+
+    const platformVariantsRoute = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/platform-variants$/);
+    if (platformVariantsRoute && req.method === "GET") {
+      const workspaceId = decodeURIComponent(platformVariantsRoute[1]);
+      const taskId = decodeURIComponent(platformVariantsRoute[2]);
+      const state = await store.read();
+      const task = state.tasks?.[taskId];
+      if (!task || task.workspaceId !== workspaceId || !task.article) return send(res, 404, { error: "Editorial task not found" });
+      return send(res, 200, { variants: listPlatformVariants(state, workspaceId, taskId), publishingEnabled: false });
+    }
+    if (platformVariantsRoute && req.method === "POST") {
+      const body = await readJson(req);
+      const result = await generatePlatformVariant({
+        store,
+        provider: platformContentProvider,
+        workspaceId: decodeURIComponent(platformVariantsRoute[1]),
+        taskId: decodeURIComponent(platformVariantsRoute[2]),
+        platformId: body.platformId,
+        placement: body.placement || "",
+        mediaAssetIds: body.mediaAssetIds || []
+      });
+      return send(res, 201, { ...result, publishingEnabled: false });
     }
 
     const searchCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/research\/searches$/);

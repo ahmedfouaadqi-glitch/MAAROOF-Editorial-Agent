@@ -6,7 +6,8 @@ function fakePage() {
   const locator = {
     count: vi.fn().mockResolvedValue(1),
     isVisible: visible,
-    fill: vi.fn().mockResolvedValue(undefined)
+    fill: vi.fn().mockResolvedValue(undefined),
+    first: vi.fn(() => locator)
   };
   return {
     url: () => "https://publisher.example/editor",
@@ -57,6 +58,14 @@ describe("Browser Agent runtime", () => {
     expect(session).toMatchObject({ workspaceId: "workspace-a", destinationId: "destination-a", state: "waiting-for-user" });
     expect(session).not.toHaveProperty("context");
     expect(session).not.toHaveProperty("browser");
+  });
+
+  it("limits concurrent sessions per workspace", async () => {
+    const fake = fakeChromium();
+    const manager = new BrowserSessionManager({ chromium: fake.chromium, resolveHost: publicDns, maxSessionsPerWorkspace: 1 });
+    await manager.create({ workspaceId: "workspace-a", destinationId: "destination-a", startUrl: "https://publisher.example/login", approvedHosts: ["publisher.example"] });
+    await expect(manager.create({ workspaceId: "workspace-a", destinationId: "destination-a", startUrl: "https://publisher.example/login", approvedHosts: ["publisher.example"] })).rejects.toMatchObject({ status: 429 });
+    await expect(manager.create({ workspaceId: "workspace-b", destinationId: "destination-a", startUrl: "https://publisher.example/login", approvedHosts: ["publisher.example"] })).resolves.toMatchObject({ workspaceId: "workspace-b" });
   });
 
   it("prevents another workspace from reading or closing the session", async () => {

@@ -35,24 +35,27 @@ This plan follows the requested browser-first editorial platform scope. A checke
 - [x] Manual sources, claims, source assessment, evidence excerpts and conflict summaries.
 - [x] Article-scoped entities, aliases, deterministic alias matching and explicit relationships.
 - [x] Arabic/English outline and editorial objective scaffolding.
+- [x] Initial user-authored GEO brief: search intent, primary/supporting phrases, target questions linked to article sections and evidence, and selection from registered entities; descriptive phrase/question/entity checks without a ranking score.
 - [ ] Extend the PostSuggester design patterns into article briefs: language, goal, market, audience, publication fit, output structure and distinct editorial angle.
-- [ ] Implement evaluated entity extraction/resolution, related questions, search intent and semantic topic clusters.
-- [ ] Add evidence-backed GEO readiness diagnostics: entity coverage, evidence coverage, answerability, freshness, structure and editorial distinctiveness.
-- [ ] Keep GEO readiness separate from measured AI search visibility; keyword density alone is not GEO proof.
+- [ ] Implement evaluated entity extraction/resolution and semantic topic clusters; related questions and search intent are currently user-authored, not automatically discovered or volume-validated.
+- [ ] Expand evidence-backed GEO diagnostics to validate answer correctness, evidence quality/freshness, article structure and distinctiveness; the current checklist checks links and text presence only.
+- [x] Keep GEO readiness separate from measured AI search visibility; occurrence counts are descriptive only and keyword density is not treated as GEO proof.
 - Acceptance: every factual assertion is linked to evidence or flagged; scoring exposes rubric and missing data.
 
 ### 3. Human editing, originality and approval
 - [x] Human-editable article drafts and objective-based outline scaffold.
 - [x] Draft-bound source, originality, media and editorial approval gates.
 - [x] Deterministic exact-match and lexical overlap baseline.
+- [x] Compare saved article drafts with other article/social drafts in the same workspace; exclude the source article when checking its own social adaptation; report candidate type and similarity for human review.
+- [x] Add local workspace-scoped client and brand records; bind article tasks by normalized names; scope duplicate checks to the same client/brand and surface sibling-brand or legacy-unassigned matches.
 - [ ] Add semantic similarity and cross-language duplication checks with a validated multilingual corpus.
-- [ ] Compare repeated article angles, entities, claims and narrative structure across workspace, client and brand.
+- [ ] Compare repeated article angles, entities, claims and narrative structure; topic overlap alone must not imply duplication. Current lexical checks exclude different clients and must not be treated as a complete duplicate detector.
 - [ ] Add article version history and durable review records.
 - [ ] Complete SEO metadata and publication-specific article packaging.
 - Acceptance: same-brand topic overlap is not automatically a duplicate; repeated substance/angle is surfaced for review.
 
 ### 4. Media intelligence
-- [ ] Add authenticated upload with size, MIME and content validation, safe filenames and workspace isolation.
+- [x] Add prototype authenticated upload with file-size, MIME and signature validation, generated storage names, and record-level workspace/article scoping; local disk only.
 - [ ] Analyze uploaded image content and rank contextual placement against article sections.
 - [ ] Support licensed/authorized image discovery, rights/creator/license/attribution records and human confirmation.
 - [ ] Generate captions, alt text, image dimensions and contextual insertion positions.
@@ -65,16 +68,18 @@ This plan follows the requested browser-first editorial platform scope. A checke
 - [x] Add candidate editorial publications and submission policy metadata.
 - [ ] Verify current editorial guidelines, eligibility, rights, exclusivity, disclosure, word limits, image rules and submission path for each selected destination.
 - [ ] Add destination-specific browser adapters and capability tests.
-- [ ] Add manual handoff where automated submission is not allowed or not reliable.
+- [x] Add a generic manual browser handoff; this is not a verified platform adapter.
 - Acceptance: every destination is tested independently; candidate status is never represented as guaranteed acceptance or an enabled publisher.
 
-### 6. Browser Publishing Agent — core outstanding capability
-- [ ] Add independent Node.js Playwright + Chromium worker; never execute browser automation in the Vite frontend.
-- [ ] Build durable job steps and browser session lifecycle per workspace/account/destination.
-- [ ] Open destination website and detect login state.
-- [ ] Pause and display a secure user handoff for login, MFA and CAPTCHA; resume the same task after user completion.
-- [ ] Fill title/body, upload and position images, set categories/tags/byline/disclosure and preview.
-- [ ] Support user-approved publishing, draft-only and manual handoff modes according to destination policy.
+### 6. Browser Publishing Agent — operator-controlled handoff implemented; publication outstanding
+- [x] Run browser automation in an independent Node.js Playwright + Chromium worker; never in the Vite frontend.
+- [x] Add workspace-scoped, in-memory browser sessions behind a server-only shared token, with a two-session per-workspace limit and explicit close/expiry.
+- [ ] Build durable job steps and persist browser sessions across worker restart.
+- [ ] Detect whether the destination login state is valid and recover expired sessions.
+- [x] Show the remote browser screenshot and allow the operator to enter credentials and handle MFA/CAPTCHA manually; no credentials are persisted or challenges bypassed.
+- [x] Insert the currently approved article title and body into operator-configured fields and show a remote preview; no media, categories, tags, byline or disclosure mapping yet.
+- [x] Provide a manual handoff; the app does not click Save/Submit/Publish.
+- [ ] Implement destination-specific draft/publish modes with explicit final approval and policy checks.
 - [ ] Persist screenshots, step logs, external submission/publication IDs and final URL.
 - [ ] Handle expired sessions, network interruptions, timeouts and safe retries without duplicate posts.
 - [ ] Verify external result independently before marking submitted/published.
@@ -97,12 +102,8 @@ This plan follows the requested browser-first editorial platform scope. A checke
 - [ ] Encrypt external credentials and browser storage state; add secrets management, backups, restore, audit logs and rotation.
 - Acceptance: cross-workspace access, concurrent job, backup/restore and authorization tests pass.
 
-### 9. MAAROOF AI future API
-- [ ] Define scoped, authenticated, versioned REST endpoints for article requests, context exchange, validation, originality and publication state.
-- [ ] Accept explicit workspace/client/brand identifiers and only authorized context.
-- [ ] Return article versions, evidence references, quota usage, job state and verified publication URLs.
-- [ ] Add idempotency, rate limits, audit logs and optional webhooks.
-- Acceptance: no direct access to MAAROOF AI database; cross-workspace requests are denied.
+### 9. Out of scope: MAAROOF AI connection
+- Do not build a MAAROOF AI API integration, shared-database access, workspace synchronization, or context exchange for this project.
 
 ### 10. Deferred: AI article writing
 - [ ] Revisit model provider selection only after human-authored workflow, cost controls, evidence contracts and article evaluations are complete.
@@ -121,7 +122,7 @@ This plan follows the requested browser-first editorial platform scope. A checke
 2. Authorized user accounts for any destination selected for browser publishing.
 3. Publication-specific policy/eligibility confirmation and any required editorial approval.
 4. Production host, self-managed database, encrypted secret store and durable job worker.
-5. Future MAAROOF AI API credentials/contract and workspace authorization rules.
-6. A later explicit decision and budget for model-assisted article writing.
+5. A separate model-provider configuration and cost decision before enabling model-assisted platform drafts.
+6. A later explicit decision and budget before enabling full article generation.
 
 No prerequisite is assumed to exist until it is supplied and verified.

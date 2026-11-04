@@ -17,6 +17,16 @@ describe("editorial task lifecycle", () => {
     expect(listEditorialTasks(state, "workspace-2")).toHaveLength(0);
   });
 
+  it("binds article tasks to normalized workspace client and brand records", () => {
+    const state: any = { tasks: {}, clients: [], brands: [] };
+    const first = createEditorialTask(state, { workspaceId: "workspace-1", topic: "First client article", clientName: "Acme Group", brandName: "Acme Daily" });
+    const second = createEditorialTask(state, { workspaceId: "workspace-1", topic: "Second client article", clientName: "ACME GROUP", brandName: "ACME DAILY" });
+    expect(first.article.clientId).toBe(second.article.clientId);
+    expect(first.article.brandId).toBe(second.article.brandId);
+    expect(first.article).toMatchObject({ clientName: "Acme Group", brandName: "Acme Daily" });
+    expect(listEditorialTasks(state, "workspace-1").find(item=>item.id===second.id)?.clientName).toBe("Acme Group");
+  });
+
   it("validates language, objective and topic", () => {
     const state = { tasks: {} };
     expect(() => createEditorialTask(state, { workspaceId: "w", topic: "ok", language: "fr" as never })).toThrow();

@@ -3,7 +3,7 @@ import { runEditorialDraftGeneration } from "./editorial-writing.mjs";
 function fixture(){
  const workspaceId="w1",taskId="t1",sourceId="s1",claimId="c1",evidenceId="e1";
  const draft={id:"d1",workspaceId,taskId,title:"",language:"en",sections:[{id:"sec1",heading:"Context",brief:"Explain the context",body:""}],metaTitle:"",metaDescription:"",editorialAngle:"",status:"outline"};
- const state={tasks:{t1:{workspaceId,article:{topic:"A sufficiently detailed topic",language:"en",objective:"analysis",stage:"drafting"}}},editorialDrafts:[draft],
+ const state={tasks:{t1:{workspaceId,article:{topic:"A sufficiently detailed topic",language:"en",objective:"analysis",stage:"drafting"}}},editorialDrafts:[draft],entities:[],
  sources:[{id:sourceId,workspaceId,taskId,url:"https://example.org/report",title:"Report",research:{publisher:"Example",qualityRating:"medium",assessmentMode:"manual-editorial-review"}}],
  claims:[{id:claimId,workspaceId,taskId,text:"A supported editorial claim",sourceIds:[sourceId]}],
  researchEvidence:[{id:evidenceId,workspaceId,taskId,sourceId,claimId,excerpt:"A sufficiently detailed evidence excerpt supplied by the editor.",stance:"supports",verificationState:"manually-transcribed-unverified"}],modelUsage:[]};
@@ -21,6 +21,17 @@ describe("AI-assisted editorial drafting contract",()=>{
   expect(result.draft.status).toBe("draft");expect(result.draft.generationMode).toBe("model-assisted");
   expect(result.draft.sections[0].evidenceIds).toEqual(["e1"]);
   expect(f.state.modelUsage).toHaveLength(1);
+ });
+ it("passes editor-selected GEO phrases and registered entities with anti-stuffing rules",async()=>{
+  const f=fixture();
+  f.state.editorialDrafts[0].geoBrief={intent:"informational",primaryQuery:"school rooftop solar",supportingTerms:["solar assessment"],targetQuestions:[{question:"How can a school assess solar?",sectionId:"sec1",evidenceIds:["e1"]}],targetEntityIds:["entity1"]};
+  f.state.entities=[{id:"entity1",workspaceId:f.workspaceId,taskId:f.taskId,canonicalName:"Example organization",aliases:["Example Org"],disambiguationNote:"The entity in the provided report."}];
+  const result=await runEditorialDraftGeneration({store:f.store,provider:f.provider,workspaceId:f.workspaceId,taskId:f.taskId});
+  const call=f.provider.generateJSON.mock.calls[0][0];
+  expect(call.prompt).toContain("school rooftop solar");
+  expect(call.prompt).toContain("Example organization");
+  expect(call.system).toContain("do not keyword-stuff");
+  expect(result.draft.status).toBe("draft");
  });
  it("rejects evidence IDs fabricated by the model and does not save the draft",async()=>{
   const f=fixture();f.provider.generateJSON.mockResolvedValueOnce({output:{title:"A carefully sourced article title",metaTitle:"Carefully sourced article",metaDescription:"A detailed description of the article for search results.",sections:[{heading:"Context",body:"This section has sufficient length to pass the basic structural content check and then some.",evidenceIds:["unknown"],claimIds:["c1"]}]}});

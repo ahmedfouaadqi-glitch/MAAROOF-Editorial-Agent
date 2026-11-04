@@ -96,18 +96,21 @@ const SAFE_KEYS = new Set(["Enter", "Tab", "Escape", "Backspace", "Delete", "Arr
 const MAX_TEXT = 200_000;
 
 export class BrowserSessionManager {
-  constructor({ chromium, resolveHost = lookup, now = () => Date.now(), ttlMs = 60 * 60 * 1000 }) {
+  constructor({ chromium, resolveHost = lookup, now = () => Date.now(), ttlMs = 60 * 60 * 1000, maxSessionsPerWorkspace = 2 }) {
     if (!chromium || typeof chromium.launch !== "function") throw new Error("Playwright Chromium is required");
     this.chromium = chromium;
     this.resolveHost = resolveHost;
     this.now = now;
     this.ttlMs = ttlMs;
+    this.maxSessionsPerWorkspace = maxSessionsPerWorkspace;
     this.sessions = new Map();
   }
 
   async create({ workspaceId, destinationId, startUrl, approvedHosts }) {
     if (typeof workspaceId !== "string" || !workspaceId.trim() || workspaceId.length > 128) fail("workspaceId is required");
     if (typeof destinationId !== "string" || !destinationId.trim() || destinationId.length > 128) fail("destinationId is required");
+    const activeCount = [...this.sessions.values()].filter(item => item.workspaceId === workspaceId && item.expiresAt > this.now()).length;
+    if (activeCount >= this.maxSessionsPerWorkspace) fail("The active browser session limit for this workspace has been reached", 429);
     const hosts = normalizeAllowedHosts(approvedHosts);
     const target = await validatePublicUrl(startUrl, hosts, { resolveHost: this.resolveHost });
     const browser = await this.chromium.launch({ headless: true });

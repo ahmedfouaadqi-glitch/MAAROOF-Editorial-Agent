@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildApprovedArticleForBrowser, getBrowserDestination, getBrowserSession,
+  buildApprovedArticleForBrowser, getBrowserDestination, getBrowserSession, listBrowserSessions,
   registerBrowserDestination, removeBrowserSession, saveBrowserSession, updateBrowserSession
 } from "./browser-publishing.mjs";
 
@@ -11,7 +11,8 @@ const profile = {
   workspaceId: "workspace-a", name: "Sample Magazine",
   homepage: "https://magazine.example", editorUrl: "https://magazine.example/login",
   approvedHosts: ["accounts.magazine.example"],
-  titleSelector: "input[name=title]", bodySelector: "[contenteditable=true]"
+  titleSelector: "input[name=title]", bodySelector: "[contenteditable=true]",
+  authorityConfirmed: true, policyReviewed: true
 };
 
 describe("browser destination registry", () => {
@@ -19,9 +20,13 @@ describe("browser destination registry", () => {
     const state = emptyState();
     const destination = registerBrowserDestination(state, profile);
     expect(destination).toMatchObject({
-      workspaceId: "workspace-a", status: "needs-policy-review", automaticPublishEnabled: false,
+      workspaceId: "workspace-a", status: "operator-declared-unverified", automaticPublishEnabled: false,
       approvedHosts: ["magazine.example", "accounts.magazine.example"]
     });
+  });
+  it("requires the operator to confirm authority and policy review", () => {
+    expect(() => registerBrowserDestination(emptyState(), { ...profile, authorityConfirmed: false })).toThrow(/authorized/);
+    expect(() => registerBrowserDestination(emptyState(), { ...profile, policyReviewed: false })).toThrow(/policies/);
   });
   it("rejects unapproved editor hosts and insecure URLs", () => {
     expect(() => registerBrowserDestination(emptyState(), { ...profile, editorUrl: "https://attacker.example/login" })).toThrow();
@@ -37,6 +42,8 @@ describe("browser destination registry", () => {
       createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60000).toISOString()
     });
     expect(() => getBrowserSession(state, "workspace-b", "session-abc")).toThrow();
+    expect(listBrowserSessions(state, "workspace-a")).toHaveLength(1);
+    expect(listBrowserSessions(state, "workspace-b")).toHaveLength(0);
   });
   it("updates and removes a session only in the owning workspace", () => {
     const state = emptyState();

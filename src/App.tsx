@@ -12,13 +12,14 @@ import AIVisibilityPanel from "./components/AIVisibilityPanel";
 import MagazineSubmissionsPanel from "./components/MagazineSubmissionsPanel";
 import EditorialDraftPanel from "./components/EditorialDraftPanel";
 import EditorialReviewPanel from "./components/EditorialReviewPanel";
+import BrowserPublishingPanel from "./components/BrowserPublishingPanel";
 import { DEFAULT_RESEARCH_BUDGET, validateResearchBudgetLimits, type ResearchBudgetLimits } from "./domain/research-budget";
 import { categoryLabels, modeLabels, platforms, readinessLabels, type PlatformCategory } from "./data/platforms";
 import { adapterRegistry } from "./data/adapter-registry";
 import { magazinePublications } from "./data/magazine-publications";
 
-type View = "home" | "articles" | "registry" | "research-settings" | "ai-visibility" | "magazine-submissions";
-type Article = { id: string; topic: string; language: string; objective: string; stage: string; createdAt: string };
+type View = "home" | "articles" | "registry" | "research-settings" | "ai-visibility" | "magazine-submissions" | "browser-publishing";
+type Article = { id: string; topic: string; language: string; objective: string; stage: string; createdAt: string; clientId?: string; clientName?: string; brandId?: string; brandName?: string };
 type Locale = "ar" | "en";
 const NEXT_STAGE: Record<string, string> = { intake: "planning", planning: "research", research: "entity-analysis", "entity-analysis": "outline", outline: "drafting", drafting: "source-review", "source-review": "originality-review", "originality-review": "media-review", "media-review": "editorial-approval", "editorial-approval": "ready-to-publish" };
 const categories: Array<"all" | PlatformCategory> = ["all", "editorial", "professional", "community", "knowledge", "research", "developer", "web-data"];
@@ -59,7 +60,7 @@ const t = {
     searchHint: "عدد استعلامات البحث الحي لكل مقالة عبر المزود المفعّل في الخادم.",
     inspectHint: "فحوص بنية المحتوى المستخرج؛ لا تعني التحقق من صحة الادعاءات.",
     newTitle: "إنشاء مهمة تحريرية", newSub: "حدد الموضوع واللغة والهدف. لن يتم النشر الخارجي تلقائياً.",
-    topic: "موضوع المقالة", topicPlaceholder: "اكتب الموضوع أو الفكرة الرئيسية...",
+    topic: "موضوع المقالة", topicPlaceholder: "اكتب الموضوع أو الفكرة الرئيسية...", client: "العميل (اختياري)", clientHint: "اختر اسماً سابقاً أو أدخل عميلاً جديداً.", brand: "العلامة التجارية (اختياري)", brandHint: "العلامة تُسجّل تحت العميل عند تحديده.",
     language: "لغة المقالة", objective: "الهدف التحريري", createTask: "إنشاء المهمة",
     analysis: "تحليل", thought: "قيادة فكرية", news: "خبر", education: "محتوى تعليمي", researchSummary: "ملخص بحثي",
     arabic: "العربية", english: "الإنجليزية", status: "الحالة", stage: "المرحلة",
@@ -93,7 +94,7 @@ const t = {
     searchHint: "Live search queries allowed per article through the server-enabled provider.",
     inspectHint: "Structural checks of scraped content; not factual verification.",
     newTitle: "Create editorial task", newSub: "Set the topic, language, and objective. No external publishing will happen automatically.",
-    topic: "Article topic", topicPlaceholder: "Enter the main topic or idea...",
+    topic: "Article topic", topicPlaceholder: "Enter the main topic or idea...", client: "Client (optional)", clientHint: "Choose an existing name or enter a new client.", brand: "Brand (optional)", brandHint: "The brand is recorded under the selected client, if any.",
     language: "Article language", objective: "Editorial objective", createTask: "Create task",
     analysis: "Analysis", thought: "Thought leadership", news: "News", education: "Educational", researchSummary: "Research summary",
     arabic: "Arabic", english: "English", status: "Status", stage: "Stage",
@@ -119,6 +120,10 @@ export default function App() {
   const [locale, setLocale] = useState<Locale>("ar");
   const [mobileNav, setMobileNav] = useState(false);
   const [topic, setTopic] = useState("");
+  const [clientName, setClientName] = useState("");
+  const [brandName, setBrandName] = useState("");
+  const [clientOptions, setClientOptions] = useState<Array<{id:string;name:string}>>([]);
+  const [brandOptions, setBrandOptions] = useState<Array<{id:string;name:string;clientId:string|null}>>([]);
   const [language, setLanguage] = useState<"ar" | "en">("ar");
   const [objective, setObjective] = useState("analysis");
   const [articles, setArticles] = useState<Article[]>([]);
@@ -129,6 +134,10 @@ export default function App() {
   const [reviewArticleId, setReviewArticleId] = useState<string | null>(null);
   const apiBase = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8787").replace(/\/$/, "");
   const copy = t[locale];
+  const normalizeIdentityName=(value:string)=>value.normalize("NFKC").toLocaleLowerCase().trim().replace(/\s+/g," ");
+  const selectedClientOption=clientOptions.find(item=>normalizeIdentityName(item.name)===normalizeIdentityName(clientName));
+  const clientSuggestions=clientOptions.map(item=>item.name);
+  const brandSuggestions=brandOptions.filter(item=>clientName.trim()?Boolean(selectedClientOption&&item.clientId===selectedClientOption.id):!item.clientId).map(item=>item.name);
   const budgetValidation = validateResearchBudgetLimits(budget);
   const selected = platforms.find((p) => p.id === selectedId);
   const adapter = selected ? adapterRegistry[selected.id] : undefined;
@@ -139,7 +148,7 @@ export default function App() {
 
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
   useEffect(() => {
-    if ((view !== "articles" && view !== "magazine-submissions") || !adminToken.trim()) return;
+    if ((view !== "articles" && view !== "magazine-submissions" && view !== "browser-publishing") || !adminToken.trim()) return;
     let cancelled = false;
     fetch(`${apiBase}/api/v1/workspaces/main-workspace/articles`, { headers: { authorization: `Bearer ${adminToken}` } })
       .then(async response => {
@@ -149,6 +158,16 @@ export default function App() {
       })
       .catch(error => { if (!cancelled) setArticleNotice(error instanceof Error ? error.message : "تعذر الاتصال بالخدمة الخلفية."); });
     return () => { cancelled = true; };
+  }, [view, adminToken, apiBase]);
+  useEffect(() => {
+    if (view !== "articles" || !adminToken.trim()) { setClientOptions([]); setBrandOptions([]); return; }
+    let cancelled = false;
+    const headers = { authorization: `Bearer ${adminToken}` };
+    Promise.all([
+      fetch(`${apiBase}/api/v1/workspaces/main-workspace/clients`, { headers }).then(async response => { const payload=await response.json(); if(!response.ok) throw new Error(payload.error||"Unable to load clients"); return payload.clients||[]; }),
+      fetch(`${apiBase}/api/v1/workspaces/main-workspace/brands`, { headers }).then(async response => { const payload=await response.json(); if(!response.ok) throw new Error(payload.error||"Unable to load brands"); return payload.brands||[]; })
+    ]).then(([clients,brands])=>{ if(cancelled)return; setClientOptions(clients); setBrandOptions(brands); }).catch(()=>{ if(!cancelled){setClientOptions([]);setBrandOptions([]);} });
+    return ()=>{cancelled=true;};
   }, [view, adminToken, apiBase]);
 
   async function saveBudget() {
@@ -189,11 +208,13 @@ export default function App() {
       const response = await fetch(`${apiBase}/api/v1/workspaces/main-workspace/articles`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${adminToken}` },
-        body: JSON.stringify({ topic, language, objective })
+        body: JSON.stringify({ topic, language, objective, clientName: clientName.trim(), brandName: brandName.trim() })
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || "تعذر إنشاء المهمة");
       setArticles(current => [payload.article, ...current]);
+      if (payload.article.clientId && payload.article.clientName) setClientOptions(current => current.some(item=>item.id===payload.article.clientId)?current:[...current,{id:payload.article.clientId,name:payload.article.clientName}]);
+      if (payload.article.brandId && payload.article.brandName) setBrandOptions(current => current.some(item=>item.id===payload.article.brandId)?current:[...current,{id:payload.article.brandId,name:payload.article.brandName,clientId:payload.article.clientId||null}]);
       setTopic("");
       setArticleNotice(locale === "ar" ? "تم إنشاء المهمة في مرحلة الاستلام." : "Task created in the intake stage.");
     } catch (error) { setArticleNotice(error instanceof Error ? error.message : "تعذر الاتصال بالخدمة الخلفية."); }
@@ -221,6 +242,7 @@ export default function App() {
   const navItems = [
     { id: "home" as const, label: copy.overview, icon: LayoutDashboard },
     { id: "articles" as const, label: copy.articles, icon: FileText },
+    { id: "browser-publishing" as const, label: locale === "ar" ? "النشر عبر المتصفح" : "Browser handoff", icon: Globe2 },
     { id: "magazine-submissions" as const, label: locale === "ar" ? "تقديمات المجلات" : "Magazine submissions", icon: BookOpenText },
     { id: "registry" as const, label: copy.registry, icon: Globe2 },
     { id: "research-settings" as const, label: copy.research, icon: SlidersHorizontal },
@@ -275,6 +297,10 @@ export default function App() {
               <form className="article-form" onSubmit={createArticle}>
                 <label>{copy.topic}<textarea value={topic} onChange={e=>setTopic(e.target.value)} placeholder={copy.topicPlaceholder} rows={4} required minLength={3}/></label>
                 <div className="form-pair">
+                  <label>{copy.client}<input list="editorial-client-options" value={clientName} onChange={e=>setClientName(e.target.value)} placeholder={copy.clientHint}/><datalist id="editorial-client-options">{clientSuggestions.map(name=><option key={name} value={name}/>)}</datalist></label>
+                  <label>{copy.brand}<input list="editorial-brand-options" value={brandName} onChange={e=>setBrandName(e.target.value)} placeholder={copy.brandHint}/><datalist id="editorial-brand-options">{brandSuggestions.map(name=><option key={name} value={name}/>)}</datalist></label>
+                </div>
+                <div className="form-pair">
                   <label>{copy.language}<select value={language} onChange={e=>setLanguage(e.target.value as "ar"|"en")}><option value="ar">{copy.arabic}</option><option value="en">{copy.english}</option></select></label>
                   <label>{copy.objective}<select value={objective} onChange={e=>setObjective(e.target.value)}><option value="analysis">{copy.analysis}</option><option value="thought-leadership">{copy.thought}</option><option value="news">{copy.news}</option><option value="educational">{copy.education}</option><option value="research-summary">{copy.researchSummary}</option></select></label>
                 </div>
@@ -289,7 +315,7 @@ export default function App() {
             </div>
           </div>
           <section className="surface-card article-list-card"><div className="section-heading"><div><span className="tiny-overline">WORK QUEUE</span><h2>{copy.recent}</h2></div><span className="count-badge">{articles.length}</span></div>
-            {articles.length === 0 ? <EmptyArticles copy={copy}/> : <div className="article-table">{articles.map(article=><div className="article-row" key={article.id}><div className="article-file-icon"><FileText size={17}/></div><div className="article-row-main"><b>{article.topic}</b><small>{article.language.toUpperCase()} · {new Date(article.createdAt).toLocaleDateString(locale === "ar" ? "ar-IQ" : "en-US")}</small></div><span className="stage-pill">{(locale==="ar"?stageLabels:enStageLabels)[article.stage] || article.stage}</span><button className="secondary-button evidence-open-button" onClick={()=>setEvidenceArticleId(evidenceArticleId===article.id?null:article.id)}>{evidenceArticleId===article.id?(locale==="ar"?"إغلاق الأدلة":"Close evidence"):(locale==="ar"?"الأدلة":"Evidence")}</button><button className="secondary-button evidence-open-button" onClick={()=>setDraftArticleId(draftArticleId===article.id?null:article.id)}>{draftArticleId===article.id?(locale==="ar"?"إغلاق المسودة":"Close draft"):(locale==="ar"?"المخطط والمسودة":"Outline / Draft")}</button><button className="secondary-button evidence-open-button" onClick={()=>setReviewArticleId(reviewArticleId===article.id?null:article.id)}>{reviewArticleId===article.id?(locale==="ar"?"إغلاق المراجعة":"Close review"):(locale==="ar"?"المراجعة والاعتماد":"Review / Approve")}</button><button className="advance-button" disabled={!NEXT_STAGE[article.stage]||advancingId===article.id||!adminToken.trim()} onClick={()=>advanceArticle(article)}>{advancingId===article.id?copy.loading:(locale==="ar"?"التالي":"Advance")} <ArrowUpLeft size={12}/></button></div>)}</div>}{articleNotice&&<p className="inline-feedback">{articleNotice}</p>}
+            {articles.length === 0 ? <EmptyArticles copy={copy}/> : <div className="article-table">{articles.map(article=><div className="article-row" key={article.id}><div className="article-file-icon"><FileText size={17}/></div><div className="article-row-main"><b>{article.topic}</b><small>{article.language.toUpperCase()} · {new Date(article.createdAt).toLocaleDateString(locale === "ar" ? "ar-IQ" : "en-US")}{article.clientName?` · ${article.clientName}`:""}{article.brandName?` / ${article.brandName}`:""}</small></div><span className="stage-pill">{(locale==="ar"?stageLabels:enStageLabels)[article.stage] || article.stage}</span><button className="secondary-button evidence-open-button" onClick={()=>setEvidenceArticleId(evidenceArticleId===article.id?null:article.id)}>{evidenceArticleId===article.id?(locale==="ar"?"إغلاق الأدلة":"Close evidence"):(locale==="ar"?"الأدلة":"Evidence")}</button><button className="secondary-button evidence-open-button" onClick={()=>setDraftArticleId(draftArticleId===article.id?null:article.id)}>{draftArticleId===article.id?(locale==="ar"?"إغلاق المسودة":"Close draft"):(locale==="ar"?"المخطط والمسودة":"Outline / Draft")}</button><button className="secondary-button evidence-open-button" onClick={()=>setReviewArticleId(reviewArticleId===article.id?null:article.id)}>{reviewArticleId===article.id?(locale==="ar"?"إغلاق المراجعة":"Close review"):(locale==="ar"?"المراجعة والاعتماد":"Review / Approve")}</button><button className="advance-button" disabled={!NEXT_STAGE[article.stage]||advancingId===article.id||!adminToken.trim()} onClick={()=>advanceArticle(article)}>{advancingId===article.id?copy.loading:(locale==="ar"?"التالي":"Advance")} <ArrowUpLeft size={12}/></button></div>)}</div>}{articleNotice&&<p className="inline-feedback">{articleNotice}</p>}
           </section>
           {evidenceArticleId && articles.some(article => article.id === evidenceArticleId) && <EditorialEvidencePanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" article={articles.find(article => article.id === evidenceArticleId)!} locale={locale}/>}
           {draftArticleId && articles.some(article => article.id === draftArticleId) && <EditorialDraftPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" taskId={draftArticleId} stage={articles.find(article => article.id === draftArticleId)!.stage} locale={locale}/>}
@@ -313,6 +339,7 @@ export default function App() {
         </section>}
         {view === "ai-visibility" && <AIVisibilityPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" locale={locale}/>}
         {view === "magazine-submissions" && <MagazineSubmissionsPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" articles={articles} publications={magazinePublications} locale={locale}/> }
+        {view === "browser-publishing" && <BrowserPublishingPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" articles={articles} locale={locale}/> }
         {view === "research-settings" && <section className="page-section">
           <PageHeading eyebrow="SYSTEM CONFIGURATION" title={copy.settingsTitle} subtitle={copy.settingsSub}/>
           <SpotlightCard theme={theme} className="surface-card budget-panel" spotlightColor={theme==="light"?"#b88c54":"#d6ae78"} intensity={0.1} spotlightSize={340}>

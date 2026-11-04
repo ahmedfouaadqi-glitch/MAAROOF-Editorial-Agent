@@ -1,22 +1,25 @@
 # MAAROOF Editorial Agent
 
-Lovable-compatible editorial operations platform with a future browser-first publishing agent.
+Lovable-compatible editorial operations platform with a prototype user-controlled browser handoff; automated publication remains deferred.
 
 ## Architecture constraints
 - Frontend: React + Vite + TypeScript, Tailwind CSS, React Router.
 - No Supabase. The current API prototype persists JSON locally.
 - Application service: independent Node.js HTTP API with serialized, atomic single-process JSON writes. It is not horizontally scalable.
-- Browser publishing: isolated Playwright + Chromium runtime is planned and not implemented yet. Browser automation must never run in the frontend.
-- Article-writing LLM use is deferred. The existing optional model adapter remains disabled by default and is not part of the current operating phase.
-- MAAROOF AI remains a separate system; future integration is through scoped, authenticated APIs only.
+- Browser publishing: the UI/API can proxy to a private Playwright worker for operator-declared destinations, manual sign-in, screenshot interaction, and filling an already-approved article. The worker does not click submit/publish, sessions are in-memory and expire, and platform-specific adapters/result verification remain incomplete. Browser automation runs only in the worker, never in the frontend.
+- Full article-writing model calls remain disabled. Platform-specific social drafts are a separate opt-in capability using a server-side OpenAI-compatible provider; they do not call MAAROOF AI.
+- This project has no MAAROOF AI connection, API integration, shared database, or workspace data exchange.
 
 ## Current implementation
 - Responsive Linear-inspired editorial workspace with vector-first dashboard, Arabic RTL default, English shell labels, light/dark themes, and mobile navigation.
 - React Bits SpotlightCard integration for restrained pointer-reactive lighting.
 - Conservative platform capability profiles, policy constraints, and verification checklists.
 - Article task creation, deterministic Arabic/English outline scaffold, human editing, and controlled stage progression.
+- Per-article GEO editorial brief: editor-selected intent, specific target/supporting phrases, evidence-linked questions and registered entities, with descriptive readiness checks only (no keyword-volume data, ranking score, or visibility promise).
+- Platform-native social copy drafts for LinkedIn, Facebook Pages, Instagram, X, Threads, TikTok, YouTube, and Pinterest, with video script and media guidance fields; generation is disabled unless a separate provider is explicitly configured.
+- Workspace/article-scoped image and video upload, authenticated preview and delete; JPEG/PNG/WebP up to 15 MiB, MP4/WebM up to 100 MiB, 1 GiB local total. The model sees user descriptions only, not file bytes.
 - Article-level source/evidence workspace, claim links, entity registry, manual source assessment, and editorial/media approval gates.
-- Deterministic exact-match and token-overlap originality baseline; this is not semantic plagiarism detection.
+- Workspace-scoped exact-match and token-overlap checks across saved article and social drafts, grouped by client/brand identity and reported for human review; not semantic or cross-language duplicate detection, and different clients are not compared.
 - Admin quotas per article: manually registered source URLs 3, Firecrawl page scrapes 3, search operations 5, and structure inspections 5 by default.
 - Optional Firecrawl v2 server adapter, quota-metered scrape/search APIs, extracted Markdown storage, and unverified provenance.
 - Optional Brave Web Search adapter behind server-side configuration.
@@ -28,8 +31,10 @@ See the [requested scope and implementation plan](docs/REQUESTED-SCOPE-AND-IMPLE
 ## Explicit exclusions and deferred work
 - Supabase and managed database services.
 - Model-based article writing, model-assisted NER and paid LLM calls until a later phase.
-- Real browser publishing, Playwright/Chromium worker, account-session handoff, and external publication verification.
+- Production object storage, malware scanning, image pixel understanding, metadata stripping, media transformations, and cross-instance file sharing are not implemented; contextual selection uses the user's description only.
+- Durable account-session handoff, media attachment in the browser, platform-specific adapters, automated publishing, idempotent retries, and external publication verification.
 - Production identity authentication, durable multi-instance persistence, and production job orchestration.
+- Any MAAROOF AI integration or direct data connection is out of scope.
 - No destination is automatically publish-enabled. Destination policy and account authorization must be verified individually.
 
 ## Research provider configuration
@@ -48,7 +53,8 @@ Requires Node.js 22 or newer.
 2. Set a strong, unique ADMIN_API_TOKEN.
 3. Start the API with npm install and npm run server.
 4. In a second terminal, run npm run dev.
-5. Validate with npm run typecheck, npm test and npm run build.
+5. For browser handoff, set the same random 32+ character BROWSER_AGENT_TOKEN for both processes, run npm run browser:install once, then run npm run browser:worker in a third terminal. Keep the worker bound to 127.0.0.1.
+6. Validate with npm run typecheck, npm test and npm run build.
 
 The API defaults to http://127.0.0.1:8787. Set HOST=0.0.0.0 only when external access is required, and configure CORS_ORIGIN to the exact frontend origin. The JSON data file is written to ./data/editorial-agent.json and excluded from Git.
 
@@ -57,6 +63,7 @@ The API defaults to http://127.0.0.1:8787. Set HOST=0.0.0.0 only when external a
 - Workspace identifiers are currently record-scoped; authenticated identity-to-workspace authorization is required before public multi-tenant deployment.
 - JSON persistence serializes writes within one Node process only. Do not run multiple instances against the same data file.
 - Firecrawl fetches remote URLs. Current validation rejects local/internal hostnames and literal IP targets, but is not a complete DNS-rebinding defence; stricter destination and provider-side controls remain necessary.
+- Serve the browser handoff UI/API over HTTPS outside local development; keep the browser worker on loopback/private networking and never expose its port publicly.
 - Keep secrets out of source control and frontend bundles.
 - Never bypass CAPTCHA, MFA, access controls or platform safeguards.
 - Never report publication success without external verification.

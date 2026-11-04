@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { editorialDraftFingerprint, assertCurrentEditorialApproval } from "./editorial-approval.mjs";
 import { assertCurrentMediaReview } from "./editorial-media.mjs";
+import { resolveEditorialIdentities } from "./editorial-identities.mjs";
 
 const OBJECTIVES = new Set(["thought-leadership", "news", "analysis", "educational", "research-summary"]);
 const LANGUAGES = new Set(["ar", "en"]);
@@ -23,12 +24,13 @@ function invalid(message) {
   return error;
 }
 
-export function createEditorialTask(state, { workspaceId, topic, language = "ar", objective = "analysis", targetPlatformId, clientId, brandId }) {
+export function createEditorialTask(state, { workspaceId, topic, language = "ar", objective = "analysis", targetPlatformId, clientId, brandId, clientName, brandName }) {
   if (typeof workspaceId !== "string" || !workspaceId.trim() || workspaceId.length > 128) throw invalid("workspaceId is required");
   if (typeof topic !== "string" || topic.trim().length < 3 || topic.length > 500) throw invalid("topic must contain 3-500 characters");
   if (!LANGUAGES.has(language)) throw invalid("language must be ar or en");
   if (!OBJECTIVES.has(objective)) throw invalid("Unsupported editorial objective");
 
+  const identity = resolveEditorialIdentities(state, { workspaceId, clientId, brandId, clientName, brandName });
   const id = randomUUID();
   const now = new Date().toISOString();
   const task = {
@@ -41,8 +43,7 @@ export function createEditorialTask(state, { workspaceId, topic, language = "ar"
       language,
       objective,
       ...(typeof targetPlatformId === "string" && targetPlatformId.trim() ? { targetPlatformId: targetPlatformId.trim() } : {}),
-      ...(typeof clientId === "string" && clientId.trim() ? { clientId: clientId.trim() } : {}),
-      ...(typeof brandId === "string" && brandId.trim() ? { brandId: brandId.trim() } : {}),
+      ...identity,
       stage: "intake",
       createdAt: now,
       updatedAt: now

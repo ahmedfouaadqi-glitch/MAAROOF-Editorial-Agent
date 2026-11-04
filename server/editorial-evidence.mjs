@@ -1,4 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
+import { compareWorkspaceEditorialContent, normalizeEditorialText } from "./editorial-similarity.mjs";
+
+export { normalizeEditorialText };
 
 function fail(message, status = 400) {
   const error = new Error(message);
@@ -12,35 +15,8 @@ function taskFor(state, workspaceId, taskId) {
   return task;
 }
 
-export function normalizeEditorialText(value) {
-  return value
-    .normalize("NFKC")
-    .toLocaleLowerCase()
-    .replace(/[\u064B-\u065F\u0670\u0640]/g, "")
-    .replace(/[أإآٱ]/g, "ا")
-    .replace(/[ى]/g, "ي")
-    .replace(/[ؤ]/g, "و")
-    .replace(/[ئ]/g, "ي")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
 function fingerprint(normalized) {
   return createHash("sha256").update(normalized).digest("hex");
-}
-
-function tokenSet(normalized) {
-  return new Set(normalized.split(" ").filter(Boolean));
-}
-
-function jaccard(left, right) {
-  const a = tokenSet(left);
-  const b = tokenSet(right);
-  if (!a.size || !b.size) return 0;
-  let intersection = 0;
-  for (const token of a) if (b.has(token)) intersection += 1;
-  return intersection / (a.size + b.size - intersection);
 }
 
 export function registerClaim(state, { workspaceId, taskId, text, sourceIds = [] }) {
@@ -97,14 +73,12 @@ export function checkOriginality(state, { workspaceId, taskId, text, nearDuplica
   if (normalized.length < 20) fail("Text is too short after normalization");
   const hash = fingerprint(normalized);
   state.originalityChecks ||= [];
-  const previous = state.originalityChecks.filter(item => item.workspaceId === workspaceId && item.taskId !== taskId);
-  const exact = previous.find(item => item.fingerprint === hash);
-  const comparisons = previous
-    .filter(item => item.normalizedText.split(" ").length >= 8 && normalized.split(" ").length >= 8)
-    .map(item => ({ item, similarity: jaccard(normalized, item.normalizedText) }))
-    .filter(item => item.similarity >= nearDuplicateThreshold)
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, 5);
+  const article = state.tasks?.[taskId]?.article || {};
+  const comparisons = compareWorkspaceEditorialContent(state, workspaceId, text, {
+    excludeArticleTaskIds: [taskId], excludeSocialTaskIds: [taskId], excludeCheckTaskIds: [taskId],
+    clientId: article.clientId || null, brandId: article.brandId || null, nearDuplicateThreshold
+  });
+  const exact = comparisons.exactMatches[0] || null;
   const result = {
     id: randomUUID(),
     workspaceId,
@@ -112,17 +86,20 @@ export function checkOriginality(state, { workspaceId, taskId, text, nearDuplica
     fingerprint: hash,
     normalizedText: normalized,
     checkedAt: new Date().toISOString(),
-    outcome: exact ? "exact-match" : comparisons.length ? "possible-near-duplicate" : "no-match-found",
+    outcome: exact ? "exact-match" : comparisons.nearMatches.length ? "possible-near-duplicate" : "no-match-found",
     exactMatchTaskId: exact?.taskId || null,
-    nearMatches: comparisons.map(({ item, similarity }) => ({
-      taskId: item.taskId,
-      similarity: Number(similarity.toFixed(4))
-    })),
+    exactMatchContentType: exact?.contentType || null,
+    exactMatches: comparisons.exactMatches,
+    nearMatches: comparisons.nearMatches,
+    comparisonScope: comparisons.comparisonScope,
+    comparedContentCount: comparisons.comparedContentCount,
+    comparedByType: comparisons.comparedByType,
     method: "normalized-sha256-and-token-jaccard",
     limitations: [
-      "Checks only text previously submitted to this workspace's originality endpoint.",
-      "Token overlap is a deterministic heuristic, not semantic similarity.",
-      "Cross-language paraphrases, external web content, and unpublished drafts are not checked."
+      "Compares saved article and social drafts assigned to the same client, or to the same standalone brand; legacy unassigned content is included as a separate candidate category.",
+      "Content assigned to a different client is excluded; current identity is metadata only and is not an authorization boundary.",
+      "Token overlap is a deterministic heuristic, not semantic similarity or a plagiarism verdict.",
+      "Other workspaces, translated paraphrases, external websites, and unrecorded content are not checked."
     ]
   };
   state.originalityChecks.push(result);

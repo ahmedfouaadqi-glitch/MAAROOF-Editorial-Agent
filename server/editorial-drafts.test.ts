@@ -18,6 +18,13 @@ describe("editorial draft scaffold",()=>{
   expect(updated.status).toBe("draft");
   expect(getEditorialDraft(db,"workspace-a","task").sections[0].body).toBe("نص كتبه المحرر.");
  });
+ it("preserves the GEO brief when rebuilding an outline but clears stale section links",()=>{
+  const db=state();const draft=buildEditorialOutline(db,{workspaceId:"workspace-a",taskId:"task"});
+  draft.geoBrief={intent:"informational",primaryQuery:"عبارة متخصصة",supportingTerms:["مصطلح داعم"],targetQuestions:[{id:"q1",question:"كيف يعمل هذا الموضوع؟",sectionId:draft.sections[0].id,evidenceIds:[]}],targetEntityIds:[]};
+  const rebuilt=buildEditorialOutline(db,{workspaceId:"workspace-a",taskId:"task",angle:"زاوية جديدة"});
+  expect(rebuilt.geoBrief.primaryQuery).toBe("عبارة متخصصة");
+  expect(rebuilt.geoBrief.targetQuestions[0].sectionId).toBe("");
+ });
  it("rejects cross-workspace access",()=>{
   const db=state();
   expect(()=>buildEditorialOutline(db,{workspaceId:"workspace-b",taskId:"task"})).toThrow("Editorial task not found");

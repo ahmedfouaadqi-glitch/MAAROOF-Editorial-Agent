@@ -30,13 +30,15 @@ function hostAllowed(host, hosts) {
   return hosts.some(item => value === item || value.endsWith("." + item));
 }
 
-export function registerBrowserDestination(state, { workspaceId, name, homepage, editorUrl, approvedHosts = [], titleSelector, bodySelector, imageUploadSelector = "" }) {
+export function registerBrowserDestination(state, { workspaceId, name, homepage, editorUrl, approvedHosts = [], titleSelector, bodySelector, imageUploadSelector = "", authorityConfirmed, policyReviewed }) {
   if (typeof workspaceId !== "string" || !workspaceId.trim() || workspaceId.length > 128) fail("workspaceId is required");
+  if (authorityConfirmed !== true) fail("Confirm that you own or are authorized to use this destination");
+  if (policyReviewed !== true) fail("Confirm that the destination's publishing policies have been reviewed");
   const displayName = clean(name, 120);
   if (displayName.length < 2) fail("Destination name must contain at least 2 characters");
   const home = normalizeUrl(homepage, "homepage");
   const editor = editorUrl ? normalizeUrl(editorUrl, "editorUrl") : home;
-  const hosts = normalizeHosts(approvedHosts, [home.hostname.toLowerCase(), editor.hostname.toLowerCase()]);
+  const hosts = normalizeHosts(approvedHosts, [home.hostname.toLowerCase()]);
   if (!hostAllowed(editor.hostname, hosts)) fail("editorUrl host must be listed in approvedHosts");
   for (const selector of [titleSelector, bodySelector]) {
     if (typeof selector !== "string" || !selector.trim() || selector.length > 500) fail("Title and body selectors must be configured");
@@ -48,14 +50,16 @@ export function registerBrowserDestination(state, { workspaceId, name, homepage,
     id: existing?.id || randomUUID(), workspaceId, name: displayName,
     homepage: home.toString(), editorUrl: editor.toString(), approvedHosts: hosts,
     selectors: { title: titleSelector.trim(), body: bodySelector.trim(), imageUpload: clean(imageUploadSelector, 500) },
-    status: "needs-policy-review",
+    status: "operator-declared-unverified",
     automaticPublishEnabled: false,
+    authorityConfirmed: true,
+    policyReviewed: true,
     createdAt: existing?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     limitations: [
-      "The destination profile is operator-configured and has not passed an external publishing test.",
-      "No automatic submit or publish action is enabled.",
-      "The user must review and complete the final submission in the remote browser."
+      "The destination and policy confirmations are user declarations; ownership and external capability are not independently verified.",
+      "The system can fill the approved article text but does not automatically submit or publish it.",
+      "The user must review the remote editor and perform any final submission personally."
     ]
   };
   if (existing) Object.assign(existing, destination);
@@ -65,6 +69,9 @@ export function registerBrowserDestination(state, { workspaceId, name, homepage,
 
 export function listBrowserDestinations(state, workspaceId) {
   return (state.browserDestinations || []).filter(item => item.workspaceId === workspaceId);
+}
+export function listBrowserSessions(state, workspaceId) {
+  return (state.browserSessions || []).filter(item => item.workspaceId === workspaceId);
 }
 export function getBrowserDestination(state, workspaceId, destinationId) {
   const item = (state.browserDestinations || []).find(x => x.id === destinationId && x.workspaceId === workspaceId);
@@ -105,6 +112,7 @@ export function removeBrowserSession(state, workspaceId, sessionId) {
 }
 
 export function buildApprovedArticleForBrowser(state, { workspaceId, taskId, destination }) {
+  if (!destination || destination.workspaceId !== workspaceId) fail("Publishing destination not found in this workspace", 404);
   const task = state.tasks?.[taskId];
   if (!task || task.workspaceId !== workspaceId || !task.article) fail("Editorial task not found", 404);
   if (task.article.stage !== "ready-to-publish") fail("Article must reach ready-to-publish before browser transfer", 409);
@@ -120,6 +128,9 @@ export function buildApprovedArticleForBrowser(state, { workspaceId, taskId, des
     body: [draft.dek, body, draft.disclosure ? `Disclosure: ${draft.disclosure}` : ""].filter(Boolean).join("\n\n"),
     titleSelector: destination.selectors.title,
     bodySelector: destination.selectors.body,
-    articleFingerprint: approval.draftFingerprint
+    articleFingerprint: approval.draftFingerprint,
+    sourceTaskId: taskId,
+    publishingEnabled: false,
+    requiresHumanSubmission: true
   };
 }

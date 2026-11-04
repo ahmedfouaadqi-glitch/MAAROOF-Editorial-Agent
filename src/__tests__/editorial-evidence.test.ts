@@ -13,7 +13,9 @@ function stateFixture() {
       { id: "source-b", workspaceId: "workspace-a", taskId: "task-b", url: "https://example.com/b" }
     ],
     claims: [],
-    originalityChecks: []
+    originalityChecks: [],
+    editorialDrafts: [] as any[],
+    platformVariants: [] as any[]
   };
 }
 
@@ -74,6 +76,54 @@ describe("editorial evidence", () => {
     expect(result.outcome).toBe("possible-near-duplicate");
     expect(result.nearMatches[0].taskId).toBe("task-a");
     expect(result.nearMatches[0].similarity).toBeGreaterThanOrEqual(0.82);
+  });
+
+  it("compares against saved article drafts and reports the matched content type", () => {
+    const state = stateFixture();
+    const text = "A detailed editorial article explains the organization's regional expansion, its market context, and the strategy for responsible growth over the coming year.";
+    state.tasks["task-a"].article.topic = "";
+    state.editorialDrafts.push({ id: "draft-a", workspaceId: "workspace-a", taskId: "task-a", sections: [{ heading: "", body: text }] });
+    const result = checkOriginality(state, { workspaceId: "workspace-a", taskId: "task-b", text });
+    expect(result.outcome).toBe("exact-match");
+    expect(result.exactMatchContentType).toBe("article-draft");
+    expect(result.exactMatches[0].recordId).toBe("draft-a");
+    expect(result.comparedByType["article-draft"]).toBe(1);
+  });
+
+  it("compares against saved social drafts and reports their platform", () => {
+    const state = stateFixture();
+    const text = "The organization announces regional expansion with a careful plan for its local communities and future market development.";
+    state.platformVariants.push({ id: "social-a", workspaceId: "workspace-a", taskId: "task-a", platformId: "linkedin", body: text, hashtags: [] });
+    const result = checkOriginality(state, { workspaceId: "workspace-a", taskId: "task-b", text });
+    expect(result.outcome).toBe("exact-match");
+    expect(result.exactMatches[0]).toMatchObject({ recordId: "social-a", contentType: "social-draft", platformId: "linkedin" });
+  });
+
+  it("compares within the same client across its brands but excludes another client", () => {
+    const state: any = stateFixture();
+    const text = "The same substantive article content is deliberately reused to test client scoped duplicate comparison across brands.";
+    state.tasks["task-a"].article = { topic: "", clientId: "client-a", brandId: "brand-sibling" };
+    state.tasks["task-b"].article = { topic: "", clientId: "client-a", brandId: "brand-current" };
+    state.tasks["task-c"] = { workspaceId: "workspace-a", article: { topic: "", clientId: "client-b", brandId: "brand-other" } };
+    state.editorialDrafts.push(
+      { id: "draft-sibling", workspaceId: "workspace-a", taskId: "task-a", sections: [{ heading: "", body: text }] },
+      { id: "draft-other-client", workspaceId: "workspace-a", taskId: "task-c", sections: [{ heading: "", body: text }] }
+    );
+    const result = checkOriginality(state, { workspaceId: "workspace-a", taskId: "task-b", text });
+    expect(result.outcome).toBe("exact-match");
+    expect(result.comparisonScope).toBe("same-client-plus-unassigned");
+    expect(result.exactMatches).toHaveLength(1);
+    expect(result.exactMatches[0]).toMatchObject({ taskId: "task-a", identityRelationship: "same-client-other-brand", brandId: "brand-sibling" });
+  });
+
+  it("excludes the current article and its own social variants from self-comparison", () => {
+    const state = stateFixture();
+    const text = "A detailed editorial article explains the organization's regional expansion, its market context, and the strategy for responsible growth over the coming year.";
+    state.editorialDrafts.push({ id: "draft-a", workspaceId: "workspace-a", taskId: "task-a", title: "Regional expansion strategy", sections: [{ heading: "Market context", body: text }] });
+    state.platformVariants.push({ id: "social-a", workspaceId: "workspace-a", taskId: "task-a", body: text });
+    const result = checkOriginality(state, { workspaceId: "workspace-a", taskId: "task-a", text });
+    expect(result.outcome).toBe("no-match-found");
+    expect(result.comparedContentCount).toBe(0);
   });
 
   it("does not compare content across workspaces", () => {

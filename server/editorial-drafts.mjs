@@ -34,9 +34,14 @@ export function buildEditorialOutline(state,{workspaceId,taskId,angle="",audienc
   generationMode:"deterministic-editorial-scaffold",
   limitation:"This is a structured outline, not AI-generated research or a factual article."
  };
- state.editorialDrafts ||= [];
- const existing=state.editorialDrafts.find(x=>x.workspaceId===workspaceId&&x.taskId===taskId);
- if(existing){Object.assign(existing,outline,{id:existing.id,createdAt:existing.createdAt});return existing;}
+	 state.editorialDrafts ||= [];
+	 const existing=state.editorialDrafts.find(x=>x.workspaceId===workspaceId&&x.taskId===taskId);
+	 if(existing){
+	  const geoBrief=existing.geoBrief?{...existing.geoBrief,targetQuestions:(existing.geoBrief.targetQuestions||[]).map(item=>({...item,sectionId:""}))}:null;
+	  Object.assign(existing,outline,{id:existing.id,createdAt:existing.createdAt});
+	  if(geoBrief)existing.geoBrief=geoBrief;
+	  return existing;
+	 }
  state.editorialDrafts.push(outline);return outline;
 }
 export function getEditorialDraft(state,workspaceId,taskId){

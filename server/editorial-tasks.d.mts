@@ -6,6 +6,8 @@ export interface EditorialTaskInput {
   targetPlatformId?: string;
   clientId?: string;
   brandId?: string;
+  clientName?: string;
+  brandName?: string;
 }
 export function createEditorialTask(state: { tasks: Record<string, unknown> }, input: EditorialTaskInput): any;
 export function listEditorialTasks(state: { tasks: Record<string, any> }, workspaceId: string): any[];
