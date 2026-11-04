@@ -34,8 +34,8 @@ describe("server-side research budget", () => {
   it("isolates tasks and workspaces", () => {
     const state = freshState();
     reserveBudget(state, { ...scope, operation: "search", reservationId: "search-0001" });
-    expect(reserveBudget(state, { workspaceId: "workspace-b", taskId: "article-a", operation: "search", reservationId: "search-0002" }).allowed).toBe(true);
-    expect(() => reserveBudget(state, { workspaceId: "workspace-b", taskId: "article-a", operation: "search", reservationId: "search-0003" })).not.toThrow();
+    expect(reserveBudget(state, { workspaceId: "workspace-a", taskId: "article-b", operation: "search", reservationId: "search-0002" }).allowed).toBe(true);
+    expect(() => reserveBudget(state, { workspaceId: "workspace-b", taskId: "article-a", operation: "search", reservationId: "search-0003" })).toThrow("Task does not belong to this workspace");
   });
 
   it("releases failed reservations and commits successful reservations", () => {
