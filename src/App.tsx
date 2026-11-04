@@ -100,6 +100,7 @@ const t = {
 export default function App() {
   const [view, setView] = useState<View>("home");
   const [query, setQuery] = useState("");
+  const [globalQuery, setGlobalQuery] = useState("");
   const [category, setCategory] = useState<"all" | PlatformCategory>("all");
   const [selectedId, setSelectedId] = useState<string>("wordpress");
   const [budget, setBudget] = useState<ResearchBudgetLimits>({ ...DEFAULT_RESEARCH_BUDGET });
@@ -221,7 +222,7 @@ export default function App() {
         <span className="brand-copy"><strong>MAAROOF</strong><small>EDITORIAL AGENT</small></span>
         <span className="brand-version">BETA</span>
       </button>
-      <button className="workspace-switch"><span className="workspace-avatar">M</span><span><b>{copy.workspace}</b><small>Personal workspace</small></span><ChevronDown size={15}/></button>
+      <div className="workspace-switch"><span className="workspace-avatar">M</span><span><b>{copy.workspace}</b><small>Personal workspace</small></span><ChevronDown size={15}/></div>
       <div className="side-label">{locale === "ar" ? "مساحة العمل" : "WORKSPACE"}</div>
       <nav className="side-nav">
         {navItems.map(item => <button key={item.id} className={view === item.id ? "nav-item active" : "nav-item"} onClick={() => { setView(item.id); setMobileNav(false); }}>
@@ -243,7 +244,7 @@ export default function App() {
           <div className="breadcrumbs"><span>MAAROOF</span><span className="crumb-slash">/</span><b>{navItems.find(item => item.id === view)?.label}</b></div>
         </div>
         <div className="topbar-actions">
-          <label className="global-search"><Search size={15}/><input placeholder={copy.search}/><kbd><Command size={10}/> K</kbd></label>
+          <label className="global-search"><Search size={15}/><input value={globalQuery} onChange={e=>setGlobalQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){setQuery(globalQuery);setCategory("all");setView("registry");}}} placeholder={copy.search} aria-label={copy.search}/><kbd><Command size={10}/> K</kbd></label>
           <button className="top-icon" onClick={() => setLocale(locale === "ar" ? "en" : "ar")} title={copy.langToggle}><span className="language-code">{locale === "ar" ? "EN" : "ع"}</span></button>
           <button className="top-icon" onClick={() => setTheme(theme === "light" ? "dark" : "light")} title={theme === "light" ? copy.dark : copy.light}>{theme === "light" ? <Moon size={17}/> : <Sun size={17}/>}</button>
           <div className="top-avatar">M</div>
