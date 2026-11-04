@@ -12,11 +12,11 @@ describe("server-side research budget", () => {
     expect(validateLimits({ ...DEFAULT_LIMITS, searchesPerArticle: -1 }).valid).toBe(false);
   });
 
-  it("reserves crawl URL units rather than request count", () => {
+  it("reserves source URL units rather than request count", () => {
     const state = freshState();
-    const first = reserveBudget(state, { ...scope, operation: "crawl", units: 3, reservationId: "crawl-0001" });
+    const first = reserveBudget(state, { ...scope, operation: "source", units: 3, reservationId: "source-0001" });
     expect(first.allowed).toBe(true);
-    const over = reserveBudget(state, { ...scope, operation: "crawl", units: 1, reservationId: "crawl-0002" });
+    const over = reserveBudget(state, { ...scope, operation: "source", units: 1, reservationId: "source-0002" });
     expect(over.allowed).toBe(false);
     expect(over.used).toBe(3);
   });
