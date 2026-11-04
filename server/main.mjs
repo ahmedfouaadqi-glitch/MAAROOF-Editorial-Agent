@@ -9,6 +9,7 @@ import { createEntity, listEntities, scanKnownEntities, createEntityRelationship
 import { assessSource, recordEvidence, listResearch } from "./editorial-research.mjs";
 import { recordVisibilityEvent, listVisibilityEvents, summarizeVisibility } from "./ai-visibility.mjs";
 import { createMagazineSubmission, listMagazineSubmissions, transitionMagazineSubmission } from "./magazine-submissions.mjs";
+import { buildEditorialOutline, getEditorialDraft, updateEditorialDraft } from "./editorial-drafts.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "127.0.0.1";
@@ -119,6 +120,27 @@ const server = createServer(async (req, res) => {
       const taskId = decodeURIComponent(articleStage[2]);
       const article = await store.transact(state => advanceEditorialTask(state, { workspaceId, taskId, nextStage: body.nextStage }));
       return send(res, 200, { article });
+    }
+
+    const editorialDraftRoute = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/draft$/);
+    if (editorialDraftRoute && req.method === "GET") {
+      const state = await store.read();
+      return send(res, 200, { draft: getEditorialDraft(state, decodeURIComponent(editorialDraftRoute[1]), decodeURIComponent(editorialDraftRoute[2])) });
+    }
+    if (editorialDraftRoute && req.method === "POST") {
+      const body = await readJson(req);
+      const draft = await store.transact(state => buildEditorialOutline(state, {
+        workspaceId: decodeURIComponent(editorialDraftRoute[1]), taskId: decodeURIComponent(editorialDraftRoute[2]),
+        angle: body.angle, audience: body.audience, keyQuestions: body.keyQuestions
+      }));
+      return send(res, 201, { draft, generation: "deterministic-scaffold", externalAction: "none" });
+    }
+    if (editorialDraftRoute && req.method === "PUT") {
+      const body = await readJson(req);
+      const draft = await store.transact(state => updateEditorialDraft(state, {
+        workspaceId: decodeURIComponent(editorialDraftRoute[1]), taskId: decodeURIComponent(editorialDraftRoute[2]), ...body
+      }));
+      return send(res, 200, { draft });
     }
 
     const magazineSubmissionCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/magazine-submissions$/);
