@@ -30,6 +30,8 @@ export function recordMediaReview(state,{workspaceId,taskId,decision,reviewerNam
 }
 export function getCurrentMediaReview(state,workspaceId,taskId){
  taskFor(state,workspaceId,taskId);
+ const draft=(state.editorialDrafts||[]).find(item=>item.workspaceId===workspaceId&&item.taskId===taskId);
+ if(!draft)return {review:null,reviewCurrent:false,approvedForCurrentDraft:false,blocker:"draft-missing"};
  const current=fingerprint(state,workspaceId,taskId);
  const review=(state.mediaReviews||[]).filter(item=>item.workspaceId===workspaceId&&item.taskId===taskId).sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0]||null;
  const isCurrent=Boolean(review&&review.draftFingerprint===current);
