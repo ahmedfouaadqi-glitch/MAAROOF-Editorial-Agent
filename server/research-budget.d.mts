@@ -1,5 +1,6 @@
 export interface ResearchLimits {
   sourceUrlsPerArticle: number;
+  scrapesPerArticle: number;
   searchesPerArticle: number;
   inspectionsPerArticle: number;
 }
@@ -14,6 +15,6 @@ export interface BudgetState {
 }
 export const DEFAULT_LIMITS: Readonly<ResearchLimits>;
 export function validateLimits(value: ResearchLimits): { valid: boolean; errors: string[] };
-export function reserveBudget(state: BudgetState, input: { taskId: string; workspaceId: string; operation: "source" | "search" | "inspect"; units?: number; reservationId: string }): { allowed: boolean; replayed?: boolean; operation?: string; used?: number; limit?: number; remaining?: number; reason?: string; usage: { source: number; scrape: number; search: number; inspect: number } };
-export function releaseReservation(state: BudgetState, input: { taskId: string; workspaceId: string; reservationId: string }): { released: boolean; replayed: boolean; usage: { source: number; search: number; inspect: number } };
+export function reserveBudget(state: BudgetState, input: { taskId: string; workspaceId: string; operation: "source" | "scrape" | "search" | "inspect"; units?: number; reservationId: string }): { allowed: boolean; replayed?: boolean; operation?: string; used?: number; limit?: number; remaining?: number; reason?: string; usage: { source: number; scrape: number; search: number; inspect: number } };
+export function releaseReservation(state: BudgetState, input: { taskId: string; workspaceId: string; reservationId: string }): { released: boolean; replayed: boolean; usage: { source: number; scrape: number; search: number; inspect: number } };
 export function commitReservation(state: BudgetState, input: { taskId: string; workspaceId: string; reservationId: string }): { committed: boolean; replayed: boolean };
