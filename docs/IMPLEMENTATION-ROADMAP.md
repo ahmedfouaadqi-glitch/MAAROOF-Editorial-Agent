@@ -13,6 +13,10 @@
 ## Track B — Editorial intelligence (provider-neutral)
 - [ ] Implement research source ingestion with provenance and retrieval timestamps.
 - [ ] Implement claim-to-evidence mapping.
+- [x] Add configurable research budget model with separate per-article crawl/search/inspect limits.
+- [x] Add an initial admin screen for editing the limits (session-local prototype only).
+- [ ] Connect budget settings to backend configuration and enforce reservations before every Firecrawl/provider call.
+- [ ] Add durable, atomic per-task usage accounting across concurrent workers.
 - [ ] Implement entity and search-intent extraction.
 - [ ] Implement outline and bilingual article draft contracts.
 - [ ] Implement originality checks with exact and near-duplicate baselines.
