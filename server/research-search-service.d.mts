@@ -1,0 +1,3 @@
+import type { ResearchSearchRequest, ResearchSearchResult } from "./research-provider.mjs";
+interface SearchStore { read():Promise<any>; transact<T>(mutator:(state:any)=>T|Promise<T>):Promise<T> }
+export function runMeteredResearchSearch(input:{store:SearchStore;provider:{id?:string;search(request:ResearchSearchRequest):Promise<unknown>}|null;workspaceId:string;taskId:string;input:unknown}):Promise<{allowed:true;result:ResearchSearchResult;quota:{operation:string;used:number;limit:number;remaining:number;reservationId:string;status:string};verification:"unverified-search-results"}|{allowed:false;quota:Record<string,unknown>}>;
