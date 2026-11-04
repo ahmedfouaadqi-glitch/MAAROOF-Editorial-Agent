@@ -6,6 +6,7 @@ import { DEFAULT_LIMITS, validateLimits, reserveBudget, releaseReservation, comm
 import { createEditorialTask, listEditorialTasks, advanceEditorialTask } from "./editorial-tasks.mjs";
 import { registerClaim, listClaims, checkOriginality } from "./editorial-evidence.mjs";
 import { createEntity, listEntities, scanKnownEntities, createEntityRelationship, listEntityRelationships } from "./editorial-entities.mjs";
+import { assessSource, recordEvidence, listResearch } from "./editorial-research.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "127.0.0.1";
@@ -149,6 +150,24 @@ const server = createServer(async (req, res) => {
       validateScope(body);
       const claim = await store.transact(state => registerClaim(state, body));
       return send(res, 201, { claim });
+    }
+
+    const researchMatch = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/research$/);
+    if (researchMatch && req.method === "GET") {
+      const state = await store.read();
+      return send(res, 200, listResearch(state, decodeURIComponent(researchMatch[1]), decodeURIComponent(researchMatch[2])));
+    }
+    if (req.method === "PUT" && url.pathname === "/api/v1/sources/assessment") {
+      const body = await readJson(req);
+      validateScope(body);
+      const source = await store.transact(state => assessSource(state, body));
+      return send(res, 200, { source, note: "Manual metadata assessment only. The source content was not fetched or independently verified." });
+    }
+    if (req.method === "POST" && url.pathname === "/api/v1/research/evidence") {
+      const body = await readJson(req);
+      validateScope(body);
+      const evidence = await store.transact(state => recordEvidence(state, body));
+      return send(res, 201, { evidence, note: "This is a manually recorded excerpt and editorial stance, not independent verification." });
     }
 
     const entitiesMatch = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/entities$/);
