@@ -3,7 +3,7 @@ import { executeResearchSearch, validateSearchRequest } from "./research-provide
 describe("provider-neutral research search",()=>{
  it("validates bounded query parameters",()=>{
   expect(validateSearchRequest({query:"  الذكاء الاصطناعي ",language:"ar"})).toMatchObject({query:"الذكاء الاصطناعي",limit:10,language:"ar"});
-  expect(()=>validateSearchRequest({query:"x"})).toThrow("2-500");
+  expect(()=>validateSearchRequest({query:"x"})).toThrow("2-400");
  });
  it("fails closed when no provider is configured",async()=>{
   await expect(executeResearchSearch({query:"market trends"})).rejects.toMatchObject({status:503});
