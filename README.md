@@ -30,7 +30,7 @@ See [API route documentation](docs/API.md) for task creation, source registratio
 ## Explicit exclusions
 - Supabase and managed database services.
 - Firecrawl, automated crawling, remote URL fetching, and scraping services.
-- No live search or inspection provider is connected. The API currently enforces quotas for these future provider operations only.
+- Optional Brave Web Search adapter is available behind server-only configuration. It remains disabled unless RESEARCH_SEARCH_PROVIDER=brave and BRAVE_SEARCH_API_KEY are set; explicit search requests are quota-metered, and results are labeled unverified. Builds and tests do not send search requests.
 - Paid model calls and provider credentials.
 - Real publishing adapters, Playwright runtime, MAAROOF AI integration, and external publication verification.
 
