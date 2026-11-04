@@ -11,7 +11,7 @@ export interface AdapterCapability {
   canUploadMedia: "yes" | "limited" | "no" | "unverified";
   canSetMetadata: "yes" | "limited" | "no" | "unverified";
   humanApproval: "required" | "recommended" | "platform-dependent";
-  implementationStatus: "catalog-only" | "contract-defined" | "adapter-not-implemented" | "not-a-publishing-target";
+  implementationStatus: "catalog-only" | "contract-defined" | "adapter-not-implemented" | "not-a-publishing-target" | "verified";
   officialDocsUrl?: string;
   constraints: string[];
   verificationChecklist: string[];
