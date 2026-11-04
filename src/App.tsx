@@ -52,17 +52,18 @@ const t = {
     integration: "طريقة التكامل المرشحة", capabilities: "قدرات النشر", constraints: "قيود يجب احترامها",
     checklist: "قائمة التحقق قبل التفعيل", docs: "الوثائق الرسمية", adapter: "حالة الموصل",
     apiKey: "مفتاح إدارة الخدمة الخلفية", apiKeyHint: "أدخل ADMIN_API_TOKEN المحفوظ في بيئة الخادم. يبقى في ذاكرة الجلسة فقط.",
-    load: "تحميل المحفوظ", save: "حفظ الإعدادات", reset: "استعادة الافتراضي", sourceLimit: "روابط المصادر لكل مقالة",
+    load: "تحميل المحفوظ", save: "حفظ الإعدادات", reset: "استعادة الافتراضي", sourceLimit: "روابط المصادر اليدوية لكل مقالة", scrapeLimit: "روابط الكشط لكل مقالة",
     searchLimit: "عمليات البحث لكل مقالة", inspectLimit: "عمليات الفحص لكل مقالة",
-    sourceHint: "مراجع يضيفها المستخدم يدوياً، ولا يتم جلب محتواها تلقائياً.",
-    searchHint: "حجوزات للبحث المستقبلي؛ لا يوجد مزوّد بحث متصل حالياً.",
-    inspectHint: "حجوزات للفحص المستقبلي؛ لا توجد خدمة استخراج متصلة حالياً.",
+    sourceHint: "روابط مرجعية يضيفها المستخدم؛ هذه الحصة منفصلة عن عمليات الكشط.",
+    scrapeHint: "عدد صفحات الويب التي يسمح بجلب محتواها عبر Firecrawl لكل مقالة.",
+    searchHint: "عدد استعلامات البحث الحي لكل مقالة عبر المزود المفعّل في الخادم.",
+    inspectHint: "فحوص بنية المحتوى المستخرج؛ لا تعني التحقق من صحة الادعاءات.",
     newTitle: "إنشاء مهمة تحريرية", newSub: "حدد الموضوع واللغة والهدف. لن يتم النشر الخارجي تلقائياً.",
     topic: "موضوع المقالة", topicPlaceholder: "اكتب الموضوع أو الفكرة الرئيسية...",
     language: "لغة المقالة", objective: "الهدف التحريري", createTask: "إنشاء المهمة",
     analysis: "تحليل", thought: "قيادة فكرية", news: "خبر", education: "محتوى تعليمي", researchSummary: "ملخص بحثي",
     arabic: "العربية", english: "الإنجليزية", status: "الحالة", stage: "المرحلة",
-    sourceNotice: "لا يوجد Supabase أو Firecrawl في هذه النسخة. الروابط تُسجّل يدوياً دون جلب آلي.",
+    sourceNotice: "التخزين والخدمة مستقلان عن Supabase. يتطلب البحث والكشط ضبط مفاتيح المزود في الخادم.",
     loading: "جارٍ التحميل...", viewAll: "عرض الكل", light: "الوضع النهاري", dark: "الوضع الليلي",
     langToggle: "English", emptyRegistry: "لم يتم العثور على نتائج مطابقة.",
     policy: "مراجعة السياسات مطلوبة", unverified: "غير متحقق", notBuilt: "لم يُبنَ بعد",
@@ -85,17 +86,18 @@ const t = {
     integration: "Proposed integration", capabilities: "Publishing capabilities", constraints: "Restrictions",
     checklist: "Activation checklist", docs: "Official documentation", adapter: "Connector status",
     apiKey: "Backend admin token", apiKeyHint: "Enter ADMIN_API_TOKEN from the server environment. Kept in session memory only.",
-    load: "Load saved", save: "Save settings", reset: "Reset defaults", sourceLimit: "Source URLs per article",
+    load: "Load saved", save: "Save settings", reset: "Reset defaults", sourceLimit: "Manually registered source URLs per article", scrapeLimit: "Scraped page URLs per article",
     searchLimit: "Search operations per article", inspectLimit: "Inspection operations per article",
-    sourceHint: "Manually registered references. Their content is not fetched automatically.",
-    searchHint: "Reservations for future search; no search provider is connected.",
-    inspectHint: "Reservations for future inspection; no extraction service is connected.",
+    sourceHint: "Manually registered references; this quota is separate from scraping.",
+    scrapeHint: "Maximum number of page URLs fetched through Firecrawl per article.",
+    searchHint: "Live search queries allowed per article through the server-enabled provider.",
+    inspectHint: "Structural checks of scraped content; not factual verification.",
     newTitle: "Create editorial task", newSub: "Set the topic, language, and objective. No external publishing will happen automatically.",
     topic: "Article topic", topicPlaceholder: "Enter the main topic or idea...",
     language: "Article language", objective: "Editorial objective", createTask: "Create task",
     analysis: "Analysis", thought: "Thought leadership", news: "News", education: "Educational", researchSummary: "Research summary",
     arabic: "Arabic", english: "English", status: "Status", stage: "Stage",
-    sourceNotice: "Supabase and Firecrawl are not used. URLs are registered manually without remote fetching.",
+    sourceNotice: "Storage and API run independently from Supabase. Search and scraping require server-side provider credentials.",
     loading: "Loading...", viewAll: "View all", light: "Light mode", dark: "Dark mode",
     langToggle: "العربية", emptyRegistry: "No matching platforms found.",
     policy: "Policy review required", unverified: "Unverified", notBuilt: "Not built",
@@ -319,13 +321,14 @@ export default function App() {
             <label className="budget-field token-field"><span>{copy.apiKey}</span><small>{copy.apiKeyHint}</small><input type="password" autoComplete="off" value={adminToken} onChange={e=>setAdminToken(e.target.value)} placeholder="ADMIN_API_TOKEN"/></label>
             <div className="budget-grid">
               <BudgetField label={copy.sourceLimit} hint={copy.sourceHint} value={budget.sourceUrlsPerArticle} onChange={v=>setBudget(old=>({...old,sourceUrlsPerArticle:v}))}/>
+              <BudgetField label={copy.scrapeLimit} hint={copy.scrapeHint} value={budget.scrapesPerArticle} onChange={v=>setBudget(old=>({...old,scrapesPerArticle:v}))}/>
               <BudgetField label={copy.searchLimit} hint={copy.searchHint} value={budget.searchesPerArticle} onChange={v=>setBudget(old=>({...old,searchesPerArticle:v}))}/>
               <BudgetField label={copy.inspectLimit} hint={copy.inspectHint} value={budget.inspectionsPerArticle} onChange={v=>setBudget(old=>({...old,inspectionsPerArticle:v}))}/>
             </div>
             {!budgetValidation.valid&&<p className="budget-error">{budgetValidation.errors.join(" · ")}</p>}
             <div className="budget-actions"><button className="secondary-button" onClick={()=>{setBudget({...DEFAULT_RESEARCH_BUDGET});setBudgetNotice(locale==="ar"?"استُعيدت القيم محلياً. احفظ لتثبيتها.":"Defaults restored locally. Save to persist.");}}><ArrowLeft size={14}/>{copy.reset}</button><div><button className="secondary-button" disabled={!adminToken.trim()||busy} onClick={loadBudget}>{copy.load}</button><button className="primary-button" disabled={!budgetValidation.valid||!adminToken.trim()||busy} onClick={saveBudget}><Check size={15}/>{busy?copy.loading:copy.save}</button></div></div>
             {budgetNotice&&<p className="inline-feedback">{budgetNotice}</p>}
-            <div className="budget-footnote"><LockKeyhole size={15}/><span>{copy.sourceNotice} {locale==="ar"?"حدود البحث والفحص محاسبية فقط حتى ربط مزوّد فعلي.":"Search and inspection limits are accounting only until a provider is connected."}</span></div>
+            <div className="budget-footnote"><LockKeyhole size={15}/><span>{copy.sourceNotice} {locale==="ar"?"تُطبّق الحصص من الخادم. يلزم إعداد مفتاح Firecrawl للبحث بالكشط؛ ولا تُرسل المفاتيح إلى الواجهة.":"Quotas are enforced server-side. Configure Firecrawl credentials on the server; never expose provider keys to the frontend."}</span></div>
           </SpotlightCard>
         </section>}
       </div>
