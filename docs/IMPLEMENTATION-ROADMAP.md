@@ -14,8 +14,8 @@
 - [x] Implement manual source URL registration with workspace/task association and registration timestamp (content is not fetched).
 - [ ] Implement claim-to-evidence mapping.
 - [ ] Integrate an explicitly selected search provider if live search is required; no Firecrawl or crawler integration is planned.
-- [x] Add configurable research budget model with separate per-article crawl/search/inspect limits.
-- [x] Add an initial admin screen for editing the limits (session-local prototype only).
+- [x] Add configurable research budget model with separate per-article source URL/search/inspect limits.
+- [x] Add an admin screen connected to persisted backend settings.
 - [x] Connect admin budget settings to the standalone Node API and persist them in local JSON.
 - [x] Enforce per-article source URL, search, and inspection reservations in the backend (no crawler is used).
 - [x] Add serialized atomic per-task accounting within one Node API process.
@@ -36,7 +36,7 @@
 - [ ] Publication reconciliation and external verification.
 
 ## Track D — Deferred integrations
-- [ ] Supabase persistence/auth/RLS — deferred until explicitly requested.
+- [ ] Supabase is explicitly excluded from this implementation track.
 - [ ] MAAROOF AI scoped API integration.
 - [ ] Deployment, secrets management, monitoring, and cost ledger.
 
