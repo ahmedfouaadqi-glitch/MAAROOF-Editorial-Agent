@@ -11,16 +11,18 @@ Lovable-compatible editorial production and verified publishing platform.
 - MAAROOF AI remains a separate system; integration is through scoped, authenticated APIs only.
 
 ## Current implementation
-- Arabic RTL dashboard shell and searchable registry for the 17 supplied platforms.
+- Responsive Linear-inspired editorial workspace with a vector-first dashboard, Arabic RTL default, English shell labels, light/dark themes, and mobile navigation.
+- Integrated the official React Bits SpotlightCard component for restrained pointer-reactive lighting; no React Bits Pro assets or additional animation dependencies.
 - Conservative platform capability profiles, policy constraints, and verification checklists.
 - Editorial workflow TypeScript contracts and deterministic draft structure validation.
+- Article task creation, listing, and controlled stage progression through the standalone Node API.
 - Fail-closed publishing gate; no platform is currently publish-enabled.
 - Admin UI for per-article manual source URL, search-operation, and inspection-operation limits (defaults 3 / 5 / 5).
 - Standalone Node.js API with admin bearer-token protection and local JSON persistence.
 - Workspace-scoped article research counters, idempotent reservations, commit/release operations, and source URL registration.
 - Manual source URLs are stored with title/notes and provenance. Their contents are not fetched or verified.
 
-See [API route documentation](docs/API.md) for task creation, source registration, research reservations, and admin configuration.
+See [API route documentation](docs/API.md) for task creation, source registration, research reservations, and admin configuration. See [UI design system](docs/UI-DESIGN-SYSTEM.md) for the visual system and [React Bits integration notes](src/components/SpotlightCard.LICENSE.md) for component attribution and license.
 
 ## Explicit exclusions
 - Supabase and managed database services.
