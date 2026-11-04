@@ -291,7 +291,7 @@ export default function App() {
           </section>
           {evidenceArticleId && articles.some(article => article.id === evidenceArticleId) && <EditorialEvidencePanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" article={articles.find(article => article.id === evidenceArticleId)!} locale={locale}/>}
           {draftArticleId && articles.some(article => article.id === draftArticleId) && <EditorialDraftPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" taskId={draftArticleId} stage={articles.find(article => article.id === draftArticleId)!.stage} locale={locale}/>}
-          {reviewArticleId && articles.some(article => article.id === reviewArticleId) && <EditorialReviewPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" taskId={reviewArticleId} stage={articles.find(article => article.id === reviewArticleId)!.stage} locale={locale}/>}
+          {reviewArticleId && articles.some(article => article.id === reviewArticleId) && <EditorialReviewPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" taskId={reviewArticleId} stage={articles.find(article => article.id === reviewArticleId)!.stage} locale={locale} onStageChange={(stage)=>setArticles(current=>current.map(item=>item.id===reviewArticleId?{...item,stage}:item))}/>}
         </section>}
         {view === "registry" && <section className="page-section">
           <PageHeading eyebrow="PUBLISHING DESTINATIONS" title={copy.registryTitle} subtitle={copy.registrySub} action={<span className="status-chip"><Globe2 size={14}/>{platforms.length} {copy.platforms}</span>}/>
