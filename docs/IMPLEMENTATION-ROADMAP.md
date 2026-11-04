@@ -19,7 +19,7 @@
 - [x] Add idempotent reservation, commit, and release operations for search/inspection quotas.
 - [x] Add a provider-neutral, fail-closed live-search contract with bounded request validation, result normalization, URL filtering, deduplication, and explicit unverified provenance.
 - [x] Add an optional server-side Brave Web Search adapter, quota-metered workspace/task API, persisted search history, and UI for searching/registering results as unverified manual sources. Disabled by default; no key or live call used in tests.
-- [ ] Firecrawl v2 server adapter, quota-metered scrape endpoint, Markdown extraction, unverified provenance, and local structure-inspection endpoint are implemented behind server configuration. Enable live requests only after operator key, cost, and data handling approval.
+- [x] Firecrawl v2 server adapter, quota-metered scrape/search endpoints, Markdown extraction, unverified provenance, and local structure-inspection endpoint; live requests require server-side configuration and operator-approved credentials.
 - [x] Implement claim-to-source linking with workspace/task isolation and source-link coverage reporting.
 - [x] Add manual source metadata review, temporal fields, methodology, jurisdiction, and quality rationale.
 - [x] Add manual excerpt-to-claim evidence records with support/contradiction/context/unclear stances.
@@ -48,7 +48,7 @@
 
 ## Track D — Explicitly excluded / deferred
 - [x] Supabase excluded from this implementation.
-- [x] Firecrawl and automated crawling excluded.
+- [x] Unbounded site crawling excluded. Firecrawl remains optional, server-side and subject to per-article quotas.
 - [ ] MAAROOF AI scoped API integration.
 - [ ] Production deployment, secrets management, monitoring, and cost ledger.
 - [ ] Multi-instance persistence and atomic cross-process quotas.
@@ -104,7 +104,7 @@
 - [ ] Implement publication profiles in the admin UI (domain, language, region, audience, topic fit, route, rules, account status).
 - [x] Add a pitch-first magazine submission inbox UI connected to the workspace-scoped API, with article/publication selection, draft creation, approval, exclusivity gating, editor-response states, and manual lifecycle controls. Actual sending and external publication verification remain pending.
 - [x] Add workspace-scoped backend records for magazine pitches, approval, submission, editor response, acceptance, rejection, withdrawal, and manual publication status; enforce approval and exclusivity gates. Frontend inbox, actual sending, and external publication verification remain pending.
-- [ ] Build the first authorized CMS publishing adapter for a user-owned WordPress/Ghost site.
+- [ ] Build the browser-first Playwright/Chromium publishing worker and destination-specific browser adapters; WordPress/Ghost REST API adapters are not required.
 - [ ] Add Playwright + Chromium isolated runtime only for permitted destinations where no suitable API exists.
 - [ ] Implement media library, image rights/credits, crops, hero images, alt text, video covers, and subtitles.
 - [ ] Implement platform-specific editorial variant generation and validation for social networks.
