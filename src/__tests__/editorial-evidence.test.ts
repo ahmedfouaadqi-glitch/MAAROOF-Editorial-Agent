@@ -4,9 +4,9 @@ import { checkOriginality, listClaims, normalizeEditorialText, registerClaim } f
 function stateFixture() {
   return {
     tasks: {
-      task-a: { workspaceId: "workspace-a", article: { topic: "First" } },
-      task-b: { workspaceId: "workspace-a", article: { topic: "Second" } },
-      task-other: { workspaceId: "workspace-b", article: { topic: "Other" } }
+      "task-a": { workspaceId: "workspace-a", article: { topic: "First" } },
+      "task-b": { workspaceId: "workspace-a", article: { topic: "Second" } },
+      "task-other": { workspaceId: "workspace-b", article: { topic: "Other" } }
     },
     sources: [
       { id: "source-a", workspaceId: "workspace-a", taskId: "task-a", url: "https://example.com/a" },
