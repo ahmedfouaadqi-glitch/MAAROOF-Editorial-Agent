@@ -62,3 +62,46 @@
 - A test fixture is not proof of live external behavior.
 - No platform is publish-enabled until its policy, account, and end-to-end behavior have been verified.
 - No real publication test without explicit approval.
+
+## Track F — AI discovery, indexing, citation, and training evidence
+
+- [x] Define separate evidence states for crawler fetch, search indexing, AI citation, and training attestation.
+- [x] Add a workspace-scoped AI visibility event ledger in the Node API.
+- [x] Add admin endpoints to list and record observations.
+- [x] Add an admin dashboard for event history and separate verified counters.
+- [x] Require evidence URL and verification note for verified indexing, citation, and training claims.
+- [x] Document provider crawler distinctions and the limitations of article-level training attribution.
+- [ ] Ingest web server/CDN logs for domains controlled by the workspace.
+- [ ] Validate crawler identity using provider-published IP ranges; never trust user-agent alone.
+- [ ] Connect Google Search Console URL Inspection with explicit OAuth authorization.
+- [ ] Evaluate Bing Webmaster API integration and permissions.
+- [ ] Build controlled AI answer/citation sampling with stored query, model/product, locale, timestamp, source URL, and evidence capture.
+- [ ] Add canonical URL, robots/noindex, sitemap, structured-data, and response-status audits.
+- [ ] Add per-domain connection ownership, access scopes, audit trail, and retention settings.
+- [ ] Add alerting for crawl failures, indexing loss, citation changes, and canonical/robots regressions.
+
+## Track G — Complete publishing and magazine execution
+
+- [x] Keep magazine/CMS destinations separate from social networks, communities, research repositories, and data sources.
+- [x] Add a candidate magazine publication registry with editorial submission requirements.
+- [x] Add platform-native social publishing profiles.
+- [ ] Restore and reconcile the exact original user-provided magazine list when its source file/list is available; do not invent missing titles.
+- [ ] Verify current submission rules, exclusivity, rights, accepted formats, and official submission routes for every candidate magazine.
+- [ ] Implement publication profiles in the admin UI (domain, language, region, audience, topic fit, route, rules, account status).
+- [ ] Build pitch-first and manuscript-submission workflows with editor-response states.
+- [ ] Build the first authorized CMS publishing adapter for a user-owned WordPress/Ghost site.
+- [ ] Add Playwright + Chromium isolated runtime only for permitted destinations where no suitable API exists.
+- [ ] Implement media library, image rights/credits, crops, hero images, alt text, video covers, and subtitles.
+- [ ] Implement platform-specific editorial variant generation and validation for social networks.
+- [ ] Add end-to-end tests for draft, preview, approval, submission, publish, and external verification.
+- [ ] Add production authentication, multi-tenant authorization, durable jobs, secrets management, monitoring, and non-JSON shared persistence.
+
+## Measurement truth rules
+
+- Crawler fetch is not indexing.
+- Indexing is not citation.
+- Citation is not training.
+- A training-purpose crawler request is not proof of article-level training use.
+- A submission is not acceptance; acceptance is not publication.
+- A publication is not proof of indexing or AI citation.
+- No destination is marked publish-ready until its policy, account access, adapter, and verification path pass end-to-end tests.
