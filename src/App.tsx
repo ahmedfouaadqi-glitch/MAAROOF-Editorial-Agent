@@ -53,7 +53,7 @@ export default function App() {
       <div className="workspace-chip"><span className="status-dot"/> مساحة العمل الرئيسية</div>
       <nav>
         <button className={activeView==="registry"?"nav-item active":"nav-item"} onClick={()=>setActiveView("registry")}><Globe2 size={17}/> سجل المجلات والمنصات</button>
-        <button className={activeView==="research-settings"?"nav-item active":"nav-item"} onClick={()=>setActiveView("research-settings")}><SlidersHorizontal size={17}/> حدود البحث والكشط</button>
+        <button className={activeView==="research-settings"?"nav-item active":"nav-item"} onClick={()=>setActiveView("research-settings")}><SlidersHorizontal size={17}/> حدود البحث والمصادر</button>
         <div className="nav-item"><Activity size={17}/> لوحة التحكم</div>
         <div className="nav-item"><FileText size={17}/> المقالات <span className="nav-soon">قريباً</span></div>
         <div className="nav-item"><Layers3 size={17}/> مساحات العمل <span className="nav-soon">لاحقاً</span></div>
