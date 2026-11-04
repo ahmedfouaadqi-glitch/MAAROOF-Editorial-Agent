@@ -18,7 +18,7 @@ export interface ResearchBudgetDecision {
   used: number;
   limit: number;
   remaining: number;
-  reason?: "limit-reached" | "invalid-limit";
+  reason?: "limit-reached" | "invalid-limit" | "invalid-units";
 }
 
 export const DEFAULT_RESEARCH_BUDGET: Readonly<ResearchBudgetLimits> = Object.freeze({
@@ -49,7 +49,8 @@ export function getResearchLimit(
 }
 
 /**
- * Per-task budget guard. reserve() must be called before invoking Firecrawl.
+ * Per-task budget guard. For crawl, reserve the number of target URLs, not the
+ * number of HTTP requests. Search and inspect reserve one unit per operation.
  * This in-memory implementation is suitable for a single-process prototype.
  * Production workers must inject a durable atomic store to coordinate replicas.
  */
@@ -76,23 +77,27 @@ export class ResearchBudgetLedger {
     return current ? { ...current } : { crawl: 0, search: 0, inspect: 0 };
   }
 
-  reserve(taskId: string, operation: ResearchOperation): ResearchBudgetDecision {
+  reserve(taskId: string, operation: ResearchOperation, units = 1): ResearchBudgetDecision {
     if (!taskId.trim()) throw new Error("taskId is required");
+    if (!Number.isSafeInteger(units) || units < 1) {
+      return { allowed: false, operation, used: this.getUsage(taskId)[operation], limit: getResearchLimit(this.limits, operation), remaining: 0, reason: "invalid-units" };
+    }
     const current = this.getUsage(taskId);
     const used = current[operation];
     const limit = getResearchLimit(this.limits, operation);
-    if (used >= limit) {
+    if (used + units > limit) {
       return { allowed: false, operation, used, limit, remaining: 0, reason: "limit-reached" };
     }
 
-    const next = { ...current, [operation]: used + 1 };
+    const next = { ...current, [operation]: used + units };
     this.usage.set(taskId, next);
     return { allowed: true, operation, used: next[operation], limit, remaining: limit - next[operation] };
   }
 
-  release(taskId: string, operation: ResearchOperation): void {
+  release(taskId: string, operation: ResearchOperation, units = 1): void {
+    if (!Number.isSafeInteger(units) || units < 1) throw new Error("units must be a positive integer");
     const current = this.getUsage(taskId);
-    this.usage.set(taskId, { ...current, [operation]: Math.max(0, current[operation] - 1) });
+    this.usage.set(taskId, { ...current, [operation]: Math.max(0, current[operation] - units) });
   }
 
   clearTask(taskId: string): void {
