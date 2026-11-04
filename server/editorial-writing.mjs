@@ -53,9 +53,18 @@ function buildPrompts(task,draft,claims,evidence,sources){
  const prompt="Draft this article using only the supplied editorial context. Do not add citations that are not in the evidence IDs. Output JSON only.\n\nEDITORIAL CONTEXT:\n"+JSON.stringify(context);
  return {system,prompt};
 }
-export async function runEditorialDraftGeneration({store,provider,workspaceId,taskId,maxTokens=3000}){
+function usageRecord({workspaceId,taskId,provider,response,outcome,errorStatus=null}){
+ return {id:randomUUID(),workspaceId,taskId,provider:response?.provider||provider?.id||"unidentified-provider",model:response?.model||provider?.model||"unidentified-model",outcome,errorStatus,usage:response?.usage||{promptTokens:null,completionTokens:null,totalTokens:null},estimatedCostUsd:null,createdAt:new Date().toISOString()};
+}
+async function logUsage(store,record){
+ await store.transact(state=>{state.modelUsage||=[];state.modelUsage.push(record);});
+}
+export async function runEditorialDraftGeneration({store,provider,workspaceId,taskId,maxTokens=3000,maxRequests=2}){
  if(!provider||typeof provider.generateJSON!=="function")fail("Model generation is disabled or not configured",503);
+ if(!Number.isSafeInteger(maxRequests)||maxRequests<1||maxRequests>10)fail("maxRequests must be from 1 to 10",500);
  const snapshot=await store.read();
+ const previousCalls=(snapshot.modelUsage||[]).filter(item=>item.workspaceId===workspaceId&&item.taskId===taskId);
+ if(previousCalls.length>=maxRequests)fail("Per-article model generation request limit reached",429);
  const task=snapshot.tasks?.[taskId];
  if(!task||task.workspaceId!==workspaceId||!task.article)fail("Editorial task not found",404);
  if(task.article.stage!=="drafting")fail("AI draft generation is available only during the drafting stage",409);
@@ -72,11 +81,17 @@ export async function runEditorialDraftGeneration({store,provider,workspaceId,ta
  let response;
  try{response=await provider.generateJSON({system:prompts.system,prompt:prompts.prompt,maxTokens,temperature:0.2});}
  catch(error){
-  await store.transact(state=>{state.modelUsage||=[];state.modelUsage.push({id:randomUUID(),workspaceId,taskId,provider:provider.id||"unidentified-provider",model:provider.model||"unidentified-model",outcome:"provider-error",errorStatus:error.status||502,createdAt:new Date().toISOString(),estimatedCostUsd:null});});
+  await logUsage(store,usageRecord({workspaceId,taskId,provider,outcome:"provider-error",errorStatus:error.status||502}));
   throw error;
  }
- const parsed=validateOutput(response.output,draft,claims,evidence);
- const saved=await store.transact(state=>{
+ let parsed;
+ try{parsed=validateOutput(response.output,draft,claims,evidence);}
+ catch(error){
+  await logUsage(store,usageRecord({workspaceId,taskId,provider,response,outcome:"invalid-output",errorStatus:error.status||422}));
+  throw error;
+ }
+ let saved;
+ try{saved=await store.transact(state=>{
   const currentTask=state.tasks?.[taskId];
   const currentDraft=(state.editorialDrafts||[]).find(item=>item.workspaceId===workspaceId&&item.taskId===taskId);
   if(!currentTask||currentTask.workspaceId!==workspaceId||currentTask.article.stage!=="drafting"||!currentDraft||editorialDraftFingerprint(currentDraft)!==initialFingerprint)fail("Article or outline changed while the model was generating; review and retry",409);
@@ -89,8 +104,11 @@ export async function runEditorialDraftGeneration({store,provider,workspaceId,ta
   });
   currentDraft.updatedAt=new Date().toISOString();
   state.modelUsage||=[];
-  state.modelUsage.push({id:randomUUID(),workspaceId,taskId,provider:currentDraft.generatedBy.provider,model:currentDraft.generatedBy.model,outcome:"success",usage:currentDraft.modelUsage,estimatedCostUsd:null,createdAt:currentDraft.updatedAt});
+  state.modelUsage.push(usageRecord({workspaceId,taskId,provider,response,outcome:"success"}));
   return structuredClone(currentDraft);
- });
+ });}catch(error){
+  if(error.status===409)await logUsage(store,usageRecord({workspaceId,taskId,provider,response,outcome:"discarded-stale",errorStatus:409}));
+  throw error;
+ }
  return {draft:saved,usage:saved.modelUsage,provider:saved.generatedBy,limitations:["Only operator-supplied claims and excerpts were provided to the model.","Evidence references are unverified and must be fact-checked by an editor.","No remote sources were fetched during generation.","Model usage is recorded, but cost is unknown unless pricing data is configured."]};
 }
