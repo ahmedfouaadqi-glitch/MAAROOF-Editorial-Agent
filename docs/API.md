@@ -119,3 +119,13 @@ The baseline normalizes Unicode, common Arabic letter variants, diacritics, punc
 Supported entity types: `person`, `organization`, `place`, `product`, `event`, `concept`, `unknown`. Canonical names and aliases are normalized for duplicate detection within the same article; separate articles may curate their own entity records. Entity relationships must reference two distinct entities and any supporting claims must belong to the same workspace and article.
 
 The current scanner is deliberately limited to exact normalized matches against aliases entered by an operator. It does not perform named-entity recognition, discover new entities, resolve ambiguous identities across sources, infer relations from prose, or establish that a claim supports a relationship. Relationship evidence states remain `claim-linked-unverified` or `unsubstantiated`.
+
+
+## Editorial research and source assessment
+- `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/research` — return article-scoped source assessments, evidence excerpts, and claim conflict summaries.
+- `PUT /api/v1/sources/assessment` — manually record source author, publisher, type, publication/update dates, effective period, jurisdiction, methodology, quality rating, and rationale.
+- `POST /api/v1/research/evidence` — manually record an excerpt from a registered source against a claim, with stance (`supports`, `contradicts`, `contextualizes`, or `unclear`) and a page/paragraph locator.
+
+Metadata completeness is the proportion of seven descriptive fields supplied; it is not a source-trust score. Quality ratings are explicit human editorial judgments and require a written rationale. Dates describe the source or the period in which its information is effective; they are not inferred from a crawl. Conflicting evidence is flagged when an editor has recorded both supporting and contradicting excerpts for the same claim. The system does not decide which side is correct.
+
+All excerpts and source assessments are manually entered. No URL is fetched, no remote page is parsed, and no claim is independently verified by these endpoints. Evidence records remain `manually-transcribed-unverified`.
