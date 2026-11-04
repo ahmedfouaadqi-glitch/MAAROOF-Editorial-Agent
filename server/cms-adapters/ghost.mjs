@@ -58,6 +58,12 @@ export function createGhostAdapter({adminUrl=process.env.GHOST_ADMIN_URL,adminAp
    const post=data?.posts?.[0];
    if(!post?.id)fail("Ghost returned no matching post",404);
    return {remoteId:String(post.id),url:typeof post.url==="string"?post.url:null,status:post.status,platform:"ghost"};
+  },
+  async findBySlug(slug){
+   const safeSlug=requiredText(slug,191,"Ghost slug");
+   const data=await request(endpoint+"slug/"+encodeURIComponent(safeSlug)+"/",{method:"GET"});
+   const post=data?.posts?.[0];
+   return post?.id?[{remoteId:String(post.id),url:typeof post.url==="string"?post.url:null,status:post.status,slug:post.slug,platform:"ghost"}]:[];
   }
  };
 }
