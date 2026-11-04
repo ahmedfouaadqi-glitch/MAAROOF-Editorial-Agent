@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { Activity, BookOpenText, CheckCircle2, CircleAlert, ExternalLink, FileText, Globe2, Layers3, Search, ShieldCheck, X, ArrowUpRight, LockKeyhole, Workflow } from "lucide-react";
+import { Activity, BookOpenText, CheckCircle2, CircleAlert, ExternalLink, FileText, Globe2, Layers3, Search, ShieldCheck, X, LockKeyhole, Workflow, SlidersHorizontal, Save, RotateCcw } from "lucide-react";
+import { DEFAULT_RESEARCH_BUDGET, validateResearchBudgetLimits, type ResearchBudgetLimits } from "./domain/research-budget";
 import { categoryLabels, modeLabels, platforms, readinessLabels, type PlatformCategory } from "./data/platforms";
 import { adapterRegistry } from "./data/adapter-registry";
 
@@ -9,6 +10,10 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<"all" | PlatformCategory>("all");
   const [selectedId, setSelectedId] = useState<string>("wordpress");
+  const [activeView, setActiveView] = useState<"registry" | "research-settings">("registry");
+  const [budget, setBudget] = useState<ResearchBudgetLimits>({ ...DEFAULT_RESEARCH_BUDGET });
+  const [budgetNotice, setBudgetNotice] = useState("");
+  const budgetValidation = validateResearchBudgetLimits(budget);
   const selected = platforms.find((p) => p.id === selectedId);
   const adapter = selected ? adapterRegistry[selected.id] : undefined;
   const visible = useMemo(() => platforms.filter((p) =>
@@ -21,9 +26,10 @@ export default function App() {
       <div className="brand"><div className="brand-mark">M</div><div><strong>MAAROOF</strong><span>EDITORIAL AGENT</span></div></div>
       <div className="workspace-chip"><span className="status-dot"/> مساحة العمل الرئيسية</div>
       <nav>
-        <div className="nav-item active"><Activity size={17}/> لوحة التحكم</div>
+        <button className={activeView==="registry"?"nav-item active":"nav-item"} onClick={()=>setActiveView("registry")}><Globe2 size={17}/> سجل المجلات والمنصات</button>
+        <button className={activeView==="research-settings"?"nav-item active":"nav-item"} onClick={()=>setActiveView("research-settings")}><SlidersHorizontal size={17}/> حدود البحث والكشط</button>
+        <div className="nav-item"><Activity size={17}/> لوحة التحكم</div>
         <div className="nav-item"><FileText size={17}/> المقالات <span className="nav-soon">قريباً</span></div>
-        <div className="nav-item"><Globe2 size={17}/> سجل المجلات والمنصات</div>
         <div className="nav-item"><Layers3 size={17}/> مساحات العمل <span className="nav-soon">لاحقاً</span></div>
         <div className="nav-item"><ShieldCheck size={17}/> النشر والتحقق <span className="nav-soon">لاحقاً</span></div>
       </nav>
@@ -31,6 +37,7 @@ export default function App() {
     </aside>
     <main className="main">
       <header className="topbar"><div><span className="eyebrow">EDITORIAL OPERATIONS</span><h1>مركز النشر التحريري</h1><p>سجل المنصات، عقود التكامل، ومتطلبات النشر قبل تشغيل الوكلاء.</p></div><div className="top-status"><span className="status-dot"/> وضع التأسيس — دون Supabase</div></header>
+      {activeView === "registry" ? <>
       <section className="stats">
         <article className="stat-card"><div className="stat-icon"><Globe2/></div><span>المنصات المسجلة</span><strong>{platforms.length}</strong><small>من ملف المستخدم</small></article>
         <article className="stat-card"><div className="stat-icon"><BookOpenText/></div><span>وجهات تحريرية</span><strong>{platforms.filter(p=>p.category==="editorial").length}</strong><small>مجلات ومدونات</small></article>
@@ -61,6 +68,19 @@ export default function App() {
       </section>
       <section className="next-panel"><div className="next-icon"><Workflow/></div><div><strong>Editorial Workflow Contracts</strong><p>تم تعريف مراحل العمل وواجهات المحركات كعقود TypeScript مستقلة عن قاعدة البيانات. لم يتم ربطها بعد بنماذج مدفوعة أو تنفيذ نشر خارجي.</p></div><span className="contract-badge">Contracts defined</span></section>
       <footer>لا تُفعّل أي منصة قبل مراجعة شروطها، التحقق من الصلاحيات، اختبار المسودة، ثم التحقق من ظهور النتيجة خارج النظام. تصنيف القدرات لا يعني أن الموصل جاهز.</footer>
+      </> : <section className="panel budget-admin">
+        <div className="panel-heading"><div><h2>Research & Firecrawl Limits</h2><p>حدود استهلاك البحث والكشط والفحص لكل مقالة على حدة.</p></div><span className="count-pill">Admin controls</span></div>
+        <div className="budget-notice"><LockKeyhole size={16}/><span>هذه القيم هي إعدادات واجهة أولية. لن تُعتبر حدوداً تشغيلية آمنة حتى يقرأها الخادم ويطبقها قبل كل استدعاء لمزوّد البحث أو Firecrawl.</span></div>
+        <div className="budget-grid">
+          <label className="budget-field"><span>روابط الكشط لكل مقالة</span><small>عدد عناوين URL التي يسمح بإرسالها إلى عملية Scrape.</small><input type="number" min="0" max="10000" step="1" value={budget.crawlUrlsPerArticle} onChange={e=>setBudget(v=>({...v,crawlUrlsPerArticle:Number(e.target.value)}))}/></label>
+          <label className="budget-field"><span>عمليات البحث لكل مقالة</span><small>عدد استدعاءات Search المسموح بها.</small><input type="number" min="0" max="10000" step="1" value={budget.searchesPerArticle} onChange={e=>setBudget(v=>({...v,searchesPerArticle:Number(e.target.value)}))}/></label>
+          <label className="budget-field"><span>عمليات الفحص لكل مقالة</span><small>عدد عمليات Inspect/Extraction المسموح بها.</small><input type="number" min="0" max="10000" step="1" value={budget.inspectionsPerArticle} onChange={e=>setBudget(v=>({...v,inspectionsPerArticle:Number(e.target.value)}))}/></label>
+        </div>
+        {!budgetValidation.valid && <p className="budget-error">{budgetValidation.errors.join(" · ")}</p>}
+        <div className="budget-actions"><button className="filter" onClick={()=>{setBudget({...DEFAULT_RESEARCH_BUDGET});setBudgetNotice("أُعيدت القيم الافتراضية في هذه الجلسة.");}}><RotateCcw size={14}/> استعادة الافتراضي</button><button className="apply-budget" disabled={!budgetValidation.valid} onClick={()=>setBudgetNotice("تم تحديث القيم في واجهة هذه الجلسة فقط؛ لم تُحفظ في خدمة خلفية بعد.")}><Save size={14}/> تطبيق القيم</button></div>
+        {budgetNotice && <p className="budget-feedback">{budgetNotice}</p>}
+        <div className="budget-rules"><h3>قواعد تطبيق الميزانية</h3><ul><li>العدادات مستقلة لكل مقالة/مهمة، ولا تتشارك الاستهلاك بين المقالات.</li><li>يُحجز الاستهلاك قبل إرسال الطلب، ولا يُرسل أي طلب بعد بلوغ الحد.</li><li>عند فشل الاستدعاء قبل إتمامه يمكن تحرير الحجز وفق نتيجة التنفيذ.</li><li>في بيئة الإنتاج يجب تطبيق الحجز ذرياً في خدمة خلفية مشتركة لمنع تجاوز الحد عند تشغيل عدة Workers.</li><li>تغيير الحد لا يمحو الاستهلاك السابق للمقالات قيد التنفيذ.</li></ul></div>
+      </section>}
     </main>
   </div>;
 }
