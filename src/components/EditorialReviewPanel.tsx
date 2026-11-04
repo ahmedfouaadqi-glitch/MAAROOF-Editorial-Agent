@@ -35,7 +35,8 @@ export default function EditorialReviewPanel({apiBase,token,workspaceId,taskId,s
     <h3><ScanSearch size={15}/>{ar?"فحص أصالة المسودة":"Current draft originality"}</h3>
     <p className="form-note">{ar?"مقارنة محلية فقط مع النصوص السابقة داخل مساحة العمل؛ لا تشمل الويب أو إعادة الصياغة الدلالية أو الترجمة.":"Local workspace comparison only; no external web corpus, semantic paraphrase, or translation analysis."}</p>
     <p className="form-note">{ar?"الحالة: ":"Status: "}{approval?.originality.checked?(approval.originality.outcome||"checked"):(ar?"لم يُفحص":"Not checked")}</p>
-    <button className="secondary-button" disabled={busy||!token.trim()} onClick={checkOriginality}><ScanSearch size={14}/>{ar?"فحص النسخة الحالية":"Check current draft"}</button>
+    <button className="secondary-button" disabled={busy||!token.trim()||stage!=="originality-review"} onClick={checkOriginality}><ScanSearch size={14}/>{ar?"فحص النسخة الحالية":"Check current draft"}</button>
+    {stage!=="originality-review"&&<p className="form-note">{ar?"يُنفذ فحص الأصالة في مرحلة فحص الأصالة فقط.":"Originality is recorded only during the originality-review stage."}</p>}
    </div>
    <form className="evidence-form" onSubmit={saveMedia} style={{marginTop:14}}>
     <h3><Image size={15}/>{ar?"مراجعة الوسائط والحقوق":"Media and rights review"}</h3>
