@@ -167,3 +167,28 @@ Example body:
 Supported event types: `crawler_fetch`, `search_index_verified`, `citation_verified`, `training_attestation`, `referral_visit`.
 
 Verified indexing, citation, and training events require both `evidenceUrl` and `evidenceNote`. Training use must never be inferred from crawler access. The current API records manual evidence; automated access-log, Search Console, Bing Webmaster, and AI-answer integrations are not connected.
+
+
+## Magazine pitch and submission tracking (manual handoff)
+
+- `POST /api/v1/workspaces/:workspaceId/tasks/:taskId/magazine-submissions` — create a local pitch record.
+- `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/magazine-submissions` — list pitch/submission records for that article.
+- `PUT /api/v1/workspaces/:workspaceId/tasks/:taskId/magazine-submissions/:submissionId/status` — record an editorial status transition and optional human-entered note.
+
+Create body:
+```json
+{
+  "publicationId": "publication-id-from-registry",
+  "proposedTitle": "Proposed article title",
+  "pitch": "Why this story matters to this publication and its readers.",
+  "authorName": "Author name",
+  "exclusivityConfirmed": false
+}
+```
+
+Status update body:
+```json
+{ "nextStatus": "approved", "note": "Reviewed by the author." }
+```
+
+Statuses: `draft`, `approved`, `submitted`, `editor-replied`, `accepted`, `rejected`, `published`, `withdrawn`. A submission can only be recorded after explicit approval and an exclusivity confirmation. Acceptance and publication are separate states. The API only records operator-reported actions; it does not send pitches, upload manuscripts, contact editors, or verify publication externally. A `published` status is a manual record, not independent proof of a live URL.
