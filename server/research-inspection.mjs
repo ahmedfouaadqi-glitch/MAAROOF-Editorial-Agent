@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { reserveBudget } from "./research-budget.mjs";
+import { commitReservation, releaseReservation, reserveBudget } from "./research-budget.mjs";
 
 function fail(message, status = 400) {
   const error = new Error(message);
@@ -27,11 +27,15 @@ export async function runResearchInspection({ store, workspaceId, taskId, source
     item.workspaceId === workspaceId && item.taskId === taskId && item.reservationId === reservationId
   );
   if (prior) return { allowed: true, replayed: true, result: prior };
+  if (snapshot.tasks[taskId].reservations?.[reservationId]) {
+    fail("This inspection operation was already started but has no saved result. Use a new operation ID.", 409);
+  }
 
   const quota = await store.transact(state => reserveBudget(state, {
     workspaceId, taskId, operation: "inspect", units: 1, reservationId
   }));
   if (!quota.allowed) return { allowed: false, quota };
+  if (quota.replayed) fail("This inspection operation is already in progress.", 409);
 
   const markdown = source.contentMarkdown;
   const words = markdown.trim().split(/\s+/).filter(Boolean);
@@ -43,25 +47,31 @@ export async function runResearchInspection({ store, workspaceId, taskId, source
   if (headings.length === 0) issues.push("no-detected-headings");
   if (links.length === 0) issues.push("no-detected-inline-links");
 
-  const result = await store.transact(state => {
-    state.researchInspections ||= [];
-    const current = (state.sources || []).find(item =>
-      item.id === sourceId && item.workspaceId === workspaceId && item.taskId === taskId
-    );
-    if (!current || current.contentMarkdown !== markdown) fail("Source changed during inspection; retry with a new operation ID", 409);
-    const record = {
-      id: randomUUID(), workspaceId, taskId, sourceId, reservationId,
-      inspectedAt: new Date().toISOString(),
-      metrics: { wordCount: words.length, headingCount: headings.length, inlineLinkCount: links.length },
-      issues,
-      verificationState: "structure-inspection-only",
-      limitations: [
-        "This deterministic inspection evaluates extracted structure, not factual accuracy.",
-        "It does not determine source credibility, relevance, or whether claims are true."
-      ]
-    };
-    state.researchInspections.push(record);
-    return record;
-  });
-  return { allowed: true, replayed: false, result, quota: { ...quota, usage: undefined } };
+  try {
+    const result = await store.transact(state => {
+      state.researchInspections ||= [];
+      const current = (state.sources || []).find(item =>
+        item.id === sourceId && item.workspaceId === workspaceId && item.taskId === taskId
+      );
+      if (!current || current.contentMarkdown !== markdown) fail("Source changed during inspection; retry with a new operation ID", 409);
+      const record = {
+        id: randomUUID(), workspaceId, taskId, sourceId, reservationId,
+        inspectedAt: new Date().toISOString(),
+        metrics: { wordCount: words.length, headingCount: headings.length, inlineLinkCount: links.length },
+        issues,
+        verificationState: "structure-inspection-only",
+        limitations: [
+          "This deterministic inspection evaluates extracted structure, not factual accuracy.",
+          "It does not determine source credibility, relevance, or whether claims are true."
+        ]
+      };
+      state.researchInspections.push(record);
+      commitReservation(state, { workspaceId, taskId, reservationId });
+      return record;
+    });
+    return { allowed: true, replayed: false, result, quota: { operation: "inspect", used: quota.used, limit: quota.limit, remaining: quota.remaining } };
+  } catch (error) {
+    await store.transact(state => releaseReservation(state, { workspaceId, taskId, reservationId })).catch(() => {});
+    throw error;
+  }
 }
