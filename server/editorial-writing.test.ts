@@ -42,4 +42,19 @@ describe("AI-assisted editorial drafting contract",()=>{
   await expect(runEditorialDraftGeneration({store:f.store,provider:f.provider,workspaceId:f.workspaceId,taskId:f.taskId})).rejects.toMatchObject({status:409});
   expect(f.state.editorialDrafts[0].title).toBe("A concurrent editor title");
  });
+ it("atomically caps the number of model attempts per article",async()=>{
+  const f=fixture();
+  await runEditorialDraftGeneration({store:f.store,provider:f.provider,workspaceId:f.workspaceId,taskId:f.taskId,maxRequests:1});
+  await expect(runEditorialDraftGeneration({store:f.store,provider:f.provider,workspaceId:f.workspaceId,taskId:f.taskId,maxRequests:1})).rejects.toMatchObject({status:429});
+  expect(f.provider.generateJSON).toHaveBeenCalledTimes(1);
+  expect(f.state.modelUsage).toHaveLength(1);
+  expect(f.state.modelUsage[0].outcome).toBe("success");
+ });
+ it("records a failed provider attempt as a consumed model request",async()=>{
+  const f=fixture();f.provider.generateJSON.mockRejectedValueOnce(Object.assign(new Error("upstream down"),{status:502}));
+  await expect(runEditorialDraftGeneration({store:f.store,provider:f.provider,workspaceId:f.workspaceId,taskId:f.taskId,maxRequests:1})).rejects.toMatchObject({status:502});
+  expect(f.state.modelUsage).toHaveLength(1);
+  expect(f.state.modelUsage[0].outcome).toBe("provider-error");
+ });
+
 });
