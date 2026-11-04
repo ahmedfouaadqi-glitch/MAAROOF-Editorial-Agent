@@ -23,11 +23,17 @@ export async function runMeteredResearchScrape({ store, provider, workspaceId, t
     item.workspaceId === workspaceId && item.taskId === taskId && item.reservationId === reservationId
   );
   if (prior) return { allowed: true, replayed: true, result: prior };
+  if (snapshot.tasks[taskId].reservations?.[reservationId]) {
+    fail("This scrape operation was already started but has no saved result. Use a new operation ID after checking the job state.", 409);
+  }
 
   const reservation = await store.transact(state => reserveBudget(state, {
     workspaceId, taskId, operation: "scrape", units: 1, reservationId
   }));
   if (!reservation.allowed) return { allowed: false, quota: reservation };
+  if (reservation.replayed) {
+    fail("This scrape operation is already in progress. Retry the same operation ID only after its result is saved.", 409);
+  }
 
   let scraped;
   try {
@@ -55,6 +61,7 @@ export async function runMeteredResearchScrape({ store, provider, workspaceId, t
         registeredAt: new Date().toISOString(),
         acquisition: "firecrawl-v2-scrape",
         fetched: true,
+        fetchedAt: scraped.retrievedAt || new Date().toISOString(),
         verificationState: "scraped-content-unverified",
         contentMarkdown: scraped.markdown
       };
