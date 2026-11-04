@@ -152,7 +152,7 @@ const server = createServer(async (req, res) => {
       return send(res, 201, { claim });
     }
 
-    const researchMatch = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)\\/tasks\\/([^/]+)\\/research$/);
+    const researchMatch = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/research$/);
     if (researchMatch && req.method === "GET") {
       const state = await store.read();
       return send(res, 200, listResearch(state, decodeURIComponent(researchMatch[1]), decodeURIComponent(researchMatch[2])));
