@@ -15,14 +15,17 @@
     "lucide-react": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "react-router-dom": "latest"
+    "react-router-dom": "latest",
+    "clsx": "latest",
+    "tailwind-merge": "latest",
+    "class-variance-authority": "latest"
   },
   "devDependencies": {
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "autoprefixer": "latest",
+    "autoprefixer": "10.4.21",
     "postcss": "latest",
-    "tailwindcss": "latest",
+    "tailwindcss": "3.4.17",
     "typescript": "latest",
     "vite": "latest",
     "vitest": "latest"
