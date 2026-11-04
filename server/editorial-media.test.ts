@@ -16,6 +16,10 @@ describe("media rights review",()=>{
   s.editorialDrafts[0].title="Changed title";
   expect(getCurrentMediaReview(s,"w","t").approvedForCurrentDraft).toBe(false);
  });
+ it("returns an empty state while a draft has not yet been created",()=>{
+  const s={tasks:{t:{workspaceId:"w",article:{stage:"outline"}}},editorialDrafts:[],mediaReviews:[]};
+  expect(getCurrentMediaReview(s,"w","t")).toMatchObject({review:null,approvedForCurrentDraft:false,blocker:"draft-missing"});
+ });
  it("enforces stage and workspace ownership",()=>{
   const s=fixture();s.tasks.t.article.stage="drafting";
   expect(()=>recordMediaReview(s,{workspaceId:"w",taskId:"t",decision:"not-required",reviewerName:"Editor",rationale:"No media needed for this piece."})).toThrow("media-review stage");
