@@ -23,7 +23,10 @@ function validateOutput(output,outline,claims,evidence){
   const body=text(section.body,60,14000,"section body");
   const evidenceIds=idList(section.evidenceIds,allowedEvidence,"evidenceIds",true);
   const claimIds=idList(section.claimIds??[],allowedClaims,"claimIds");
+  const citedRecords=evidence.filter(item=>evidenceIds.includes(item.id));
+  const citedClaimIds=new Set(citedRecords.map(item=>item.claimId));
   if(claimIds.some(id=>!claims.some(claim=>claim.id===id&&Array.isArray(claim.sourceIds)&&claim.sourceIds.length>0)))fail("A generated section references an unlinked claim",422);
+  if(claimIds.some(id=>!citedClaimIds.has(id))||citedRecords.some(item=>!claimIds.includes(item.claimId)))fail("Evidence IDs and claim IDs must refer to the same registered claim",422);
   return {id:outline.sections[index].id,heading,brief:outline.sections[index].brief||"",body,evidenceIds,claimIds};
  });
  const entities=Array.isArray(output.entities)?output.entities.slice(0,30).map(item=>({
