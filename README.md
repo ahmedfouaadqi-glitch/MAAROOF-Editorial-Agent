@@ -20,7 +20,7 @@ Lovable-compatible editorial production and verified publishing platform.
 - Workspace-scoped article research counters, idempotent reservations, commit/release operations, and source URL registration.
 - Manual source URLs are stored with title/notes and provenance. Their contents are not fetched or verified.
 
-## Explicit exclusions
+See [API route documentation](docs/API.md) for task creation, source registration, research reservations, and admin configuration.\n\n## Explicit exclusions
 - Supabase and managed database services.
 - Firecrawl, automated crawling, remote URL fetching, and scraping services.
 - No live search or inspection provider is connected. The API currently enforces quotas for these future provider operations only.
