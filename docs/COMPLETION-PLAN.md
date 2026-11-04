@@ -39,7 +39,8 @@ This plan is the acceptance baseline for completing the product end to end. A ch
 ### 3. Article drafting, validation, and editorial approval
 - [x] Arabic/English deterministic outlines and human-editable draft persistence.
 - [x] Structural draft validation baseline and local exact/near-match originality checks.
-- [ ] Add a provider-neutral writing/analysis adapter after the operator chooses and configures an authorized model service.
+- [x] Add an opt-in OpenAI-compatible model adapter and evidence-constrained article drafting service with server-side secrets, explicit invocation, bounded output tokens, atomic per-article request limits, and usage records. No provider is selected or enabled by default.
+- [ ] Add model-assisted NER, entity resolution, multilingual search intent, and relation suggestions behind a provider interface and evaluation set.
 - [ ] Add draft-version snapshots, editorial review decisions, approval freshness, and fail-closed readiness checks.
 - [ ] Add SEO metadata, structured article variants, fact-check coverage, and publication export formats.
 - Acceptance: a draft cannot become ready-to-publish without a current approved review of the exact draft version and completed required checks.
