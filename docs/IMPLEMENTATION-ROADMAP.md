@@ -11,12 +11,15 @@
 - [ ] Implement and test the first publishing adapter against a site owned by the user.
 
 ## Track B — Editorial intelligence (provider-neutral)
-- [ ] Implement research source ingestion with provenance and retrieval timestamps.
+- [x] Implement manual source URL registration with workspace/task association and registration timestamp (content is not fetched).
 - [ ] Implement claim-to-evidence mapping.
+- [ ] Integrate an explicitly selected search provider if live search is required; no Firecrawl or crawler integration is planned.
 - [x] Add configurable research budget model with separate per-article crawl/search/inspect limits.
 - [x] Add an initial admin screen for editing the limits (session-local prototype only).
-- [ ] Connect budget settings to backend configuration and enforce reservations before every Firecrawl/provider call.
-- [ ] Add durable, atomic per-task usage accounting across concurrent workers.
+- [x] Connect admin budget settings to the standalone Node API and persist them in local JSON.
+- [x] Enforce per-article source URL, search, and inspection reservations in the backend (no crawler is used).
+- [x] Add serialized atomic per-task accounting within one Node API process.
+- [ ] Move persistence to a multi-instance database/transaction store if horizontal scaling is required.
 - [ ] Implement entity and search-intent extraction.
 - [ ] Implement outline and bilingual article draft contracts.
 - [ ] Implement originality checks with exact and near-duplicate baselines.
@@ -24,8 +27,10 @@
 - [ ] Add model-provider interface only after engine contracts are tested.
 
 ## Track C — Independent execution services
-- [ ] Node.js API service with authentication middleware contract (no database dependency in first local prototype).
-- [ ] Durable job state abstraction and idempotency.
+- [x] Standalone Node.js API service with admin bearer-token protection and no database dependency.
+- [ ] Replace shared admin token with real user/workspace authentication before production multi-tenant deployment.
+- [x] Idempotent research budget reservations and local JSON persistence.
+- [ ] Durable job state abstraction and idempotency for long-running editorial tasks.
 - [ ] Isolated Playwright + Chromium worker.
 - [ ] Login handoff and session expiry recovery.
 - [ ] Publication reconciliation and external verification.
