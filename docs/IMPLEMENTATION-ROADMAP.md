@@ -17,12 +17,23 @@
 - [x] Persist limits and task usage in a local JSON store.
 - [x] Enforce source URL registration limits atomically with source insertion.
 - [x] Add idempotent reservation, commit, and release operations for search/inspection quotas.
-- [x] Add a provider-neutral, fail-closed live-search contract with bounded request validation, result normalization, URL filtering, deduplication, and explicit unverified provenance.\n- [x] Add an optional server-side Brave Web Search adapter, quota-metered workspace/task API, persisted search history, and UI for searching/registering results as unverified manual sources. Disabled by default; no key or live call used in tests.\n- [ ] Select and connect an external search provider after provider, pricing, data handling, and credentials are approved; no Firecrawl or crawler integration is planned.
-- [x] Implement claim-to-source linking with workspace/task isolation and source-link coverage reporting.\n- [x] Add manual source metadata review, temporal fields, methodology, jurisdiction, and quality rationale.\n- [x] Add manual excerpt-to-claim evidence records with support/contradiction/context/unclear stances.\n- [x] Surface conflicting evidence per claim without automatic truth adjudication.\n- [ ] Add independently verified source acquisition, freshness monitoring, and corroboration after a provider is selected.
-- [x] Add a typed, article-scoped entity registry with canonical names, aliases, and disambiguation notes.\n- [x] Add deterministic matching of registered aliases against editorial claims.\n- [x] Add explicit entity relationships linked to supporting claim IDs, with unverified evidence states.\n- [ ] Implement model-assisted named-entity recognition, entity resolution, and search-intent extraction after provider contracts and evaluation sets are ready.
+- [x] Add a provider-neutral, fail-closed live-search contract with bounded request validation, result normalization, URL filtering, deduplication, and explicit unverified provenance.
+- [x] Add an optional server-side Brave Web Search adapter, quota-metered workspace/task API, persisted search history, and UI for searching/registering results as unverified manual sources. Disabled by default; no key or live call used in tests.
+- [ ] Select and connect an external search provider after provider, pricing, data handling, and credentials are approved; no Firecrawl or crawler integration is planned.
+- [x] Implement claim-to-source linking with workspace/task isolation and source-link coverage reporting.
+- [x] Add manual source metadata review, temporal fields, methodology, jurisdiction, and quality rationale.
+- [x] Add manual excerpt-to-claim evidence records with support/contradiction/context/unclear stances.
+- [x] Surface conflicting evidence per claim without automatic truth adjudication.
+- [ ] Add independently verified source acquisition, freshness monitoring, and corroboration after a provider is selected.
+- [x] Add a typed, article-scoped entity registry with canonical names, aliases, and disambiguation notes.
+- [x] Add deterministic matching of registered aliases against editorial claims.
+- [x] Add explicit entity relationships linked to supporting claim IDs, with unverified evidence states.
+- [ ] Implement model-assisted named-entity recognition, entity resolution, and search-intent extraction after provider contracts and evaluation sets are ready.
 - [x] Add a workspace-scoped, deterministic objective-based outline scaffold and human-editable draft persistence/UI in Arabic and English. This is not LLM-generated writing; model-assisted drafting remains deferred until a provider is explicitly selected and approved.
-- [x] Add deterministic exact-match and token-overlap near-duplicate checks against previously submitted workspace text.\n- [ ] Add semantic, cross-language, and external-corpus originality checks; these require validated embeddings/models and a wider corpus.
-- [x] Add deterministic tests for evidence linking, workspace isolation, Arabic normalization, and exact-match detection.\n- [ ] Add deterministic tests for the remaining editorial engines.
+- [x] Add deterministic exact-match and token-overlap near-duplicate checks against previously submitted workspace text.
+- [ ] Add semantic, cross-language, and external-corpus originality checks; these require validated embeddings/models and a wider corpus.
+- [x] Add deterministic tests for evidence linking, workspace isolation, Arabic normalization, and exact-match detection.
+- [ ] Add deterministic tests for the remaining editorial engines.
 - [ ] Add model-provider interface only after engine contracts are tested.
 
 ## Track C — Independent execution services
@@ -51,8 +62,10 @@
 - [x] Connect article creation and article listing to the standalone Node API.
 - [x] Add controlled one-stage-at-a-time article progression in the UI.
 - [x] Retain platform registry, capability inspector, and backend research settings.
-- [ ] Add authenticated user/workspace switching and role-based navigation.\n- [x] Add article-level evidence workspace UI for manual sources, claim linking, and local originality checks.
-- [ ] Add functional notifications, file/media upload, and approval inbox.\n- [x] Add article-level editorial evidence and entity intelligence workspaces.
+- [ ] Add authenticated user/workspace switching and role-based navigation.
+- [x] Add article-level evidence workspace UI for manual sources, claim linking, and local originality checks.
+- [ ] Add functional notifications, file/media upload, and approval inbox.
+- [x] Add article-level editorial evidence and entity intelligence workspaces.
 - [ ] Add browser-level responsive and accessibility tests.
 
 ## Acceptance rules
