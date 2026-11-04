@@ -1,4 +1,4 @@
-# Implementation Roadmap (No Supabase / No Firecrawl)
+# Implementation Roadmap (No Supabase / Optional Firecrawl)
 
 ## Track A — Platform and editorial contracts
 - [x] React + Vite + TypeScript foundation.
@@ -10,16 +10,16 @@
 - [ ] Verify current API/publishing policies for each selected target.
 - [ ] Implement and test the first publishing adapter against a site owned by the user.
 
-## Track B — Editorial intelligence without automated crawling
+## Track B — Editorial intelligence with bounded, optional Firecrawl
 - [x] Implement manual source URL registration with workspace/task association and timestamps; do not fetch remote contents.
-- [x] Add configurable per-article source URL, search, and inspection quotas (3 / 5 / 5 defaults).
+- [x] Add configurable per-article manual source URL, Firecrawl scrape, search, and inspection quotas (3 / 3 / 5 / 5 defaults).
 - [x] Add an admin screen connected to the standalone Node API.
 - [x] Persist limits and task usage in a local JSON store.
 - [x] Enforce source URL registration limits atomically with source insertion.
 - [x] Add idempotent reservation, commit, and release operations for search/inspection quotas.
 - [x] Add a provider-neutral, fail-closed live-search contract with bounded request validation, result normalization, URL filtering, deduplication, and explicit unverified provenance.
 - [x] Add an optional server-side Brave Web Search adapter, quota-metered workspace/task API, persisted search history, and UI for searching/registering results as unverified manual sources. Disabled by default; no key or live call used in tests.
-- [ ] Select and connect an external search provider after provider, pricing, data handling, and credentials are approved; no Firecrawl or crawler integration is planned.
+- [ ] Firecrawl v2 server adapter, quota-metered scrape endpoint, Markdown extraction, unverified provenance, and local structure-inspection endpoint are implemented behind server configuration. Enable live requests only after operator key, cost, and data handling approval.
 - [x] Implement claim-to-source linking with workspace/task isolation and source-link coverage reporting.
 - [x] Add manual source metadata review, temporal fields, methodology, jurisdiction, and quality rationale.
 - [x] Add manual excerpt-to-claim evidence records with support/contradiction/context/unclear stances.
@@ -34,7 +34,7 @@
 - [ ] Add semantic, cross-language, and external-corpus originality checks; these require validated embeddings/models and a wider corpus.
 - [x] Add deterministic tests for evidence linking, workspace isolation, Arabic normalization, and exact-match detection.
 - [ ] Add deterministic tests for the remaining editorial engines.
-- [x] Add an opt-in server-side OpenAI-compatible model adapter and evidence-constrained article drafting engine, with explicit user invocation, atomic per-article request limits, and usage records; no provider is enabled by default.
+- [x] Keep the existing optional model adapter disabled; article-writing model calls are deferred until a later phase.
 - [ ] Add model-assisted named-entity recognition, entity resolution, and search intent extraction after evaluation sets are ready.
 
 ## Track C — Independent execution services
