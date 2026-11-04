@@ -24,10 +24,11 @@ describe("research budget configuration", () => {
 
   it("enforces crawl, search and inspection limits independently per article", () => {
     const ledger = new ResearchBudgetLedger();
-    for (let i = 0; i < 3; i++) expect(ledger.reserve("article-a", "crawl").allowed).toBe(true);
-    expect(ledger.reserve("article-a", "crawl")).toMatchObject({
+    expect(ledger.reserve("article-a", "crawl", 3)).toMatchObject({ allowed: true, used: 3, limit: 3, remaining: 0 });
+    expect(ledger.reserve("article-a", "crawl", 1)).toMatchObject({
       allowed: false, used: 3, limit: 3, remaining: 0, reason: "limit-reached"
     });
+    expect(ledger.reserve("article-a", "crawl", 0).reason).toBe("invalid-units");
 
     for (let i = 0; i < 5; i++) expect(ledger.reserve("article-a", "search").allowed).toBe(true);
     expect(ledger.reserve("article-a", "search").allowed).toBe(false);
