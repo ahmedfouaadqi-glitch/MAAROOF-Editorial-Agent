@@ -28,7 +28,7 @@ describe("server-side research budget", () => {
       expect(reserveBudget(state, { ...scope, operation: "inspect", reservationId: `inspect-00${i}` }).allowed).toBe(true);
     }
     expect(reserveBudget(state, { ...scope, operation: "search", reservationId: "search-final" }).allowed).toBe(false);
-    expect(reserveBudget(state, { ...scope, operation: "inspect", reservationId: "inspect-final" }).allowed).toBe(false);
+    expect(reserveBudget(state, { ...scope, operation: "inspect", reservationId: "inspect-final" }).allowed).toBe(false);\n  });\n\n  it("enforces Firecrawl scrape quota independently", () => {\n    const state = freshState();\n    for (let i = 0; i < 3; i++) expect(reserveBudget(state, { ...scope, operation: "scrape", reservationId: `scrape-000${i}` }).allowed).toBe(true);\n    expect(reserveBudget(state, { ...scope, operation: "scrape", reservationId: "scrape-final" }).allowed).toBe(false);
   });
 
   it("isolates tasks and workspaces", () => {
