@@ -4,51 +4,65 @@ Lovable-compatible editorial production and verified publishing platform.
 
 ## Architecture constraints
 - Frontend: React + Vite + TypeScript, Tailwind CSS, React Router.
-- No Supabase or managed database is used. Local JSON persistence is used for the current single-process API prototype.
-- Application service: independent Node.js HTTP API with atomic single-process JSON persistence (implemented prototype; not horizontally scalable).
+- No Supabase or managed database is used. The current API prototype persists JSON locally.
+- Application service: independent Node.js HTTP API with serialized, atomic single-process JSON writes. It is not horizontally scalable.
 - Browser publishing: isolated Playwright + Chromium runtime (planned; not implemented yet). Browser automation must never run in the frontend.
 - AI: provider-agnostic gateway (planned). No paid model calls are made by the current foundation.
 - MAAROOF AI remains a separate system; integration is through scoped, authenticated APIs only.
 
 ## Current implementation
-- Arabic RTL dashboard shell.
-- Searchable and filterable registry for the 17 platforms supplied by the user.
-- Platform profiles with conservative capability declarations, policy constraints, official documentation links where identified, and per-platform verification checklists.
-- Editorial workflow TypeScript contracts for intake, planning, research, entity analysis, drafting, evidence review, originality review, media review, editorial approval, publishing, and publication verification.
-- Fail-closed publishing gate: registry metadata cannot authorize publishing. Every adapter remains blocked until implementation, policy, account, credentials, human approval (when required), and idempotency checks pass.
-- Vitest test cases for registry completeness, fail-closed publishing behavior, and per-article research budget enforcement.
-- Admin UI for configuring per-article manual source URL, search-operation, and inspection-operation limits (3 / 5 / 5 defaults), saved through the standalone API.
-- Standalone Node.js HTTP API with local JSON persistence, authenticated admin settings, workspace-scoped task budgets, idempotent reservations, atomic source-reference registration, quota blocking, and reservation commit/release.
+- Arabic RTL dashboard shell and searchable registry for the 17 supplied platforms.
+- Conservative platform capability profiles, policy constraints, and verification checklists.
+- Editorial workflow TypeScript contracts and deterministic draft structure validation.
+- Fail-closed publishing gate; no platform is currently publish-enabled.
+- Admin UI for per-article manual source URL, search-operation, and inspection-operation limits (defaults 3 / 5 / 5).
+- Standalone Node.js API with admin bearer-token protection and local JSON persistence.
+- Workspace-scoped article research counters, idempotent reservations, commit/release operations, and source URL registration.
+- Manual source URLs are stored with title/notes and provenance. Their contents are not fetched or verified.
 
-## Platform registry policy
-The 17 listed entries are not all magazines. The registry separates editorial destinations, professional networks, communities, encyclopedic knowledge bases, research repositories, code hosts, and data sources. A listed platform is not presumed to accept promotional articles or automated publishing.
-
-Official APIs are preferred where appropriate and authorized. Browser automation is considered only after platform-specific policy review and controlled testing. Manual handoff remains available for destinations where automated publishing is unsupported or inappropriate.
-
-## Deliberately not implemented yet
-- Supabase (explicitly excluded).
-- Automated web crawling, Firecrawl, and external search/inspection provider integrations (explicitly excluded/not configured).
-- Live AI model calls, paid research, and provider credentials.
-- Multi-instance durable database, user identity authentication, and cross-process quota coordination; current JSON persistence is single-process and admin-token protected.
-- Real platform publishing adapters.
-- Playwright browser runtime and persistent authenticated sessions.
-- MAAROOF AI API integration.
-- External publication verification.
+## Explicit exclusions
+- Supabase and managed database services.
+- Firecrawl, automated crawling, remote URL fetching, and scraping services.
+- No live search or inspection provider is connected. The API currently enforces quotas for these future provider operations only.
+- Paid model calls and provider credentials.
+- Real publishing adapters, Playwright runtime, MAAROOF AI integration, and external publication verification.
 
 ## Local development
+Requires Node.js 22 or newer.
+
+1. Copy `.env.example` to `.env`.
+2. Set a strong, unique `ADMIN_API_TOKEN` in `.env`.
+3. Start the API:
+
 ```bash
 npm install
+npm run server
+```
+
+4. In a second terminal, start the frontend:
+
+```bash
 npm run dev
+```
+
+5. Validate the project:
+
+```bash
 npm run typecheck
 npm test
 npm run build
 ```
 
-## Safety and reliability
+The API defaults to `http://127.0.0.1:8787`. Set `HOST=0.0.0.0` only when the service must accept connections from outside the local host, and configure `CORS_ORIGIN` to the exact frontend origin. The JSON data file is written to `./data/editorial-agent.json` and is excluded from Git.
+
+## Security and scaling limitations
+- The shared admin bearer token is an interim operator gate, not user identity authentication. Do not expose it in a public frontend bundle or use it as a production multi-tenant auth model.
+- Workspace identifiers are scoped in records, but a real authenticated identity-to-workspace authorization layer is still required before production.
+- The JSON store serializes writes within one Node process only. Run exactly one API instance against a given data file; multiple processes/replicas require a transactional shared store.
+- Keep secrets out of source control and model prompts.
 - Never bypass CAPTCHA, MFA, access controls, or platform safeguards.
 - Never report publication success without external verification.
-- Use idempotency and publication reconciliation to prevent duplicate submissions.
-- Keep credentials and API secrets out of model prompts and frontend bundles.
-- Do not enable a platform adapter until its policy, account access, and end-to-end behavior have been verified.
 - Do not use research repositories, Q&A communities, or data archives as generic promotional publishing destinations.
-\n## Research acquisition policy\n\nNo Firecrawl or automated crawler is used. Source URLs are registered manually and are not fetched. Search and inspection quotas are reserved by backend API endpoints, but no live search or inspection provider is currently connected.\n
+
+## Research acquisition policy
+No Firecrawl or automated crawler is used. Source URLs are manually registered and are not fetched. Search and inspection quotas are reserved by backend API endpoints, but no live search or inspection provider is currently connected.
