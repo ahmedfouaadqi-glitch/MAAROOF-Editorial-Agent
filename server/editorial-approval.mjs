@@ -13,7 +13,7 @@ function draftFor(state,workspaceId,taskId){
  return draft;
 }
 export function buildDraftReviewText(draft){
- return [draft.title||"",draft.dek||"",draft.editorialAngle||"",...(draft.sections||[]).flatMap(section=>[section.heading||"",section.body||""]),draft.metaTitle||"",draft.metaDescription||""].filter(Boolean).join("\n");
+ return [draft.title||"",draft.dek||"",draft.editorialAngle||"",...(draft.sections||[]).flatMap(section=>[section.heading||"",section.body||"",...(section.evidenceIds||[]).map(id=>"evidence:"+id),...(section.claimIds||[]).map(id=>"claim:"+id)]),draft.metaTitle||"",draft.metaDescription||""].filter(Boolean).join("\n");
 }
 export function editorialDraftFingerprint(draft){
  return createHash("sha256").update(normalizeEditorialText(buildDraftReviewText(draft))).digest("hex");
