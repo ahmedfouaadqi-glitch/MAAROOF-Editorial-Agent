@@ -14,6 +14,8 @@ import { runMeteredResearchSearch } from "./research-search-service.mjs";
 import { createBraveSearchProvider } from "./brave-search-provider.mjs";
 import { checkEditorialDraftOriginality, getEditorialApproval, recordEditorialReview } from "./editorial-approval.mjs";
 import { getCurrentMediaReview, recordMediaReview } from "./editorial-media.mjs";
+import { createOpenAICompatibleProvider } from "./model-provider.mjs";
+import { runEditorialDraftGeneration } from "./editorial-writing.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "127.0.0.1";
@@ -24,6 +26,11 @@ const store = new JsonStore(dataFile);
 const searchProvider = process.env.RESEARCH_SEARCH_PROVIDER === "brave"
   ? createBraveSearchProvider()
   : null;
+const modelProvider = process.env.ENABLE_MODEL_GENERATION === "true"
+  ? createOpenAICompatibleProvider()
+  : null;
+const configuredModelTokens = Number(process.env.MODEL_MAX_OUTPUT_TOKENS || 3000);
+const modelMaxOutputTokens = Number.isSafeInteger(configuredModelTokens) && configuredModelTokens >= 256 && configuredModelTokens <= 8192 ? configuredModelTokens : 3000;
 
 function send(res, status, payload) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
@@ -70,7 +77,7 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     if (req.method === "GET" && url.pathname === "/health") {
-      return send(res, 200, { ok: true, service: "maaroof-editorial-api", persistence: "local-json", integrations: { supabase: false, firecrawl: false, liveSearch: Boolean(searchProvider), searchProvider: searchProvider?.id || null } });
+      return send(res, 200, { ok: true, service: "maaroof-editorial-api", persistence: "local-json", integrations: { supabase: false, firecrawl: false, liveSearch: Boolean(searchProvider), searchProvider: searchProvider?.id || null, modelGeneration: Boolean(modelProvider), model: modelProvider?.model || null } });
     }
 
     requireAdmin(req);
@@ -176,6 +183,16 @@ const server = createServer(async (req, res) => {
         note: body.note
       }));
       return send(res, 200, { submission, externalAction: "none" });
+    }
+
+    const draftGenerationRoute = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/draft\/generate$/);
+    if (draftGenerationRoute && req.method === "POST") {
+      const workspaceId = decodeURIComponent(draftGenerationRoute[1]);
+      const taskId = decodeURIComponent(draftGenerationRoute[2]);
+      const result = await runEditorialDraftGeneration({
+        store, provider: modelProvider, workspaceId, taskId, maxTokens: modelMaxOutputTokens
+      });
+      return send(res, 200, result);
     }
 
     const draftOriginalityRoute = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/originality\/check-draft$/);
