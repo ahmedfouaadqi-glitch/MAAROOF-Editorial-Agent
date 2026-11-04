@@ -14,6 +14,7 @@ Request body:
 {
   "limits": {
     "sourceUrlsPerArticle": 3,
+    "scrapesPerArticle": 3,
     "searchesPerArticle": 5,
     "inspectionsPerArticle": 5
   }
@@ -52,7 +53,7 @@ POST body example:
 }
 ```
 
-**Important:** Registering a URL does not fetch, crawl, parse, or verify the remote page. No Firecrawl or other crawler is present.
+**Important:** Registering a URL manually does not fetch or verify it. The separate Firecrawl scrape endpoint performs bounded retrieval only when the server has a valid FIRECRAWL_API_KEY. Retrieved content remains unverified.
 
 ## Research quota reservations
 - `POST /api/v1/tasks/:taskId/research-reservations` — reserve one or more `search` or `inspect` units. `source` units are reserved automatically when a source URL is registered.
@@ -122,7 +123,7 @@ The current scanner is deliberately limited to exact normalized matches against 
 
 
 ## Live research search provider boundary
-A provider-neutral contract is implemented in `server/research-provider.mjs`. It validates bounded queries, normalizes and deduplicates HTTP(S) result URLs, and labels every result `search-result-unverified`. It fails closed when no provider is injected. No live search provider, API key, paid request, page fetch, or Firecrawl integration is configured. Search results are discovery leads and must be opened and assessed before they can support a claim.
+A provider-neutral contract is implemented in `server/research-provider.mjs`. It validates bounded queries, normalizes and deduplicates HTTP(S) result URLs, and labels every result `search-result-unverified`. Firecrawl v2 and Brave are optional server-side providers. When no provider is enabled, live search fails closed. Search results are discovery leads and must be opened and assessed before they can support a claim.
 
 ## Editorial research and source assessment
 - `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/research` — return article-scoped source assessments, evidence excerpts, and claim conflict summaries.
@@ -183,7 +184,7 @@ Each provider attempt consumes one per-article search quota. Provider failures a
 
 The adapter is disabled by default. No credentials, live requests, or paid API calls are part of CI. Provider plans and pricing can change; check the provider dashboard before enabling it.
 
-## Opt-in model-assisted article drafting
+## Deferred model-assisted article drafting
 
 - `POST /api/v1/workspaces/:workspaceId/tasks/:taskId/draft/generate` — explicitly request a model-assisted draft while the article is in the `drafting` stage.
 - `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/model-usage` — list per-article generation attempts and token counts.
@@ -236,3 +237,27 @@ Status update body:
 ```
 
 Statuses: `draft`, `approved`, `submitted`, `editor-replied`, `accepted`, `rejected`, `published`, `withdrawn`. A submission can only be recorded after explicit approval and an exclusivity confirmation. Acceptance and publication are separate states. The API only records operator-reported actions; it does not send pitches, upload manuscripts, contact editors, or verify publication externally. A `published` status is a manual record, not independent proof of a live URL.
+
+
+## Firecrawl search, scraping, and source inspection
+
+### Search
+- POST /api/v1/workspaces/:workspaceId/tasks/:taskId/research/searches — execute one quota-metered query.
+- GET /api/v1/workspaces/:workspaceId/tasks/:taskId/research/searches — read stored search runs.
+
+Set RESEARCH_SEARCH_PROVIDER=firecrawl with FIRECRAWL_API_KEY to use Firecrawl Search, or RESEARCH_SEARCH_PROVIDER=brave with BRAVE_SEARCH_API_KEY to use Brave. Keys are server-side only. Each provider attempt consumes one search quota (default 5 per article). Results are labelled search-result-unverified and are only discovery leads. The search itself does not fetch the page content.
+
+### Scraping
+- POST /api/v1/workspaces/:workspaceId/tasks/:taskId/research/scrapes — retrieve one explicitly selected URL and store extracted Markdown as an unverified source.
+- GET /api/v1/workspaces/:workspaceId/tasks/:taskId/research/scrapes — list stored scrape runs.
+
+Set FIRECRAWL_API_KEY on the server. Scraping fails closed without a key. The default quota is 3 page URLs per article and can be changed in the admin research settings. The provider uses Firecrawl v2, requests Markdown and main content only, caps stored Markdown at 120,000 characters, and rejects non-HTTP(S), credentialed, local/internal-hostname and literal-IP URL targets. This validation is not a complete DNS-rebinding defense; further destination controls and provider-side protections remain necessary.
+
+A successful scrape means content was retrieved, not that it is accurate, original, current or relevant. Retrieved content remains scraped-content-unverified until claims are assessed and supported by evidence. Tests use mocked providers and make no live Firecrawl requests.
+
+### Structure inspection
+- POST /api/v1/workspaces/:workspaceId/tasks/:taskId/research/inspections — run a deterministic structure inspection against an already scraped source ID.
+- GET /api/v1/workspaces/:workspaceId/tasks/:taskId/research/inspections — list inspections.
+
+The default quota is 5 inspections per article. An inspection reports word count, Markdown heading count, inline link count and structural warnings. It is a local deterministic check; it does not consume a Firecrawl request and does not establish source credibility or factual accuracy.
+
