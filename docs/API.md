@@ -169,6 +169,14 @@ Supported event types: `crawler_fetch`, `search_index_verified`, `citation_verif
 Verified indexing, citation, and training events require both `evidenceUrl` and `evidenceNote`. Training use must never be inferred from crawler access. The current API records manual evidence; automated access-log, Search Console, Bing Webmaster, and AI-answer integrations are not connected.
 
 
+
+## Editorial outline and draft workspace
+- `POST /api/v1/workspaces/:workspaceId/tasks/:taskId/draft` — create or regenerate an objective-based structural outline.
+- `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/draft` — retrieve the saved outline/draft.
+- `PUT /api/v1/workspaces/:workspaceId/tasks/:taskId/draft` — save editor-authored title, metadata, section headings, and section body text.
+
+The outline generator is deterministic and creates section prompts only. It does not generate factual prose, perform live research, or call an LLM. All draft operations verify that the task belongs to the requested workspace.
+
 ## Magazine pitch and submission tracking (manual handoff)
 
 - `POST /api/v1/workspaces/:workspaceId/tasks/:taskId/magazine-submissions` — create a local pitch record.
