@@ -42,6 +42,11 @@ export function createWordPressAdapter({siteUrl=process.env.WORDPRESS_SITE_URL,u
    if(!/^\d+$/.test(String(remoteId)))fail("Invalid WordPress remote post ID",400);
    const data=await request(endpoint+"/"+encodeURIComponent(String(remoteId))+"?context=edit",{method:"GET"});
    return {remoteId:String(data.id),url:typeof data.link==="string"?data.link:null,status:data.status,platform:"wordpress"};
+  },
+  async findBySlug(slug){
+   const query=new URLSearchParams({slug:safeText(slug,180),context:"edit"});
+   const rows=await request(endpoint+"?"+query.toString(),{method:"GET"});
+   return Array.isArray(rows)?rows.map(item=>({remoteId:String(item.id),url:typeof item.link==="string"?item.link:null,status:item.status,slug:item.slug,platform:"wordpress"})):[];
   }
  };
 }
