@@ -39,28 +39,25 @@ export const adapterRegistry: Record<string, AdapterCapability> = {
     verificationChecklist: ["تحديد النشرة المستهدفة", "التحقق من صلاحية الكاتب", "فحص خيارات المسودة والنشر", "تأكيد الرابط العام"]
   },
   wordpress: {
-    platformId: "wordpress", role: "editorial-destination", integration: "official-api",
-    canCreateArticle: "yes", canUploadMedia: "yes", canSetMetadata: "limited",
-    humanApproval: "platform-dependent", implementationStatus: "adapter-not-implemented",
-    officialDocsUrl: "https://developer.wordpress.org/rest-api/",
-    constraints: ["يتطلب عنوان موقع WordPress وصلاحية مصادقة مناسبة.", "حقول SEO والتصنيفات قد تعتمد على الإضافات المثبتة.", "تختلف صلاحيات النشر بين draft وpending وpublish."],
-    verificationChecklist: ["تحديد WordPress.com أو self-hosted", "التحقق من REST API", "اختبار المصادقة والصلاحيات", "اختبار رفع الوسائط", "اختبار مسودة ثم تحقق خارجي"]
+    platformId: "wordpress", role: "editorial-destination", integration: "browser-agent",
+    canCreateArticle: "unverified", canUploadMedia: "unverified", canSetMetadata: "unverified",
+    humanApproval: "required", implementationStatus: "adapter-not-implemented",
+    constraints: ["يُدار النشر عبر وكيل متصفح بعد تحديد نطاق الموقع وموافقة مالكه.", "لا يوجد تكامل REST API مطلوب ضمن النطاق الحالي.", "يجب احترام صلاحيات الحساب وسياسات الموقع وعدم تخطي MFA أو CAPTCHA."],
+    verificationChecklist: ["تسجيل نطاق الموقع وإثبات ملكية/تفويض الحساب", "مراجعة سياسات النشر", "إنشاء جلسة متصفح يوافق عليها المستخدم", "اختبار حفظ مسودة", "التحقق خارجياً من النتيجة"]
   },
   blogger: {
-    platformId: "blogger", role: "editorial-destination", integration: "official-api",
-    canCreateArticle: "yes", canUploadMedia: "limited", canSetMetadata: "limited",
-    humanApproval: "platform-dependent", implementationStatus: "adapter-not-implemented",
-    officialDocsUrl: "https://developers.google.com/blogger/docs/3.0/using",
-    constraints: ["يتطلب OAuth ونطاقات صلاحيات مناسبة.", "يجب التحقق من إمكانات الصور والبيانات الوصفية ضمن واجهة Blogger الحالية."],
-    verificationChecklist: ["إنشاء OAuth client", "تحديد المدونة وصلاحيات المستخدم", "اختبار إنشاء مسودة", "اختبار النشر والتحقق من الرابط"]
+    platformId: "blogger", role: "editorial-destination", integration: "browser-agent",
+    canCreateArticle: "unverified", canUploadMedia: "unverified", canSetMetadata: "unverified",
+    humanApproval: "required", implementationStatus: "adapter-not-implemented",
+    constraints: ["يُستخدم مسار المتصفح بعد التحقق من الحساب وسياسات المنصة.", "لا يُبنى موصل Blogger API ضمن النطاق الحالي.", "يجب طلب تدخل المستخدم للمصادقة متعددة العوامل أو التحديات."],
+    verificationChecklist: ["تحديد المدونة المقصودة", "تأكيد تفويض الحساب", "اختبار جلسة المتصفح", "التحقق من حفظ المسودة خارجياً"]
   },
   ghost: {
-    platformId: "ghost", role: "editorial-destination", integration: "official-api",
-    canCreateArticle: "yes", canUploadMedia: "yes", canSetMetadata: "yes",
-    humanApproval: "platform-dependent", implementationStatus: "adapter-not-implemented",
-    officialDocsUrl: "https://ghost.org/docs/admin-api/",
-    constraints: ["يتطلب عنوان Ghost ومفتاح Admin API من مالك الموقع.", "يجب حفظ المفاتيح في backend secret store فقط."],
-    verificationChecklist: ["تحديد نسخة Ghost ومضيفها", "إعداد Admin API", "اختبار المقال والصورة والوسوم", "اختبار draft/publish", "التحقق من المقال المنشور"]
+    platformId: "ghost", role: "editorial-destination", integration: "browser-agent",
+    canCreateArticle: "unverified", canUploadMedia: "unverified", canSetMetadata: "unverified",
+    humanApproval: "required", implementationStatus: "adapter-not-implemented",
+    constraints: ["يُستخدم مسار المتصفح إلى لوحة الموقع بعد اعتماد النطاق وتفويض الحساب.", "لا يوجد Ghost Admin API adapter ضمن النطاق الحالي.", "لا يتم تجاوز أي خطوة تحقق أو صلاحية يطلبها الموقع."],
+    verificationChecklist: ["تسجيل نطاق Ghost وبيانات المجلة", "تأكيد التفويض وتسجيل الدخول", "اختبار إدخال المقال والصورة", "التحقق الخارجي من المسودة أو النشر"]
   },
   devto: {
     platformId: "devto", role: "professional-network", integration: "not-assessed",
