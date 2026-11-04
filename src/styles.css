@@ -66,3 +66,17 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .evidence-open-button{height:27px;padding:0 8px;font-size:8px}
 .originality-form{margin-top:2px}
 @media(max-width:700px){.evidence-panel{padding:14px}.evidence-grid{grid-template-columns:1fr}.evidence-summary{gap:6px}.evidence-summary>div{padding:8px}.evidence-summary b{font-size:16px}.article-row{flex-wrap:wrap}.evidence-open-button{margin-right:auto}}
+
+
+/* Entity intelligence */
+.entity-intelligence{display:grid;gap:13px;padding:16px;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
+.entity-intelligence>.section-heading p{font-size:9px;color:var(--muted);margin-top:4px}
+.entity-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.entity-toolbar>.muted{font-size:9px;line-height:1.6}
+.entity-toolbar .secondary-button{flex-shrink:0}
+.entity-list{display:grid;gap:8px}
+.entity-list>h3{font-size:11px;margin:2px 0;color:var(--text-strong)}
+.entity-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.entity-title-row .stage-pill{font-size:8px}
+.entity-intelligence .form-pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media(max-width:600px){.entity-toolbar{align-items:flex-start;flex-direction:column}.entity-intelligence .form-pair{grid-template-columns:1fr}}
