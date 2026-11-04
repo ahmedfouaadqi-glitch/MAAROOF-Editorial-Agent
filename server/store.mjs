@@ -7,7 +7,8 @@ const EMPTY = {
   tasks: {},
   sources: [],
   researchSearches: [],
-  researchScrapes: []
+  researchScrapes: [],
+  researchInspections: []
 };
 
 export class JsonStore {
@@ -22,6 +23,7 @@ export class JsonStore {
       let changed = false;
       state.limits = { ...EMPTY.limits, ...(state.limits || {}) };
       state.researchScrapes ||= [];
+      state.researchInspections ||= [];
       state.researchSearches ||= [];
       state.sources ||= [];
       state.tasks ||= {};
@@ -35,7 +37,7 @@ export class JsonStore {
         }
         task.reservations ||= {};
       }
-      if (changed || !raw.includes('"scrapesPerArticle"') || !raw.includes('"researchScrapes"')) await this.#write(state);
+      if (changed || !raw.includes('"scrapesPerArticle"') || !raw.includes('"researchScrapes"') || !raw.includes('"researchInspections"')) await this.#write(state);
     }
     catch (error) {
       if (error.code !== "ENOENT") throw error;
