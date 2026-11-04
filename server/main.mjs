@@ -8,6 +8,7 @@ import { registerClaim, listClaims, checkOriginality } from "./editorial-evidenc
 import { createEntity, listEntities, scanKnownEntities, createEntityRelationship, listEntityRelationships } from "./editorial-entities.mjs";
 import { assessSource, recordEvidence, listResearch } from "./editorial-research.mjs";
 import { recordVisibilityEvent, listVisibilityEvents, summarizeVisibility } from "./ai-visibility.mjs";
+import { createMagazineSubmission, listMagazineSubmissions, transitionMagazineSubmission } from "./magazine-submissions.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "127.0.0.1";
@@ -118,6 +119,34 @@ const server = createServer(async (req, res) => {
       const taskId = decodeURIComponent(articleStage[2]);
       const article = await store.transact(state => advanceEditorialTask(state, { workspaceId, taskId, nextStage: body.nextStage }));
       return send(res, 200, { article });
+    }
+
+    const magazineSubmissionCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/magazine-submissions$/);
+    if (magazineSubmissionCollection && req.method === "GET") {
+      const workspaceId = decodeURIComponent(magazineSubmissionCollection[1]);
+      const taskId = decodeURIComponent(magazineSubmissionCollection[2]);
+      const state = await store.read();
+      return send(res, 200, { submissions: listMagazineSubmissions(state, workspaceId, taskId) });
+    }
+    if (magazineSubmissionCollection && req.method === "POST") {
+      const body = await readJson(req);
+      const workspaceId = decodeURIComponent(magazineSubmissionCollection[1]);
+      const taskId = decodeURIComponent(magazineSubmissionCollection[2]);
+      const submission = await store.transact(state => createMagazineSubmission(state, { ...body, workspaceId, taskId }));
+      return send(res, 201, { submission, externalAction: "none" });
+    }
+
+    const magazineSubmissionStatus = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/tasks\/([^/]+)\/magazine-submissions\/([^/]+)\/status$/);
+    if (magazineSubmissionStatus && req.method === "PUT") {
+      const body = await readJson(req);
+      const submission = await store.transact(state => transitionMagazineSubmission(state, {
+        workspaceId: decodeURIComponent(magazineSubmissionStatus[1]),
+        taskId: decodeURIComponent(magazineSubmissionStatus[2]),
+        submissionId: decodeURIComponent(magazineSubmissionStatus[3]),
+        nextStatus: body.nextStatus,
+        note: body.note
+      }));
+      return send(res, 200, { submission, externalAction: "none" });
     }
 
     const reservationMatch = url.pathname.match(/^\/api\/v1\/tasks\/([^/]+)\/research-reservations$/);
