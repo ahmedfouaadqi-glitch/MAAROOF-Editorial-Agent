@@ -1,97 +1,82 @@
 # MAAROOF Editorial Agent
 
-Lovable-compatible editorial production and verified publishing platform.
+Lovable-compatible editorial operations platform with a future browser-first publishing agent.
 
 ## Architecture constraints
 - Frontend: React + Vite + TypeScript, Tailwind CSS, React Router.
-- No Supabase or managed database is used. The current API prototype persists JSON locally.
+- No Supabase. The current API prototype persists JSON locally.
 - Application service: independent Node.js HTTP API with serialized, atomic single-process JSON writes. It is not horizontally scalable.
-- Browser publishing: isolated Playwright + Chromium runtime (planned; not implemented yet). Browser automation must never run in the frontend.
-- AI: optional OpenAI-compatible server-side adapter for evidence-constrained article drafting. Disabled by default; explicit user action is required, and per-article requests are capped. No model provider or API key is selected in the repository.
-- MAAROOF AI remains a separate system; integration is through scoped, authenticated APIs only.
+- Browser publishing: isolated Playwright + Chromium runtime is planned and not implemented yet. Browser automation must never run in the frontend.
+- Article-writing LLM use is deferred. The existing optional model adapter remains disabled by default and is not part of the current operating phase.
+- MAAROOF AI remains a separate system; future integration is through scoped, authenticated APIs only.
 
 ## Current implementation
-- Responsive Linear-inspired editorial workspace with a vector-first dashboard, Arabic RTL default, English shell labels, light/dark themes, and mobile navigation.
-- Integrated the official React Bits SpotlightCard component for restrained pointer-reactive lighting; no React Bits Pro assets or additional animation dependencies.
+- Responsive Linear-inspired editorial workspace with vector-first dashboard, Arabic RTL default, English shell labels, light/dark themes, and mobile navigation.
+- React Bits SpotlightCard integration for restrained pointer-reactive lighting.
 - Conservative platform capability profiles, policy constraints, and verification checklists.
-- Editorial workflow TypeScript contracts and deterministic draft structure validation.
-- Article task creation, listing, and controlled stage progression through the standalone Node API.
-- Fail-closed publishing gate; no platform is currently publish-enabled.
-- Admin UI for per-article manual source URL, search-operation, and inspection-operation limits (defaults 3 / 5 / 5).
-- Standalone Node.js API with admin bearer-token protection and local JSON persistence.
-- Workspace-scoped article research counters, idempotent reservations, commit/release operations, and source URL registration.
-- Manual source URLs are stored with title/notes and provenance. Their contents are not fetched or verified.
-- Article-level evidence workspace: manually register references, add factual claims, and link claims only to sources from the same workspace and article.
-- Claim coverage reports source-link completeness only; linked sources remain unverified until an evidence review is implemented.
-- Deterministic originality baseline: normalized SHA-256 exact-match checks and token-overlap near-match heuristics against text previously submitted in the same workspace.
+- Article task creation, deterministic Arabic/English outline scaffold, human editing, and controlled stage progression.
+- Article-level source/evidence workspace, claim links, entity registry, manual source assessment, and editorial/media approval gates.
+- Deterministic exact-match and token-overlap originality baseline; this is not semantic plagiarism detection.
+- Admin quotas per article: manually registered source URLs 3, Firecrawl page scrapes 3, search operations 5, and structure inspections 5 by default.
+- Optional Firecrawl v2 server adapter, quota-metered scrape/search APIs, extracted Markdown storage, and unverified provenance.
+- Optional Brave Web Search adapter behind server-side configuration.
+- Structure inspection of scraped Markdown: word count, headings and inline links. It does not establish factual accuracy.
+- Local JSON persistence, workspace/task scoping and an interim shared admin bearer-token gate.
 
-See [API route documentation](docs/API.md) for task creation, source registration, research reservations, and admin configuration. See [UI design system](docs/UI-DESIGN-SYSTEM.md) for the visual system and [React Bits integration notes](src/components/SpotlightCard.LICENSE.md) for component attribution and license.
+See the [requested scope and implementation plan](docs/REQUESTED-SCOPE-AND-IMPLEMENTATION-PLAN.md), [API documentation](docs/API.md), [magazine registry](docs/MAGAZINE-PUBLICATION-REGISTRY.md), and [UI design system](docs/UI-DESIGN-SYSTEM.md).
 
-## Explicit exclusions
+## Explicit exclusions and deferred work
 - Supabase and managed database services.
-- Firecrawl, automated crawling, remote URL fetching, and scraping services.
-- Optional Brave Web Search adapter is available behind server-only configuration. It remains disabled unless RESEARCH_SEARCH_PROVIDER=brave and BRAVE_SEARCH_API_KEY are set; explicit search requests are quota-metered, and results are labeled unverified. Builds and tests do not send search requests.
-- No model credentials or provider are supplied; live model generation remains disabled until the operator configures server-only settings. CI uses mocked providers and makes no model calls.
-- Real publishing adapters, Playwright runtime, MAAROOF AI integration, and external publication verification.
+- Model-based article writing, model-assisted NER and paid LLM calls until a later phase.
+- Real browser publishing, Playwright/Chromium worker, account-session handoff, and external publication verification.
+- Production identity authentication, durable multi-instance persistence, and production job orchestration.
+- No destination is automatically publish-enabled. Destination policy and account authorization must be verified individually.
+
+## Research provider configuration
+- Set FIRECRAWL_API_KEY on the server to enable page scraping.
+- Set RESEARCH_SEARCH_PROVIDER=firecrawl to use Firecrawl Search with the same server-side key.
+- Alternatively set RESEARCH_SEARCH_PROVIDER=brave and BRAVE_SEARCH_API_KEY to use Brave Search.
+- Search and scrape outputs remain unverified. A scraped page is a retrieved source, not proof of truth.
+- The admin can set per-article quotas. Defaults are 3 page scrapes, 5 search operations and 5 structural inspections. Manual reference registration has its own separate limit.
+
+No provider key is sent to Vite or the browser. Tests use mocked providers and do not execute live paid calls.
 
 ## Local development
 Requires Node.js 22 or newer.
 
-1. Copy `.env.example` to `.env`.
-2. Set a strong, unique `ADMIN_API_TOKEN` in `.env`.
-3. Start the API:
+1. Copy .env.example to .env.
+2. Set a strong, unique ADMIN_API_TOKEN.
+3. Start the API with npm install and npm run server.
+4. In a second terminal, run npm run dev.
+5. Validate with npm run typecheck, npm test and npm run build.
 
-```bash
-npm install
-npm run server
-```
-
-4. In a second terminal, start the frontend:
-
-```bash
-npm run dev
-```
-
-5. Validate the project:
-
-```bash
-npm run typecheck
-npm test
-npm run build
-```
-
-The API defaults to `http://127.0.0.1:8787`. Set `HOST=0.0.0.0` only when the service must accept connections from outside the local host, and configure `CORS_ORIGIN` to the exact frontend origin. The JSON data file is written to `./data/editorial-agent.json` and is excluded from Git.
+The API defaults to http://127.0.0.1:8787. Set HOST=0.0.0.0 only when external access is required, and configure CORS_ORIGIN to the exact frontend origin. The JSON data file is written to ./data/editorial-agent.json and excluded from Git.
 
 ## Security and scaling limitations
-- The shared admin bearer token is an interim operator gate, not user identity authentication. Do not expose it in a public frontend bundle or use it as a production multi-tenant auth model.
-- Workspace identifiers are scoped in records, but a real authenticated identity-to-workspace authorization layer is still required before production.
-- The JSON store serializes writes within one Node process only. Run exactly one API instance against a given data file; multiple processes/replicas require a transactional shared store.
-- Keep secrets out of source control and model prompts.
-- Never bypass CAPTCHA, MFA, access controls, or platform safeguards.
+- The shared admin bearer token is an interim operator gate, not production identity authentication.
+- Workspace identifiers are currently record-scoped; authenticated identity-to-workspace authorization is required before public multi-tenant deployment.
+- JSON persistence serializes writes within one Node process only. Do not run multiple instances against the same data file.
+- Firecrawl fetches remote URLs. Current validation rejects local/internal hostnames and literal IP targets, but is not a complete DNS-rebinding defence; stricter destination and provider-side controls remain necessary.
+- Keep secrets out of source control and frontend bundles.
+- Never bypass CAPTCHA, MFA, access controls or platform safeguards.
 - Never report publication success without external verification.
-- Do not use research repositories, Q&A communities, or data archives as generic promotional publishing destinations.
+- Do not use research repositories, Q&A communities, encyclopedias or data archives as generic promotional publishing destinations.
 
-## Research acquisition policy
-No Firecrawl or automated crawler is used. Source URLs remain manually registered and are not fetched. An optional Brave search adapter is available when server-side credentials are configured; search results remain unverified discovery leads. Content fetching and independent source verification are not yet implemented.
+## Platform classification
+The supplied 17-entry seed list is preserved, but not all entries are magazines:
+- Self-publishing/CMS: Medium, Substack, WordPress, Blogger, Ghost.
+- Developer/professional long-form: DEV Community, Hashnode, LinkedIn Articles.
+- Communities/Q&A: Reddit, Quora, Stack Exchange.
+- Encyclopedia/research repositories: Wikipedia, arXiv, PubMed Central.
+- Code/data/archive destinations: GitHub, Common Crawl, Hugging Face Datasets.
 
-### Entity intelligence baseline
-- Register article-scoped people, organizations, places, products, events, concepts, or unknown entities with aliases and a disambiguation note.
-- Match registered aliases against claim text and link matching claims to entities.
-- Record explicit directed relationships between entities and optionally attach claim IDs as unverified support.
-- Current matching is deterministic alias matching, not automatic named-entity recognition or global identity resolution.
+Additional editorial candidates are documented in the separate magazine registry. Candidate listing does not imply a working adapter, permission or guaranteed editorial acceptance.
 
-
-### Editorial research baseline
-- Record source metadata, publication and effective dates, methodology, jurisdiction, and a reasoned manual quality assessment.
-- Attach manually transcribed excerpts to claims with explicit supporting, contradicting, contextual, or unclear stances.
-- Surface conflicting evidence at claim level without automatically deciding which source is correct.
-- Metadata completeness is not source reliability; all evidence remains manually recorded and unverified until independently checked.
-
-## Publishing destination registries
-- [Magazine and editorial publication registry](docs/MAGAZINE-PUBLICATION-REGISTRY.md) and its machine-readable catalogue at `config/magazine-publication-registry.json`.
-- [Platform-native social publishing](docs/PLATFORM-NATIVE-SOCIAL-PUBLISHING.md) and its machine-readable catalogue at `config/social-platform-catalog.json`.
-- Editorial magazines, self-publishing systems, CMS products, social networks, communities, research repositories, and data sources are maintained as distinct destination types. Candidate listing does not imply an active adapter or publication permission.
-
-- [AI visibility monitoring](docs/AI-VISIBILITY-MONITORING.md): separate evidence for AI crawler fetches, search indexing, answer citations, and explicit training attestations. Admin UI and workspace-scoped API event ledger are implemented; live log/search-console/AI-answer adapters remain pending.
-- [Implementation roadmap](docs/IMPLEMENTATION-ROADMAP.md): implementation checklist by track.
-- [Completion plan](docs/COMPLETION-PLAN.md): ordered end-to-end phases, acceptance criteria, and external prerequisites.
+## Editorial truth rules
+- Search discovery is not source verification.
+- Scraped content is not a verified claim.
+- A source link is not proof that the source supports a claim.
+- A local originality no-match is not proof of originality.
+- Submission is not acceptance; acceptance is not publication.
+- A click is not proof of external publication.
+- Each destination requires a current policy check and a verified account/submission route before automation is enabled.
