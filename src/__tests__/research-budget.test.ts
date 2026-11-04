@@ -28,7 +28,7 @@ describe("research budget configuration", () => {
     expect(ledger.reserve("article-a", "source", 1)).toMatchObject({
       allowed: false, used: 3, limit: 3, remaining: 0, reason: "limit-reached"
     });
-    expect(ledger.reserve("article-a", "source", 0).reason).toBe("invalid-units");
+    expect(ledger.reserve("article-a", "source", 0).reason).toBe("invalid-units");\n\n    for (let i = 0; i < 3; i++) expect(ledger.reserve("article-a", "scrape").allowed).toBe(true);\n    expect(ledger.reserve("article-a", "scrape").allowed).toBe(false);
 
     for (let i = 0; i < 5; i++) expect(ledger.reserve("article-a", "search").allowed).toBe(true);
     expect(ledger.reserve("article-a", "search").allowed).toBe(false);
@@ -46,7 +46,7 @@ describe("research budget configuration", () => {
 
   it("allows an administrator to change limits and releases a failed reservation", () => {
     const ledger = new ResearchBudgetLedger();
-    ledger.updateLimits({ sourceUrlsPerArticle: 1, searchesPerArticle: 2, inspectionsPerArticle: 4 });
+    ledger.updateLimits({ sourceUrlsPerArticle: 1, scrapesPerArticle: 2, searchesPerArticle: 2, inspectionsPerArticle: 4 });
     expect(ledger.reserve("article-a", "source").allowed).toBe(true);
     expect(ledger.reserve("article-a", "source").allowed).toBe(false);
     ledger.release("article-a", "source");
