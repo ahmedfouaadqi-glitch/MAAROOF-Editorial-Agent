@@ -7,6 +7,7 @@ import { createEditorialTask, listEditorialTasks, advanceEditorialTask } from ".
 import { registerClaim, listClaims, checkOriginality } from "./editorial-evidence.mjs";
 import { createEntity, listEntities, scanKnownEntities, createEntityRelationship, listEntityRelationships } from "./editorial-entities.mjs";
 import { assessSource, recordEvidence, listResearch } from "./editorial-research.mjs";
+import { recordVisibilityEvent, listVisibilityEvents, summarizeVisibility } from "./ai-visibility.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "127.0.0.1";
@@ -64,6 +65,23 @@ const server = createServer(async (req, res) => {
     }
 
     requireAdmin(req);
+
+    if (req.method === "GET" && url.pathname === "/api/v1/admin/ai-visibility") {
+      const workspaceId = url.searchParams.get("workspaceId") || "main-workspace";
+      const state = await store.read();
+      const events = listVisibilityEvents(state, workspaceId);
+      return send(res, 200, { events, summary: summarizeVisibility(events), limitations: {
+        crawlerFetch: "Only observed events explicitly ingested or manually recorded are shown; no server/CDN access-log integration is currently connected.",
+        indexing: "Requires a verifiable search/index result or official inspection evidence; crawler visits do not prove indexing.",
+        citations: "Requires a captured answer/result URL or screenshot and manual verification; indexing does not prove citation.",
+        training: "Cannot be inferred from crawling. Record only an explicit provider statement/attestation with evidence."
+      } });
+    }
+    if (req.method === "POST" && url.pathname === "/api/v1/admin/ai-visibility/events") {
+      const body = await readJson(req);
+      const event = await store.transact(state => recordVisibilityEvent(state, body));
+      return send(res, 201, { event });
+    }
 
     if (req.method === "GET" && url.pathname === "/api/v1/admin/research-limits") {
       const state = await store.read();
