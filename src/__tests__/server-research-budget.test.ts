@@ -47,6 +47,13 @@ describe("server-side research budget", () => {
     expect(() => releaseReservation(state, { ...scope, reservationId: "search-0002" })).toThrow();
   });
 
+  it("rejects reuse of released reservations", () => {
+    const state = freshState();
+    reserveBudget(state, { ...scope, operation: "search", reservationId: "released-reservation" });
+    releaseReservation(state, { ...scope, reservationId: "released-reservation" });
+    expect(() => reserveBudget(state, { ...scope, operation: "search", reservationId: "released-reservation" })).toThrow("Reservation ID is closed");
+  });
+
   it("supports idempotent retries using the same reservation id", () => {
     const state = freshState();
     reserveBudget(state, { ...scope, operation: "search", reservationId: "same-reservation" });
