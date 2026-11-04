@@ -19,8 +19,8 @@ describe("editorial task lifecycle", () => {
 
   it("validates language, objective and topic", () => {
     const state = { tasks: {} };
-    expect(() => createEditorialTask(state, { workspaceId: "w", topic: "ok", language: "fr" })).toThrow();
-    expect(() => createEditorialTask(state, { workspaceId: "w", topic: "valid topic", objective: "spam" })).toThrow();
+    expect(() => createEditorialTask(state, { workspaceId: "w", topic: "ok", language: "fr" as never })).toThrow();
+    expect(() => createEditorialTask(state, { workspaceId: "w", topic: "valid topic", objective: "spam" as never })).toThrow();
   });
 
   it("enforces the editorial sequence and workspace ownership", () => {
