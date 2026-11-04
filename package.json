@@ -10,7 +10,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "server": "node server/main.mjs",
-    "dev:all": "node server/main.mjs"
+    "dev:api": "node server/main.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
