@@ -18,13 +18,13 @@ describe("version-bound editorial approval",()=>{
   expect(report.blockers).toContain("current-draft-originality-check-missing");
  });
  it("records approval against the current draft fingerprint",()=>{
-  const f=fixture();checkEditorialDraftOriginality(f.state,{workspaceId:f.workspaceId,taskId:f.taskId});
+  const f=fixture();f.state.tasks.t1.article.stage="originality-review";checkEditorialDraftOriginality(f.state,{workspaceId:f.workspaceId,taskId:f.taskId});f.state.tasks.t1.article.stage="editorial-approval";
   const result=recordEditorialReview(f.state,{workspaceId:f.workspaceId,taskId:f.taskId,decision:"approved",reviewerName:"Editor",rationale:"I reviewed the full draft and its linked evidence."});
   expect(result.readiness.approvedForCurrentDraft).toBe(true);
   expect(assertCurrentEditorialApproval(f.state,f.workspaceId,f.taskId).approvedForCurrentDraft).toBe(true);
  });
  it("does not allow approved review for a different draft version",()=>{
-  const f=fixture();checkEditorialDraftOriginality(f.state,{workspaceId:f.workspaceId,taskId:f.taskId});
+  const f=fixture();f.state.tasks.t1.article.stage="originality-review";checkEditorialDraftOriginality(f.state,{workspaceId:f.workspaceId,taskId:f.taskId});f.state.tasks.t1.article.stage="editorial-approval";
   recordEditorialReview(f.state,{workspaceId:f.workspaceId,taskId:f.taskId,decision:"approved",reviewerName:"Editor",rationale:"I reviewed the full draft and its linked evidence."});
   f.state.editorialDrafts[0].title="Edited after approval";
   expect(getEditorialApproval(f.state,f.workspaceId,f.taskId).approvedForCurrentDraft).toBe(false);
