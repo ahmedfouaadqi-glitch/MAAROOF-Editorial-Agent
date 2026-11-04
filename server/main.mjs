@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { JsonStore } from "./store.mjs";
 import { DEFAULT_LIMITS, validateLimits, reserveBudget, releaseReservation, commitReservation } from "./research-budget.mjs";
+import { createEditorialTask, listEditorialTasks, advanceEditorialTask } from "./editorial-tasks.mjs";
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "127.0.0.1";
@@ -74,6 +75,28 @@ const server = createServer(async (req, res) => {
         return state.limits;
       });
       return send(res, 200, { limits: result, saved: true });
+    }
+
+    const articleCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/articles$/);
+    if (articleCollection && req.method === "GET") {
+      const workspaceId = decodeURIComponent(articleCollection[1]);
+      const state = await store.read();
+      return send(res, 200, { articles: listEditorialTasks(state, workspaceId) });
+    }
+    if (articleCollection && req.method === "POST") {
+      const body = await readJson(req);
+      const workspaceId = decodeURIComponent(articleCollection[1]);
+      const task = await store.transact(state => createEditorialTask(state, { ...body, workspaceId }));
+      return send(res, 201, { article: { id: task.id, workspaceId: task.workspaceId, ...task.article } });
+    }
+
+    const articleStage = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/articles\/([^/]+)\/stage$/);
+    if (articleStage && req.method === "PUT") {
+      const body = await readJson(req);
+      const workspaceId = decodeURIComponent(articleStage[1]);
+      const taskId = decodeURIComponent(articleStage[2]);
+      const article = await store.transact(state => advanceEditorialTask(state, { workspaceId, taskId, nextStage: body.nextStage }));
+      return send(res, 200, { article });
     }
 
     const reservationMatch = url.pathname.match(/^\/api\/v1\/tasks\/([^/]+)\/research-reservations$/);
