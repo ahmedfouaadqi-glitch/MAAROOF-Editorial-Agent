@@ -10,6 +10,11 @@ function fail(message, status = 400) {
 function clean(value, max = 300) {
   return typeof value === "string" ? value.trim().slice(0, max) : "";
 }
+function normalizeOptionalSelector(value, field) {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value !== "string" || value.trim().length > 500) fail(`${field} must be a string up to 500 characters`);
+  return value.trim();
+}
 function normalizeUrl(value, field) {
   let url;
   try { url = new URL(value); } catch { fail(`${field} must be a valid URL`); }
@@ -40,16 +45,16 @@ export function registerBrowserDestination(state, { workspaceId, name, homepage,
   const editor = editorUrl ? normalizeUrl(editorUrl, "editorUrl") : home;
   const hosts = normalizeHosts(approvedHosts, [home.hostname.toLowerCase()]);
   if (!hostAllowed(editor.hostname, hosts)) fail("editorUrl host must be listed in approvedHosts");
-  for (const selector of [titleSelector, bodySelector]) {
-    if (typeof selector !== "string" || !selector.trim() || selector.length > 500) fail("Title and body selectors must be configured");
-  }
+  const title = normalizeOptionalSelector(titleSelector, "titleSelector");
+  const body = normalizeOptionalSelector(bodySelector, "bodySelector");
+  if (Boolean(title) !== Boolean(body)) fail("Provide both title and body selectors for automatic text insertion, or leave both blank for browser-only handoff");
   if (imageUploadSelector && (typeof imageUploadSelector !== "string" || imageUploadSelector.length > 500)) fail("imageUploadSelector is invalid");
   state.browserDestinations ||= [];
   const existing = state.browserDestinations.find(item => item.workspaceId === workspaceId && item.homepage === home.toString());
   const destination = {
     id: existing?.id || randomUUID(), workspaceId, name: displayName,
     homepage: home.toString(), editorUrl: editor.toString(), approvedHosts: hosts,
-    selectors: { title: titleSelector.trim(), body: bodySelector.trim(), imageUpload: clean(imageUploadSelector, 500) },
+    selectors: { title, body, imageUpload: clean(imageUploadSelector, 500) },
     status: "operator-declared-unverified",
     automaticPublishEnabled: false,
     authorityConfirmed: true,
@@ -58,7 +63,8 @@ export function registerBrowserDestination(state, { workspaceId, name, homepage,
     updatedAt: new Date().toISOString(),
     limitations: [
       "The destination and policy confirmations are user declarations; ownership and external capability are not independently verified.",
-      "The system can fill the approved article text but does not automatically submit or publish it.",
+      "Automatic text insertion requires both field selectors; otherwise this destination is available for browser-only handoff.",
+      "The system never automatically submits or publishes the article.",
       "The user must review the remote editor and perform any final submission personally."
     ]
   };
@@ -121,6 +127,7 @@ export function buildApprovedArticleForBrowser(state, { workspaceId, taskId, des
   if (!approval.approvedForCurrentDraft) fail("The current draft has no valid human editorial approval", 409);
   const draft = getEditorialDraft(state, workspaceId, taskId);
   if (!draft || !draft.title?.trim() || !draft.sections?.some(section => section.body?.trim())) fail("A complete article draft is required", 409);
+  if (!destination.selectors?.title || !destination.selectors?.body) fail("Configure both article field selectors before automatic text insertion", 409);
   const body = draft.sections.map(section => [`## ${section.heading}`, section.body].filter(Boolean).join("\n\n")).join("\n\n");
   if (body.length > 200_000) fail("Article body exceeds the browser transfer limit", 413);
   return {

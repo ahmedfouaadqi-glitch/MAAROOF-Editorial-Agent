@@ -55,11 +55,11 @@
 
 
 ## Track E — Frontend product experience
-- [x] Replace the prototype shell with a responsive Linear-inspired workspace.
+- [x] Replace the prototype shell with a responsive original yellow-and-black editorial workspace, using compact grouped navigation without copying a reference product.
 - [x] Build a vector-first editorial dashboard with original inline SVG artwork.
 - [x] Integrate React Bits SpotlightCard with upstream source attribution and license.
 - [x] Add light mode default, dark mode, Arabic-first RTL, and English shell labels.
-- [x] Add desktop sidebar and mobile bottom navigation.
+- [x] Add grouped desktop navigation, a collapsible mobile sidebar, and a full-screen mobile browser assistant.
 - [x] Connect article creation and article listing to the standalone Node API.
 - [x] Add controlled one-stage-at-a-time article progression in the UI.
 - [x] Retain platform registry, capability inspector, and backend research settings.

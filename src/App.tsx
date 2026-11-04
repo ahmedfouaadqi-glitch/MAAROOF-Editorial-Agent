@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   Activity, ArrowDownLeft, ArrowLeft, ArrowUpLeft, BookOpenText, Check,
-  CheckCircle2, ChevronDown, CircleHelp, Command, FileCheck2, FilePlus2,
+  CheckCircle2, ChevronDown, CircleHelp, FileCheck2, FilePlus2,
   FileText, Globe2, Home, Layers3, LayoutDashboard, Library, ListFilter,
-  LockKeyhole, Menu, Moon, MoreHorizontal, Plus, Search, Settings2,
+  LockKeyhole, Menu, Moon, MoreHorizontal, Plus, Search,
   ShieldCheck, SlidersHorizontal, Sparkles, Sun, Workflow, X, Zap
 } from "lucide-react";
 import SpotlightCard from "./components/SpotlightCard";
@@ -18,7 +18,7 @@ import { categoryLabels, modeLabels, platforms, readinessLabels, type PlatformCa
 import { adapterRegistry } from "./data/adapter-registry";
 import { magazinePublications } from "./data/magazine-publications";
 
-type View = "home" | "articles" | "registry" | "research-settings" | "ai-visibility" | "magazine-submissions" | "browser-publishing";
+type View = "home" | "articles" | "registry" | "research-settings" | "ai-visibility" | "magazine-submissions";
 type Article = { id: string; topic: string; language: string; objective: string; stage: string; createdAt: string; clientId?: string; clientName?: string; brandId?: string; brandName?: string };
 type Locale = "ar" | "en";
 const NEXT_STAGE: Record<string, string> = { intake: "planning", planning: "research", research: "entity-analysis", "entity-analysis": "outline", outline: "drafting", drafting: "source-review", "source-review": "originality-review", "originality-review": "media-review", "media-review": "editorial-approval", "editorial-approval": "ready-to-publish" };
@@ -38,10 +38,10 @@ const enStageLabels: Record<string, string> = {
 const t = {
   ar: {
     workspace: "مساحة العمل الرئيسية", overview: "نظرة عامة", articles: "المقالات", registry: "المنصات والمجلات",
-    research: "البحث والمصادر", visibility: "رصد ظهور الذكاء الاصطناعي", settings: "الإعدادات", help: "المساعدة", search: "ابحث عن أي شيء...",
-    eyebrow: "منظومة العمليات التحريرية", title: "مساحة العمل التحريرية", subtitle: "من الفكرة إلى مقال موثّق وجاهز للنشر، ضمن مسار تحريري واضح.",
-    create: "إنشاء مقالة", explore: "استعراض المنصات", active: "حالة المنظومة", ready: "البنية الأساسية جاهزة",
-    platforms: "منصة مسجلة", destinations: "وجهات تحريرية", connectors: "موصلات نشر مختبرة", drafts: "مقالات قيد العمل",
+    research: "البحث والمصادر", visibility: "رصد ظهور الذكاء الاصطناعي", settings: "الإعدادات", help: "المساعدة", search: "ابحث عن منصة أو مجلة...",
+    eyebrow: "منظومة العمليات التحريرية", title: "مساحة العمل التحريرية", subtitle: "من الفكرة إلى مقال قابل للمراجعة، ضمن مسار تحريري واضح.",
+    create: "إنشاء مقالة", explore: "استعراض المنصات", active: "حالة النموذج", ready: "نموذج أولي",
+    platforms: "منصة مسجلة", destinations: "وجهات تحريرية", connectors: "موائمات نشر مفعلة", drafts: "مقالات قيد العمل",
     workflow: "مسار الإنتاج التحريري", workflowSub: "مراحل واضحة، ومراجعة قبل أي نشر خارجي.",
     recent: "أحدث المقالات", allArticles: "كل المقالات", noArticles: "لا توجد مقالات بعد",
     noArticlesSub: "ابدأ بإنشاء أول مهمة تحريرية. ستظهر هنا مراحل تقدمها بعد ربط المحركات.",
@@ -52,7 +52,7 @@ const t = {
     profile: "ملف المنصة", noPublish: "النشر غير مفعّل. هذا الملف يوضح المتطلبات ولا يثبت جاهزية الموصل.",
     integration: "طريقة التكامل المرشحة", capabilities: "قدرات النشر", constraints: "قيود يجب احترامها",
     checklist: "قائمة التحقق قبل التفعيل", docs: "الوثائق الرسمية", adapter: "حالة الموصل",
-    apiKey: "مفتاح إدارة الخدمة الخلفية", apiKeyHint: "أدخل ADMIN_API_TOKEN المحفوظ في بيئة الخادم. يبقى في ذاكرة الجلسة فقط.",
+    apiKey: "رمز الوصول", apiKeyHint: "أدخل رمز الوصول الذي زوّدك به مسؤول المساحة. يبقى في ذاكرة الجلسة الحالية فقط.",
     load: "تحميل المحفوظ", save: "حفظ الإعدادات", reset: "استعادة الافتراضي", sourceLimit: "روابط المصادر اليدوية لكل مقالة", scrapeLimit: "روابط الكشط لكل مقالة",
     searchLimit: "عمليات البحث لكل مقالة", inspectLimit: "عمليات الفحص لكل مقالة",
     sourceHint: "روابط مرجعية يضيفها المستخدم؛ هذه الحصة منفصلة عن عمليات الكشط.",
@@ -64,7 +64,7 @@ const t = {
     language: "لغة المقالة", objective: "الهدف التحريري", createTask: "إنشاء المهمة",
     analysis: "تحليل", thought: "قيادة فكرية", news: "خبر", education: "محتوى تعليمي", researchSummary: "ملخص بحثي",
     arabic: "العربية", english: "الإنجليزية", status: "الحالة", stage: "المرحلة",
-    sourceNotice: "التخزين والخدمة مستقلان عن Supabase. يتطلب البحث والكشط ضبط مفاتيح المزود في الخادم.",
+    sourceNotice: "راجع المصادر والوسائط بنفسك قبل اعتماد المسودة أو متابعة النشر.",
     loading: "جارٍ التحميل...", viewAll: "عرض الكل", light: "الوضع النهاري", dark: "الوضع الليلي",
     langToggle: "English", emptyRegistry: "لم يتم العثور على نتائج مطابقة.",
     policy: "مراجعة السياسات مطلوبة", unverified: "غير متحقق", notBuilt: "لم يُبنَ بعد",
@@ -72,10 +72,10 @@ const t = {
   },
   en: {
     workspace: "Main workspace", overview: "Overview", articles: "Articles", registry: "Platforms & magazines",
-    research: "Research & sources", visibility: "AI visibility", settings: "Settings", help: "Help", search: "Search anything...",
-    eyebrow: "EDITORIAL OPERATIONS", title: "Editorial workspace", subtitle: "Move from an idea to a sourced, publication-ready article through a clear editorial workflow.",
-    create: "Create article", explore: "Explore platforms", active: "SYSTEM STATUS", ready: "Foundation is ready",
-    platforms: "Registered platforms", destinations: "Editorial destinations", connectors: "Verified publishers", drafts: "Articles in progress",
+    research: "Research & sources", visibility: "AI visibility", settings: "Settings", help: "Help", search: "Search platforms or magazines...",
+    eyebrow: "EDITORIAL OPERATIONS", title: "Editorial workspace", subtitle: "Move from an idea to a review-ready article through a clear editorial workflow.",
+    create: "Create article", explore: "Explore platforms", active: "PROTOTYPE STATUS", ready: "Prototype",
+    platforms: "Registered platforms", destinations: "Editorial destinations", connectors: "Active publishing adapters", drafts: "Articles in progress",
     workflow: "Editorial production flow", workflowSub: "Defined stages with human review before external publishing.",
     recent: "Recent articles", allArticles: "All articles", noArticles: "No articles yet",
     noArticlesSub: "Create your first editorial task. Its progress will appear here as engines are connected.",
@@ -86,7 +86,7 @@ const t = {
     profile: "PLATFORM PROFILE", noPublish: "Publishing is disabled. This profile describes requirements; it does not prove connector readiness.",
     integration: "Proposed integration", capabilities: "Publishing capabilities", constraints: "Restrictions",
     checklist: "Activation checklist", docs: "Official documentation", adapter: "Connector status",
-    apiKey: "Backend admin token", apiKeyHint: "Enter ADMIN_API_TOKEN from the server environment. Kept in session memory only.",
+    apiKey: "Workspace access key", apiKeyHint: "Enter the access key provided by your workspace administrator. Kept in memory for this session only.",
     load: "Load saved", save: "Save settings", reset: "Reset defaults", sourceLimit: "Manually registered source URLs per article", scrapeLimit: "Scraped page URLs per article",
     searchLimit: "Search operations per article", inspectLimit: "Inspection operations per article",
     sourceHint: "Manually registered references; this quota is separate from scraping.",
@@ -98,7 +98,7 @@ const t = {
     language: "Article language", objective: "Editorial objective", createTask: "Create task",
     analysis: "Analysis", thought: "Thought leadership", news: "News", education: "Educational", researchSummary: "Research summary",
     arabic: "Arabic", english: "English", status: "Status", stage: "Stage",
-    sourceNotice: "Storage and API run independently from Supabase. Search and scraping require server-side provider credentials.",
+    sourceNotice: "Review sources and media yourself before approving a draft or continuing to publish.",
     loading: "Loading...", viewAll: "View all", light: "Light mode", dark: "Dark mode",
     langToggle: "العربية", emptyRegistry: "No matching platforms found.",
     policy: "Policy review required", unverified: "Unverified", notBuilt: "Not built",
@@ -119,6 +119,9 @@ export default function App() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [locale, setLocale] = useState<Locale>("ar");
   const [mobileNav, setMobileNav] = useState(false);
+  const [browserDrawerOpen, setBrowserDrawerOpen] = useState(false);
+  const browserOpenButtonRef = useRef<HTMLButtonElement>(null);
+  const browserCloseButtonRef = useRef<HTMLButtonElement>(null);
   const [topic, setTopic] = useState("");
   const [clientName, setClientName] = useState("");
   const [brandName, setBrandName] = useState("");
@@ -148,7 +151,14 @@ export default function App() {
 
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
   useEffect(() => {
-    if ((view !== "articles" && view !== "magazine-submissions" && view !== "browser-publishing") || !adminToken.trim()) return;
+    if (!browserDrawerOpen) return;
+    browserCloseButtonRef.current?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setBrowserDrawerOpen(false); };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => { window.removeEventListener("keydown", closeOnEscape); window.requestAnimationFrame(() => browserOpenButtonRef.current?.focus()); };
+  }, [browserDrawerOpen]);
+  useEffect(() => {
+    if ((view !== "articles" && view !== "magazine-submissions" && !browserDrawerOpen) || !adminToken.trim()) return;
     let cancelled = false;
     fetch(`${apiBase}/api/v1/workspaces/main-workspace/articles`, { headers: { authorization: `Bearer ${adminToken}` } })
       .then(async response => {
@@ -158,7 +168,7 @@ export default function App() {
       })
       .catch(error => { if (!cancelled) setArticleNotice(error instanceof Error ? error.message : "تعذر الاتصال بالخدمة الخلفية."); });
     return () => { cancelled = true; };
-  }, [view, adminToken, apiBase]);
+  }, [view, adminToken, apiBase, browserDrawerOpen]);
   useEffect(() => {
     if (view !== "articles" || !adminToken.trim()) { setClientOptions([]); setBrandOptions([]); return; }
     let cancelled = false;
@@ -200,7 +210,7 @@ export default function App() {
   async function createArticle(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!topic.trim() || !adminToken.trim()) {
-      setArticleNotice(locale === "ar" ? "أدخل مفتاح الإدارة وموضوع المقالة أولاً." : "Enter the admin token and article topic first.");
+      setArticleNotice(locale === "ar" ? "أدخل موضوع المقالة، وأضف رمز الوصول من الإعدادات للمتابعة." : "Enter the article topic and add the workspace access key in Settings to continue.");
       return;
     }
     setBusy(true); setArticleNotice("");
@@ -242,44 +252,50 @@ export default function App() {
   const navItems = [
     { id: "home" as const, label: copy.overview, icon: LayoutDashboard },
     { id: "articles" as const, label: copy.articles, icon: FileText },
-    { id: "browser-publishing" as const, label: locale === "ar" ? "النشر عبر المتصفح" : "Browser handoff", icon: Globe2 },
     { id: "magazine-submissions" as const, label: locale === "ar" ? "تقديمات المجلات" : "Magazine submissions", icon: BookOpenText },
     { id: "registry" as const, label: copy.registry, icon: Globe2 },
-    { id: "research-settings" as const, label: copy.research, icon: SlidersHorizontal },
+    { id: "research-settings" as const, label: copy.settings, icon: SlidersHorizontal },
     { id: "ai-visibility" as const, label: copy.visibility, icon: Activity }
+  ];
+  const navGroups = [
+    { label: locale === "ar" ? "الإنتاج التحريري" : "EDITORIAL", items: navItems.filter(item => ["home", "articles", "magazine-submissions"].includes(item.id)) },
+    { label: locale === "ar" ? "الاستكشاف والأدلة" : "DISCOVERY & EVIDENCE", items: navItems.filter(item => ["registry", "ai-visibility"].includes(item.id)) },
+    { label: locale === "ar" ? "الإدارة" : "MANAGEMENT", items: navItems.filter(item => ["research-settings"].includes(item.id)) }
   ];
   const destinationCount = platforms.filter(p => p.category === "editorial").length;
 
-  return <div className={`app-shell ${theme === "dark" ? "theme-dark" : "theme-light"}`} dir={locale === "ar" ? "rtl" : "ltr"}>
+  return <div className={`app-shell ${theme === "dark" ? "theme-dark" : "theme-light"} ${browserDrawerOpen ? "browser-drawer-open" : ""}`} dir={locale === "ar" ? "rtl" : "ltr"} lang={locale}>
     <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
-      <button className="brand" onClick={() => { setView("home"); setMobileNav(false); }} aria-label="MAAROOF home">
+      <button className="brand" onClick={() => { setView("home"); setMobileNav(false); }} aria-label={locale==="ar"?"الرئيسية - معروف":"MAAROOF home"}>
         <span className="brand-mark"><BrandMark /></span>
         <span className="brand-copy"><strong>MAAROOF</strong><small>EDITORIAL AGENT</small></span>
         <span className="brand-version">BETA</span>
       </button>
-      <div className="workspace-switch"><span className="workspace-avatar">M</span><span><b>{copy.workspace}</b><small>Personal workspace</small></span><ChevronDown size={15}/></div>
-      <div className="side-label">{locale === "ar" ? "مساحة العمل" : "WORKSPACE"}</div>
-      <nav className="side-nav">
-        {navItems.map(item => <button key={item.id} className={view === item.id ? "nav-item active" : "nav-item"} onClick={() => { setView(item.id); setMobileNav(false); }}>
-          <item.icon size={17} strokeWidth={1.8}/><span>{item.label}</span>{item.id === "articles" && articles.length > 0 && <i>{articles.length}</i>}
-        </button>)}
-      </nav>
-      <div className="side-label secondary-label">{locale === "ar" ? "الإدارة" : "MANAGE"}</div>
-      <button className="nav-item" onClick={() => setView("research-settings")}><Settings2 size={17}/><span>{copy.settings}</span></button>
+        <div className="workspace-switch" aria-label={copy.workspace}><span className="workspace-avatar">M</span><span><b>{copy.workspace}</b><small>{locale === "ar" ? "مساحة العمل الرئيسية" : "Main editorial workspace"}</small></span></div>
+      {navGroups.map(group => <section className="nav-group" key={group.label}>
+        <div className="side-label">{group.label}</div>
+        <nav className="side-nav">
+          {group.items.map(item => <button key={item.id} className={view === item.id ? "nav-item active" : "nav-item"} onClick={() => { setView(item.id); setMobileNav(false); setBrowserDrawerOpen(false); }}>
+            <item.icon size={17} strokeWidth={1.8}/><span>{item.label}</span>{item.id === "articles" && articles.length > 0 && <i>{articles.length}</i>}
+          </button>)}
+        </nav>
+      </section>)}
       <div className="sidebar-bottom">
         <div className="sidebar-help"><span className="help-icon"><CircleHelp size={16}/></span><span><b>{copy.help}</b><small>{locale === "ar" ? "دليل استخدام المنصة" : "Product documentation"}</small></span><ArrowUpLeft size={14}/></div>
-        <div className="profile-row"><div className="profile-avatar">M</div><div><b>MAAROOF Workspace</b><small>{locale === "ar" ? "مساحة تجريبية" : "Development workspace"}</small></div><MoreHorizontal size={17}/></div>
+        <div className="profile-row"><div className="profile-avatar">M</div><div><b>{locale==="ar"?"مساحة معروف":"MAAROOF workspace"}</b><small>{locale === "ar" ? "مساحة تحرير" : "Editorial workspace"}</small></div><MoreHorizontal size={17}/></div>
       </div>
     </aside>
+    {mobileNav&&<button className="sidebar-backdrop" aria-label={locale==="ar"?"إغلاق قائمة التنقل":"Close navigation menu"} onClick={()=>setMobileNav(false)}/>}
 
     <main className="main-area">
       <header className="topbar">
         <div className="topbar-start">
-          <button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label="Toggle navigation"><Menu size={19}/></button>
+          <button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label={locale === "ar" ? "فتح التنقل" : "Open navigation"}><Menu size={19}/></button>
           <div className="breadcrumbs"><span>MAAROOF</span><span className="crumb-slash">/</span><b>{navItems.find(item => item.id === view)?.label}</b></div>
         </div>
         <div className="topbar-actions">
-          <label className="global-search"><Search size={15}/><input value={globalQuery} onChange={e=>setGlobalQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){setQuery(globalQuery);setCategory("all");setView("registry");}}} placeholder={copy.search} aria-label={copy.search}/><kbd><Command size={10}/> K</kbd></label>
+          <label className="global-search"><Search size={15}/><input value={globalQuery} onChange={e=>setGlobalQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){setQuery(globalQuery);setCategory("all");setView("registry");}}} placeholder={copy.search} aria-label={copy.search}/></label>
+          <button ref={browserOpenButtonRef} className={`browser-open-button ${browserDrawerOpen ? "active" : ""}`} onClick={() => setBrowserDrawerOpen(true)} aria-expanded={browserDrawerOpen} aria-controls="browser-agent-panel" aria-label={locale === "ar" ? "فتح مساعد النشر في لوحة جانبية" : "Open publishing assistant side panel"} title={locale === "ar" ? "فتح جلسة المتصفح بجانب مساحة العمل" : "Open the browser beside your workspace"}><Globe2 size={16}/><span>{locale === "ar" ? "المتصفح" : "Browser"}</span><i/></button>
           <button className="top-icon" onClick={() => setLocale(locale === "ar" ? "en" : "ar")} title={copy.langToggle}><span className="language-code">{locale === "ar" ? "EN" : "ع"}</span></button>
           <button className="top-icon" onClick={() => setTheme(theme === "light" ? "dark" : "light")} title={theme === "light" ? copy.dark : copy.light}>{theme === "light" ? <Moon size={17}/> : <Sun size={17}/>}</button>
           <div className="top-avatar">M</div>
@@ -289,10 +305,10 @@ export default function App() {
       <div className="page-content">
         {view === "home" && <HomeView copy={copy} articles={articles} onCreate={() => setView("articles")} onRegistry={() => setView("registry")} onViewAll={() => setView("articles")} locale={locale} theme={theme}/>}
         {view === "articles" && <section className="page-section">
-          <PageHeading eyebrow="EDITORIAL WORKFLOW" title={copy.newTitle} subtitle={copy.newSub} action={<span className="status-chip"><span className="status-dot"/> API workspace</span>}/>
+          <PageHeading eyebrow={locale === "ar" ? "مسار العمل التحريري" : "EDITORIAL WORKFLOW"} title={copy.newTitle} subtitle={copy.newSub} action={<span className="status-chip"><span className="status-dot"/>{locale==="ar"?"قرار النشر بيدك":"You control publishing"}</span>}/>
           <div className="article-layout">
-            <SpotlightCard theme={theme} className="surface-card create-card" spotlightColor={theme === "light" ? "#b88c54" : "#d6ae78"} intensity={0.14} spotlightSize={360} borderGlow={0.2}>
-              <div className="card-topline"><span className="section-icon"><FilePlus2 size={17}/></span><span className="tiny-overline">{locale === "ar" ? "NEW EDITORIAL TASK" : "NEW EDITORIAL TASK"}</span></div>
+            <SpotlightCard theme={theme} className="surface-card create-card" spotlightColor="#F2C21A" intensity={0.12} spotlightSize={360} borderGlow={0.2}>
+              <div className="card-topline"><span className="section-icon"><FilePlus2 size={17}/></span><span className="tiny-overline">{locale === "ar" ? "مهمة تحريرية جديدة" : "NEW EDITORIAL TASK"}</span></div>
               <h2>{copy.newTitle}</h2><p className="muted">{copy.newSub}</p>
               <form className="article-form" onSubmit={createArticle}>
                 <label>{copy.topic}<textarea value={topic} onChange={e=>setTopic(e.target.value)} placeholder={copy.topicPlaceholder} rows={4} required minLength={3}/></label>
@@ -305,16 +321,16 @@ export default function App() {
                   <label>{copy.objective}<select value={objective} onChange={e=>setObjective(e.target.value)}><option value="analysis">{copy.analysis}</option><option value="thought-leadership">{copy.thought}</option><option value="news">{copy.news}</option><option value="educational">{copy.education}</option><option value="research-summary">{copy.researchSummary}</option></select></label>
                 </div>
                 <div className="form-note"><LockKeyhole size={14}/>{copy.sourceNotice}</div>
-                <button className="primary-button" type="submit" disabled={busy}><Plus size={16}/>{busy ? copy.loading : copy.createTask}<ArrowLeft size={15}/></button>
+                <button className="primary-button" type="submit" disabled={busy||!adminToken.trim()}><Plus size={16}/>{busy ? copy.loading : copy.createTask}<ArrowLeft size={15}/></button>
                 {articleNotice && <p className="inline-feedback">{articleNotice}</p>}
               </form>
             </SpotlightCard>
             <div className="side-stack">
-              <div className="surface-card token-card"><div className="card-topline"><span className="section-icon"><ShieldCheck size={17}/></span><span className="tiny-overline">BACKEND ACCESS</span></div><h3>{copy.apiKey}</h3><p className="muted">{copy.apiKeyHint}</p><input className="token-input" type="password" autoComplete="off" value={adminToken} onChange={e=>setAdminToken(e.target.value)} placeholder="ADMIN_API_TOKEN"/></div>
+              <div className={`surface-card token-card workspace-access-card ${adminToken.trim()?"connected":"needs-connection"}`}><div className="card-topline"><span className="section-icon">{adminToken.trim()?<CheckCircle2 size={17}/>:<ShieldCheck size={17}/>}</span><span className="tiny-overline">{locale==="ar"?"مساحة العمل":"WORKSPACE"}</span><span className="access-state"><i/>{adminToken.trim()?(locale==="ar"?"الرمز مُدخل":"Key entered"):(locale==="ar"?"لم يُدخل بعد":"Not entered")}</span></div><h3>{locale==="ar"?"الوصول إلى مساحة العمل":"Workspace access"}</h3><p className="muted">{adminToken.trim()?(locale==="ar"?"الرمز محفوظ في ذاكرة هذه الجلسة؛ يُتحقق منه عند أول طلب.":"The key stays in session memory and is verified on the first request."):(locale==="ar"?"أدخل رمز الوصول من الإعدادات للمتابعة.":"Add the workspace access key in Settings to continue.")}</p><button className="secondary-button" type="button" onClick={()=>setView("research-settings")}>{adminToken.trim()?(locale==="ar"?"إدارة رمز الوصول":"Manage access key"):(locale==="ar"?"فتح الإعدادات":"Open settings")}<ArrowUpLeft size={14}/></button></div>
               <div className="surface-card workflow-mini"><div className="card-title-row"><div><span className="tiny-overline">PIPELINE</span><h3>{copy.workflow}</h3></div><Workflow size={18}/></div><div className="mini-pipeline"><span className="pipeline-node current">01</span><i/><span className="pipeline-node">02</span><i/><span className="pipeline-node">03</span><i/><span className="pipeline-node">04</span></div><div className="pipeline-captions"><span>{locale==="ar"?"استلام":"Intake"}</span><span>{locale==="ar"?"بحث":"Research"}</span><span>{locale==="ar"?"كتابة":"Draft"}</span><span>{locale==="ar"?"مراجعة":"Review"}</span></div></div>
             </div>
           </div>
-          <section className="surface-card article-list-card"><div className="section-heading"><div><span className="tiny-overline">WORK QUEUE</span><h2>{copy.recent}</h2></div><span className="count-badge">{articles.length}</span></div>
+          <section className="surface-card article-list-card"><div className="section-heading"><div><span className="tiny-overline">{locale==="ar"?"قائمة العمل":"WORK QUEUE"}</span><h2>{copy.recent}</h2></div><span className="count-badge">{articles.length}</span></div>
             {articles.length === 0 ? <EmptyArticles copy={copy}/> : <div className="article-table">{articles.map(article=><div className="article-row" key={article.id}><div className="article-file-icon"><FileText size={17}/></div><div className="article-row-main"><b>{article.topic}</b><small>{article.language.toUpperCase()} · {new Date(article.createdAt).toLocaleDateString(locale === "ar" ? "ar-IQ" : "en-US")}{article.clientName?` · ${article.clientName}`:""}{article.brandName?` / ${article.brandName}`:""}</small></div><span className="stage-pill">{(locale==="ar"?stageLabels:enStageLabels)[article.stage] || article.stage}</span><button className="secondary-button evidence-open-button" onClick={()=>setEvidenceArticleId(evidenceArticleId===article.id?null:article.id)}>{evidenceArticleId===article.id?(locale==="ar"?"إغلاق الأدلة":"Close evidence"):(locale==="ar"?"الأدلة":"Evidence")}</button><button className="secondary-button evidence-open-button" onClick={()=>setDraftArticleId(draftArticleId===article.id?null:article.id)}>{draftArticleId===article.id?(locale==="ar"?"إغلاق المسودة":"Close draft"):(locale==="ar"?"المخطط والمسودة":"Outline / Draft")}</button><button className="secondary-button evidence-open-button" onClick={()=>setReviewArticleId(reviewArticleId===article.id?null:article.id)}>{reviewArticleId===article.id?(locale==="ar"?"إغلاق المراجعة":"Close review"):(locale==="ar"?"المراجعة والاعتماد":"Review / Approve")}</button><button className="advance-button" disabled={!NEXT_STAGE[article.stage]||advancingId===article.id||!adminToken.trim()} onClick={()=>advanceArticle(article)}>{advancingId===article.id?copy.loading:(locale==="ar"?"التالي":"Advance")} <ArrowUpLeft size={12}/></button></div>)}</div>}{articleNotice&&<p className="inline-feedback">{articleNotice}</p>}
           </section>
           {evidenceArticleId && articles.some(article => article.id === evidenceArticleId) && <EditorialEvidencePanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" article={articles.find(article => article.id === evidenceArticleId)!} locale={locale}/>}
@@ -322,7 +338,7 @@ export default function App() {
           {reviewArticleId && articles.some(article => article.id === reviewArticleId) && <EditorialReviewPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" taskId={reviewArticleId} stage={articles.find(article => article.id === reviewArticleId)!.stage} locale={locale} onStageChange={(stage)=>setArticles(current=>current.map(item=>item.id===reviewArticleId?{...item,stage}:item))}/>}
         </section>}
         {view === "registry" && <section className="page-section">
-          <PageHeading eyebrow="PUBLISHING DESTINATIONS" title={copy.registryTitle} subtitle={copy.registrySub} action={<span className="status-chip"><Globe2 size={14}/>{platforms.length} {copy.platforms}</span>}/>
+          <PageHeading eyebrow={locale==="ar"?"وجهات النشر":"PUBLISHING DESTINATIONS"} title={copy.registryTitle} subtitle={copy.registrySub} action={<span className="status-chip"><Globe2 size={14}/>{platforms.length} {copy.platforms}</span>}/>
           <div className="registry-summary">
             <div className="summary-tile"><span>{copy.platforms}</span><b>{platforms.length}</b><Globe2 size={18}/></div>
             <div className="summary-tile"><span>{copy.destinations}</span><b>{destinationCount}</b><BookOpenText size={18}/></div>
@@ -339,13 +355,12 @@ export default function App() {
         </section>}
         {view === "ai-visibility" && <AIVisibilityPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" locale={locale}/>}
         {view === "magazine-submissions" && <MagazineSubmissionsPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" articles={articles} publications={magazinePublications} locale={locale}/> }
-        {view === "browser-publishing" && <BrowserPublishingPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" articles={articles} locale={locale}/> }
         {view === "research-settings" && <section className="page-section">
-          <PageHeading eyebrow="SYSTEM CONFIGURATION" title={copy.settingsTitle} subtitle={copy.settingsSub}/>
-          <SpotlightCard theme={theme} className="surface-card budget-panel" spotlightColor={theme==="light"?"#b88c54":"#d6ae78"} intensity={0.1} spotlightSize={340}>
-            <div className="card-topline"><span className="section-icon"><SlidersHorizontal size={17}/></span><span className="tiny-overline">RESEARCH GOVERNANCE</span></div>
-            <div className="budget-intro"><div><h2>{copy.settingsTitle}</h2><p className="muted">{copy.sourceNotice}</p></div><span className="status-chip"><LockKeyhole size={13}/> Admin only</span></div>
-            <label className="budget-field token-field"><span>{copy.apiKey}</span><small>{copy.apiKeyHint}</small><input type="password" autoComplete="off" value={adminToken} onChange={e=>setAdminToken(e.target.value)} placeholder="ADMIN_API_TOKEN"/></label>
+          <PageHeading eyebrow={locale==="ar"?"إعدادات النظام":"SYSTEM CONFIGURATION"} title={copy.settingsTitle} subtitle={copy.settingsSub}/>
+          <SpotlightCard theme={theme} className="surface-card budget-panel" spotlightColor="#F2C21A" intensity={0.09} spotlightSize={340}>
+            <div className="card-topline"><span className="section-icon"><SlidersHorizontal size={17}/></span><span className="tiny-overline">{locale==="ar"?"إدارة البحث والمصادر":"RESEARCH GOVERNANCE"}</span></div>
+            <div className="budget-intro"><div><h2>{copy.settingsTitle}</h2><p className="muted">{copy.sourceNotice}</p></div><span className="status-chip"><LockKeyhole size={13}/> {locale==="ar"?"للمسؤول":"Admin only"}</span></div>
+            <label className="budget-field token-field"><span>{copy.apiKey}</span><small>{copy.apiKeyHint}</small><input type="password" autoComplete="off" value={adminToken} onChange={e=>setAdminToken(e.target.value)} placeholder={locale==="ar"?"أدخل رمز الوصول":"Enter access key"}/></label>
             <div className="budget-grid">
               <BudgetField label={copy.sourceLimit} hint={copy.sourceHint} value={budget.sourceUrlsPerArticle} onChange={v=>setBudget(old=>({...old,sourceUrlsPerArticle:v}))}/>
               <BudgetField label={copy.scrapeLimit} hint={copy.scrapeHint} value={budget.scrapesPerArticle} onChange={v=>setBudget(old=>({...old,scrapesPerArticle:v}))}/>
@@ -360,7 +375,14 @@ export default function App() {
         </section>}
       </div>
     </main>
-    <nav className="mobile-bottom-nav">{navItems.map(item=><button key={item.id} className={view===item.id?"active":""} onClick={()=>setView(item.id)}><item.icon size={18}/><span>{item.label}</span></button>)}</nav>
+    {browserDrawerOpen&&<button className="agent-drawer-backdrop" aria-label={locale==="ar"?"إغلاق لوحة المتصفح":"Close browser panel"} onClick={()=>setBrowserDrawerOpen(false)}/>}
+    {browserDrawerOpen&&<aside id="browser-agent-panel" className="agent-drawer" role="complementary" aria-labelledby="browser-drawer-title">
+        <header className="agent-drawer-header">
+          <div className="agent-drawer-brand"><span className="agent-drawer-mark"><BrandMark/></span><div><span className="tiny-overline">{locale==="ar"?"جلسة تفاعلية":"INTERACTIVE SESSION"}</span><h2 id="browser-drawer-title">{locale==="ar"?"مساعد المتصفح":"Browser assistant"}</h2><p>{locale==="ar"?"افتح الوجهة، سجّل الدخول بنفسك، وراجع قبل المتابعة.":"Open a destination, sign in yourself, and review before continuing."}</p></div></div>
+          <button ref={browserCloseButtonRef} className="top-icon agent-drawer-close" onClick={()=>setBrowserDrawerOpen(false)} aria-label={locale==="ar"?"إغلاق اللوحة":"Close panel"}><X size={17}/></button>
+        </header>
+        <div className="agent-drawer-content"><BrowserPublishingPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" articles={articles} locale={locale} onOpenSettings={()=>{setBrowserDrawerOpen(false);setView("research-settings");}}/></div>
+    </aside>}
   </div>;
 }
 
@@ -379,35 +401,67 @@ function HomeView({copy,articles,onCreate,onRegistry,onViewAll,locale,theme}:{co
   return <section className="home-view">
     <PageHeading eyebrow={copy.eyebrow} title={copy.title} subtitle={copy.subtitle} action={<span className="status-chip"><span className="status-dot"/>{copy.ready}</span>}/>
     <div className="hero-grid">
-      <SpotlightCard theme={theme} className="hero-card" spotlightColor="#c9a477" intensity={0.13} spotlightSize={390} softness={0.75} borderGlow={0.25}>
-        <div className="hero-copy"><div className="hero-kicker"><span className="hero-kicker-dot"/>{locale==="ar"?"منظومة تحريرية ذكية":"INTELLIGENT EDITORIAL SYSTEM"}</div><h2>{locale==="ar"?<>حوّل الفكرة إلى<br/><em>قصة موثّقة.</em></>:<>Turn ideas into<br/><em>verified stories.</em></>}</h2><p>{locale==="ar"?"من التخطيط والبحث إلى الكتابة والمراجعة والنشر المنضبط — في مساحة عمل واحدة.":"Plan, research, write, review, and publish responsibly — all in one workspace."}</p><div className="hero-actions"><button className="primary-button" onClick={onCreate}><Plus size={16}/>{copy.create}<ArrowLeft size={15}/></button><button className="secondary-button" onClick={onRegistry}>{copy.explore}<ArrowUpLeft size={14}/></button></div><div className="hero-trust"><span><CheckCircle2 size={14}/>{locale==="ar"?"مراجعة بشرية":"Human review"}</span><span><ShieldCheck size={14}/>{locale==="ar"?"نشر موثّق":"Verified publishing"}</span></div></div>
-        <div className="hero-visual"><EditorialVector/></div>
+      <SpotlightCard theme={theme} className="hero-card" spotlightColor="#F2C21A" intensity={0.12} spotlightSize={390} softness={0.75} borderGlow={0.2}>
+        <div className="hero-copy"><div className="hero-kicker"><span className="hero-kicker-dot"/>{locale==="ar"?"مساحة عمل تحريرية":"EDITORIAL WORKSPACE"}</div><h2>{locale==="ar"?<>حوّل الفكرة إلى<br/><em>مسودة واضحة.</em></>:<>Turn ideas into<br/><em>clear drafts.</em></>}</h2><p>{locale==="ar"?"خطوات تحريرية مرتبة من الفكرة إلى المراجعة، مع بقاء قرار المتابعة والنشر بيدك.":"A clear path from idea to review, with every decision to continue or publish in your hands."}</p><div className="hero-actions"><button className="primary-button" onClick={onCreate}><Plus size={16}/>{copy.create}<ArrowLeft size={15}/></button><button className="secondary-button" onClick={onRegistry}>{copy.explore}<ArrowUpLeft size={14}/></button></div><div className="hero-trust"><span><CheckCircle2 size={14}/>{locale==="ar"?"مراجعة بشرية":"Human review"}</span><span><ShieldCheck size={14}/>{locale==="ar"?"قرار النشر بيدك":"You control publishing"}</span></div></div>
+        <div className="hero-visual"><EditorialVector locale={locale}/></div>
         <div className="hero-bottomline"><span>MAAROOF / EDITORIAL OS</span><span>01 — 11 / WORKFLOW</span></div>
       </SpotlightCard>
       <div className="hero-side">
-        <div className="side-status-card surface-card"><div className="status-card-top"><span className="status-live"><i/> {copy.active}</span><MoreHorizontal size={17}/></div><div className="status-illustration"><div className="status-orbit orbit-a"/><div className="status-orbit orbit-b"/><div className="status-core"><Sparkles size={23}/></div><span className="orbit-dot dot-one"/><span className="orbit-dot dot-two"/><span className="orbit-dot dot-three"/></div><h3>{locale==="ar"?"الأساس التشغيلي":"Operational foundation"}</h3><p>{locale==="ar"?"البنية الأساسية وسجل المنصات جاهزان. محركات الإنتاج والنشر ما زالت قيد التطوير.":"Foundation and platform registry are in place. Editorial engines and publishing are still in development."}</p><div className="status-progress"><span/><b>FOUNDATION</b><strong>V0.3</strong></div></div>
+        <div className="side-status-card surface-card"><div className="status-card-top"><span className="status-live"><i/> {copy.active}</span><MoreHorizontal size={17}/></div><div className="status-illustration" aria-hidden="true"><div className="status-orbit orbit-a"/><div className="status-orbit orbit-b"/><div className="status-core"><Sparkles size={23}/></div><span className="orbit-dot dot-one"/><span className="orbit-dot dot-two"/><span className="orbit-dot dot-three"/></div><h3>{locale==="ar"?"النشر":"Publishing"}</h3><p>{locale==="ar"?"هذه نسخة أولية. راجع المقال بنفسك؛ النشر التلقائي غير مفعّل.":"This is a prototype. Review articles yourself; automated publishing is not enabled."}</p><div className="status-progress"><span/><b>{locale==="ar"?"الموائمات":"ADAPTERS"}</b><strong>{locale==="ar"?"غير مفعلة":"OFF"}</strong></div></div>
         <div className="quick-action-card surface-card"><span className="tiny-overline">{copy.quick}</span><button onClick={onCreate}><span className="quick-icon"><FilePlus2 size={16}/></span><span><b>{copy.newArticle}</b><small>{locale==="ar"?"ابدأ مهمة تحريرية جديدة":"Start an editorial task"}</small></span><ArrowUpLeft size={15}/></button><button onClick={onRegistry}><span className="quick-icon"><Library size={16}/></span><span><b>{copy.platformRegistry}</b><small>{locale==="ar"?"راجع وجهات النشر":"Review publishing destinations"}</small></span><ArrowUpLeft size={15}/></button></div>
       </div>
     </div>
-    <div className="metrics-grid">{metrics.map((item,i)=><SpotlightCard key={item.label} theme={theme} className="metric-card" spotlightColor="#b98d5b" intensity={0.1} spotlightSize={200} borderGlow={0.12}><div className="metric-top"><span>{item.label}</span><item.icon size={17}/></div><strong>{item.value}</strong><small>{item.note}</small><span className="metric-index">0{i+1}</span></SpotlightCard>)}</div>
+    <div className="metrics-grid">{metrics.map((item,i)=><SpotlightCard key={item.label} theme={theme} className="metric-card" spotlightColor="#F2C21A" intensity={0.09} spotlightSize={200} borderGlow={0.1}><div className="metric-top"><span>{item.label}</span><item.icon size={17}/></div><strong>{item.value}</strong><small>{item.note}</small><span className="metric-index">0{i+1}</span></SpotlightCard>)}</div>
     <div className="home-lower-grid">
-      <section className="surface-card pipeline-card"><div className="section-heading"><div><span className="tiny-overline">EDITORIAL PIPELINE</span><h2>{copy.workflow}</h2><p>{copy.workflowSub}</p></div><span className="pipeline-count">11 {locale==="ar"?"مرحلة":"stages"}</span></div><div className="pipeline-rail">{stages.map((stage,i)=><div className={i===0?"pipeline-step active":"pipeline-step"} key={stage}><span className="pipeline-step-dot">{i===0?"01":String(i+1).padStart(2,"0")}</span><small>{stage}</small>{i!==stages.length-1&&<i/>}</div>)}</div><div className="pipeline-caption"><span><i className="legend-dot active-dot"/> {locale==="ar"?"المرحلة المهيأة":"Defined stage"}</span><span><i className="legend-dot"/> {locale==="ar"?"محركات قيد التنفيذ":"Engines pending"}</span></div></section>
-      <section className="surface-card recent-card"><div className="section-heading"><div><span className="tiny-overline">WORK QUEUE</span><h2>{copy.recent}</h2></div><button className="text-action" onClick={onViewAll}>{copy.viewAll}<ArrowUpLeft size={14}/></button></div>{articles.length===0?<EmptyArticles copy={copy}/>:<div className="recent-list">{articles.slice(0,4).map(article=><div className="recent-item" key={article.id}><span className="recent-file"><FileText size={16}/></span><span><b>{article.topic}</b><small>{(locale==="ar"?stageLabels:enStageLabels)[article.stage]||article.stage}</small></span><ArrowUpLeft size={14}/></div>)}</div>}</section>
+      <section className="surface-card pipeline-card"><div className="section-heading"><div><span className="tiny-overline">{locale==="ar"?"مراحل التحرير":"EDITORIAL PIPELINE"}</span><h2>{copy.workflow}</h2><p>{copy.workflowSub}</p></div><span className="pipeline-count">11 {locale==="ar"?"مرحلة":"stages"}</span></div><div className="pipeline-rail">{stages.map((stage,i)=><div className={i===0?"pipeline-step active":"pipeline-step"} key={stage}><span className="pipeline-step-dot">{i===0?"01":String(i+1).padStart(2,"0")}</span><small>{stage}</small>{i!==stages.length-1&&<i/>}</div>)}</div><div className="pipeline-caption"><span><i className="legend-dot active-dot"/> {locale==="ar"?"المرحلة المهيأة":"Defined stage"}</span><span><i className="legend-dot"/> {locale==="ar"?"محركات قيد التنفيذ":"Engines pending"}</span></div></section>
+      <section className="surface-card recent-card"><div className="section-heading"><div><span className="tiny-overline">{locale==="ar"?"قائمة العمل":"WORK QUEUE"}</span><h2>{copy.recent}</h2></div><button className="text-action" onClick={onViewAll}>{copy.viewAll}<ArrowUpLeft size={14}/></button></div>{articles.length===0?<EmptyArticles copy={copy}/>:<div className="recent-list">{articles.slice(0,4).map(article=><div className="recent-item" key={article.id}><span className="recent-file"><FileText size={16}/></span><span><b>{article.topic}</b><small>{(locale==="ar"?stageLabels:enStageLabels)[article.stage]||article.stage}</small></span><ArrowUpLeft size={14}/></div>)}</div>}</section>
     </div>
-    <div className="home-footnote"><span><LockKeyhole size={14}/>{copy.sourceNotice}</span><span>BUILD 0.3.0 <i/> REACT + VITE</span></div>
+    <div className="home-footnote"><span><LockKeyhole size={14}/>{copy.sourceNotice}</span><span>{locale==="ar"?"مراجعة بشرية · النشر بقرارك":"HUMAN REVIEW · YOUR CALL"}</span></div>
   </section>;
 }
 
-function EditorialVector() {
-  return <svg className="editorial-vector" viewBox="0 0 520 390" role="img" aria-label="Abstract editorial workflow vector illustration">
-    <defs><linearGradient id="paperFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#fff" stopOpacity=".98"/><stop offset="1" stopColor="#f0ece4" stopOpacity=".9"/></linearGradient><linearGradient id="goldLine" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#b48a58"/><stop offset="1" stopColor="#e0c49a"/></linearGradient><filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="15" stdDeviation="16" floodColor="#9b815f" floodOpacity=".13"/></filter></defs>
-    <circle cx="265" cy="190" r="153" fill="none" stroke="#d6c4a8" strokeDasharray="2 9" strokeWidth="1.2"/><circle cx="265" cy="190" r="118" fill="none" stroke="#d9d1c4" strokeDasharray="4 8"/>
-    <path d="M90 195 C145 62 350 38 426 174 S362 332 245 319" fill="none" stroke="#c7a77c" strokeWidth="1.4" strokeDasharray="5 7"/>
-    <path d="M112 276 C178 346 324 358 408 258" fill="none" stroke="#ded4c5" strokeWidth="1.2"/>
-    <g filter="url(#softShadow)" transform="translate(170 62) rotate(-5 105 130)"><rect x="0" y="0" width="210" height="260" rx="15" fill="url(#paperFill)" stroke="#e0d8cc"/><rect x="19" y="20" width="35" height="5" rx="2.5" fill="#c4a579"/><rect x="19" y="43" width="140" height="8" rx="4" fill="#293747"/><rect x="19" y="59" width="165" height="5" rx="2.5" fill="#b8b2a9"/><rect x="19" y="76" width="152" height="5" rx="2.5" fill="#d5d0c8"/><rect x="19" y="104" width="172" height="76" rx="8" fill="#eee9e0"/><path d="M33 159 L60 136 L84 147 L116 118 L145 132 L177 112" fill="none" stroke="#b48a58" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/><circle cx="116" cy="118" r="4" fill="#b48a58"/><rect x="19" y="198" width="90" height="5" rx="2.5" fill="#c7c0b6"/><rect x="19" y="211" width="145" height="5" rx="2.5" fill="#ddd7ce"/><rect x="19" y="230" width="52" height="15" rx="7.5" fill="#e8dfd1"/><text x="45" y="240" fontSize="7" textAnchor="middle" fill="#896a45" fontFamily="Inter">VERIFIED</text></g>
-    <g filter="url(#softShadow)"><rect x="42" y="108" width="88" height="60" rx="12" fill="#fff" stroke="#e5ddd0"/><circle cx="61" cy="128" r="6" fill="#d4bd9a"/><path d="M75 126h39M75 137h27M54 151h61" stroke="#c9c2b8" strokeWidth="3" strokeLinecap="round"/><rect x="360" y="242" width="112" height="72" rx="13" fill="#fff" stroke="#e5ddd0"/><circle cx="383" cy="266" r="9" fill="#edf2eb"/><path d="M379 266l3 3 6-7" stroke="#66846d" strokeWidth="1.8" fill="none" strokeLinecap="round"/><path d="M402 263h51M402 275h37M376 294h76" stroke="#c9c2b8" strokeWidth="3" strokeLinecap="round"/></g>
-    <g fill="#b68e5c"><circle cx="100" cy="274" r="4"/><circle cx="410" cy="108" r="4"/><circle cx="310" cy="353" r="3"/></g><g fill="none" stroke="url(#goldLine)" strokeWidth="1.5"><path d="M100 274l30-23 20 9"/><path d="M410 108l-22 20-16-2"/></g>
-    <g transform="translate(395 58)"><circle cx="23" cy="23" r="22" fill="#fff" stroke="#e5ddd0"/><path d="M23 12v22M12 23h22" stroke="#b48a58" strokeWidth="1.8" strokeLinecap="round"/></g>
+function EditorialVector({locale}:{locale:Locale}) {
+  return <svg className="editorial-vector" viewBox="0 0 520 390" role="img" aria-label={locale==="ar"?"رسم خطي لمسار تحرير المقال":"Linear illustration of an editorial workflow"}>
+    <path d="M61 284V138l32-32M447 105l25 25v160" fill="none" stroke="var(--line-strong)" strokeWidth="1.4" strokeDasharray="2 7" strokeLinecap="round"/>
+    <path d="M62 283h43M447 290h-41" fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round"/>
+    <g transform="translate(151 38) rotate(-3 108 148)">
+      <path d="M0 0h163l47 47v245H0z" fill="var(--surface)" stroke="var(--text-strong)" strokeWidth="1.6" strokeLinejoin="round"/>
+      <path d="M163 0v48h47" fill="var(--surface-soft)" stroke="var(--text-strong)" strokeWidth="1.4" strokeLinejoin="round"/>
+      <path d="M18 23h33" stroke="var(--accent)" strokeWidth="5" strokeLinecap="round"/>
+      <text x="18" y="48" fontFamily="Inter" fontSize="7" fontWeight="700" letterSpacing="1.1" fill="var(--muted-strong)">EDITORIAL NOTE / 01</text>
+      <path d="M18 69h137M18 82h116" fill="none" stroke="var(--text-strong)" strokeWidth="4.2" strokeLinecap="round"/>
+      <path d="M18 98h158" fill="none" stroke="var(--line-strong)" strokeWidth="1.2"/>
+      <rect x="18" y="114" width="174" height="69" rx="4" fill="var(--surface-soft)" stroke="var(--line-strong)" strokeWidth="1"/>
+      <path d="M29 132h39m-39 10h115m-115 10h84" fill="none" stroke="var(--text-strong)" strokeWidth="2.4" strokeLinecap="round"/>
+      <path d="M29 166h127" fill="none" stroke="var(--accent)" strokeWidth="3.3" strokeLinecap="round"/>
+      <path d="M18 202h42m12 0h19m12 0h69" fill="none" stroke="var(--line-strong)" strokeWidth="2" strokeLinecap="round"/>
+      <rect x="18" y="221" width="174" height="1" fill="var(--line-strong)"/>
+      <text x="18" y="242" fontFamily="Inter" fontSize="7" fontWeight="700" letterSpacing=".9" fill="var(--muted-strong)">SOURCE</text>
+      <text x="98" y="242" fontFamily="Inter" fontSize="7" fontWeight="700" letterSpacing=".9" fill="var(--muted-strong)">REVIEW</text>
+      <path d="M18 251h58m22 0h73" stroke="var(--text-strong)" strokeWidth="2.4" strokeLinecap="round"/>
+      <rect x="18" y="267" width="51" height="16" rx="3" fill="var(--accent)"/>
+      <text x="43.5" y="278" textAnchor="middle" fontFamily="Inter" fontSize="6.5" fontWeight="800" letterSpacing=".6" fill="#171717">DRAFT</text>
+    </g>
+    <g transform="translate(33 122)">
+      <path d="M8 0h94v62H8z" fill="var(--surface)" stroke="var(--text-strong)" strokeWidth="1.4"/>
+      <path d="M8 0h19v6H8z" fill="var(--accent)"/>
+      <circle cx="24" cy="25" r="7" fill="var(--accent)"/>
+      <path d="M41 22h42M18 43h64M18 53h38" fill="none" stroke="var(--line-strong)" strokeWidth="2.4" strokeLinecap="round"/>
+      <text x="18" y="17" fontFamily="Inter" fontSize="5.5" fontWeight="700" fill="var(--muted-strong)">SOURCE / 02</text>
+    </g>
+    <g transform="translate(373 237)">
+      <path d="M0 11h105v66H0z" fill="var(--surface)" stroke="var(--text-strong)" strokeWidth="1.4"/>
+      <path d="M17 34l7 7 15-17" fill="none" stroke="var(--accent)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M51 31h37M17 56h71M17 67h43" fill="none" stroke="var(--line-strong)" strokeWidth="2.6" strokeLinecap="round"/>
+      <text x="17" y="17" fontFamily="Inter" fontSize="5.5" fontWeight="700" fill="var(--muted-strong)">HUMAN REVIEW</text>
+    </g>
+    <path d="M113 287l25-22m269-166l-18 20" fill="none" stroke="var(--text-strong)" strokeWidth="1.5" strokeLinecap="round"/>
+    <circle cx="113" cy="287" r="4" fill="var(--accent)"/><circle cx="389" cy="119" r="4" fill="var(--text-strong)"/>
+    <g transform="translate(324 308) rotate(-43)">
+      <path d="M0 0h66v10H0z" fill="var(--text-strong)"/>
+      <path d="M66 0l12 5-12 5z" fill="var(--accent)" stroke="var(--text-strong)" strokeWidth="1" strokeLinejoin="round"/>
+      <path d="M10 0v10" stroke="var(--accent)" strokeWidth="2"/>
+    </g>
   </svg>;
 }
 
@@ -425,5 +479,10 @@ function capabilityLabel(value:"yes"|"limited"|"no"|"unverified",locale:Locale) 
 }
 
 function BrandMark() {
-  return <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8 29V11l12 12 12-12v18" fill="none" stroke="currentColor" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="20" cy="20" r="17" fill="none" stroke="currentColor" strokeOpacity=".32"/></svg>;
+  return <svg viewBox="0 0 40 40" aria-hidden="true">
+    <path d="M10 5.5h14l7 7V34H10z" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round"/>
+    <path d="M24 5.5V13h7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round"/>
+    <path d="M15 18h11M15 23h11M15 28h7" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round"/>
+    <path d="M28 26.5l3.5 3.5-5.5 4.5-3.5.5.5-3.5z" fill="#F2C21A" stroke="#171717" strokeWidth="1.1" strokeLinejoin="round"/>
+  </svg>;
 }

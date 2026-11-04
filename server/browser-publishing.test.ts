@@ -32,6 +32,19 @@ describe("browser destination registry", () => {
     expect(() => registerBrowserDestination(emptyState(), { ...profile, editorUrl: "https://attacker.example/login" })).toThrow();
     expect(() => registerBrowserDestination(emptyState(), { ...profile, homepage: "http://magazine.example" })).toThrow();
   });
+  it("allows browser-only sign-in and accepts editor subdomains of the homepage", () => {
+    const destination = registerBrowserDestination(emptyState(), {
+      ...profile, editorUrl: "https://admin.magazine.example/editor", approvedHosts: [], titleSelector: "", bodySelector: ""
+    });
+    expect(destination.approvedHosts).toEqual(["magazine.example"]);
+    expect(destination.selectors).toMatchObject({ title: "", body: "" });
+    expect(() => registerBrowserDestination(emptyState(), { ...profile, editorUrl: "https://publisher.example/editor", approvedHosts: [], titleSelector: "", bodySelector: "" })).toThrow(/approvedHosts/);
+    expect(registerBrowserDestination(emptyState(), { ...profile, editorUrl: "https://publisher.example/editor", approvedHosts: ["publisher.example"], titleSelector: "", bodySelector: "" })).toMatchObject({ approvedHosts: ["magazine.example", "publisher.example"] });
+  });
+  it("requires both selectors together when automatic insertion is configured", () => {
+    expect(() => registerBrowserDestination(emptyState(), { ...profile, bodySelector: "" })).toThrow(/both title and body selectors/);
+    expect(() => registerBrowserDestination(emptyState(), { ...profile, titleSelector: 23 })).toThrow(/titleSelector must be a string/);
+  });
   it("does not let a different workspace read the destination or session", () => {
     const state = emptyState();
     const destination = registerBrowserDestination(state, profile);

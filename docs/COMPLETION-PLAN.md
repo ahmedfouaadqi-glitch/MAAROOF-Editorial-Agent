@@ -68,7 +68,7 @@ This plan follows the requested browser-first editorial platform scope. A checke
 - [x] Add candidate editorial publications and submission policy metadata.
 - [ ] Verify current editorial guidelines, eligibility, rights, exclusivity, disclosure, word limits, image rules and submission path for each selected destination.
 - [ ] Add destination-specific browser adapters and capability tests.
-- [x] Add a generic manual browser handoff; this is not a verified platform adapter.
+- [x] Add a generic manual browser handoff in a side drawer within the application frame; this is not a verified platform adapter.
 - Acceptance: every destination is tested independently; candidate status is never represented as guaranteed acceptance or an enabled publisher.
 
 ### 6. Browser Publishing Agent — operator-controlled handoff implemented; publication outstanding

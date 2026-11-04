@@ -167,7 +167,7 @@ The present local JSON store is a single-process prototype and is not a producti
 ## 12. Current repository reality
 
 Already present on the active feature branch:
-- React + Vite + TypeScript frontend and Linear-inspired vector-first layout;
+- React + Vite + TypeScript frontend and original yellow-and-black vector-first editorial layout, with Linear-like clarity but no copied assets or screen design;
 - Arabic RTL default and English shell;
 - React Bits SpotlightCard integration;
 - initial platform and magazine registries;

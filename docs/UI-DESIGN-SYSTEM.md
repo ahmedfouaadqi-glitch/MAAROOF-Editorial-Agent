@@ -1,11 +1,12 @@
 # MAAROOF Editorial Agent — UI System
 
 ## Visual direction
-- Product UI follows a restrained Linear-inspired application pattern: compact navigation, quiet surfaces, precise borders, dense but readable metadata, and consistent spacing.
+- Product UI uses an original editorial workspace: compact grouped navigation and precise surfaces, with a warm yellow-and-ink-black signature palette; it may borrow clarity from Linear-style tools but does not copy their layout or visual assets.
+- Ivory and grayscale are supporting neutrals for legibility; yellow marks the active path and primary actions, while black anchors text, navigation, and the dark theme.
 - Vector illustrations are native inline SVG. They are not stock images and do not depend on remote image services.
 - Light mode is the default. Dark mode is a complete token set, not a separate page skin.
 - Arabic is the default locale and the application shell switches RTL/LTR direction with the locale control.
-- The mobile layout uses a fixed bottom navigation and a collapsible side navigation.
+- The mobile layout uses a collapsible side navigation; the browser assistant opens as a full-screen panel on phones and remains a side drawer on wider screens.
 
 ## React Bits integration
 The project integrates the official React Bits `SpotlightCard` TypeScript/CSS component in:
@@ -38,4 +39,4 @@ The upstream repository declares MIT + Commons Clause licensing. Preserve upstre
 - The workspace ID is currently a development constant (`main-workspace`); production identity-to-workspace authorization is not implemented.
 - API admin token is held in React memory for the active session and must not be exposed in a public bundle.
 - Article creation and stage progression are operational only when the standalone API is running and a valid admin token is supplied.
-- Editorial AI engines, live search, remote source acquisition, browser publishing, and publication verification are not implemented by this UI.
+- The UI includes manual evidence workflows and a generic user-controlled browser handoff. Verified platform-specific publishing adapters, automated submission, and external publication verification remain unimplemented; live search and scraping still require server-side provider configuration and quotas.

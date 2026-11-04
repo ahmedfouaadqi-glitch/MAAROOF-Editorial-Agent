@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent, type MouseEvent } from "react";
-import { AlertTriangle, Check, ExternalLink, Globe2, LogIn, MonitorPlay, MousePointer2, ShieldCheck, Upload, X } from "lucide-react";
+import { AlertTriangle, ArrowUpLeft, Check, ExternalLink, Globe2, LogIn, MonitorPlay, MousePointer2, ShieldCheck, Upload, X } from "lucide-react";
 
 type Article = { id:string; topic:string; stage:string };
 type Destination = {
@@ -13,11 +13,23 @@ type BrowserSession = {
 };
 type Screenshot = {contentType:string;base64:string};
 const keys=["Enter","Tab","Escape","Backspace","Delete","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Home","End","Space"];
+function sessionStateLabel(state:string,ar:boolean){
+  const labels:Record<string,[string,string]>={
+    "waiting-for-user":["بانتظار تسجيل الدخول","Waiting for sign-in"],
+    "user-controlled":["المتصفح مفتوح","Browser open"],
+    "ready":["جاهزة","Ready"],"starting":["جارٍ الفتح","Starting"],
+    "expired":["انتهت الجلسة","Session expired"],"closed":["أُغلقت الجلسة","Session closed"],
+    "error":["تعذر تشغيل الجلسة","Session error"]
+  };
+  const label=labels[state];
+  return label?(ar?label[0]:label[1]):(ar?"حالة الجلسة":"Session status");
+}
 
-export default function BrowserPublishingPanel({apiBase,token,workspaceId,articles,locale}:{apiBase:string;token:string;workspaceId:string;articles:Article[];locale:"ar"|"en"}){
+export default function BrowserPublishingPanel({apiBase,token,workspaceId,articles,locale,onOpenSettings}:{apiBase:string;token:string;workspaceId:string;articles:Article[];locale:"ar"|"en";onOpenSettings:()=>void}){
   const ar=locale==="ar";
   const [destinations,setDestinations]=useState<Destination[]>([]);
   const [sessions,setSessions]=useState<BrowserSession[]>([]);
+  const [step,setStep]=useState<"destination"|"session">("destination");
   const [destinationId,setDestinationId]=useState("");
   const [session,setSession]=useState<BrowserSession|null>(null);
   const [screenshot,setScreenshot]=useState<Screenshot|null>(null);
@@ -28,6 +40,8 @@ export default function BrowserPublishingPanel({apiBase,token,workspaceId,articl
   const [typingText,setTypingText]=useState("");const [key,setKey]=useState("Tab");
   const [busy,setBusy]=useState(false);const [notice,setNotice]=useState("");
   const readyArticles=articles.filter(article=>article.stage==="ready-to-publish");
+  const selectedDestination=destinations.find(item=>item.id===destinationId);
+  const canInsertArticle=Boolean(selectedDestination?.selectors?.title&&selectedDestination?.selectors?.body);
 
   async function request(path:string,init:RequestInit={}){
     const response=await fetch(apiBase+path,{...init,headers:{authorization:`Bearer ${token}`,...(init.body?{"content-type":"application/json"}:{}),...init.headers}});
@@ -45,6 +59,7 @@ export default function BrowserPublishingPanel({apiBase,token,workspaceId,articl
       const nextSessions:BrowserSession[]=sessionResult.sessions||[];
       setDestinations(nextDestinations);setSessions(nextSessions);
       setDestinationId(current=>current||nextDestinations[0]?.id||"");
+      if(nextDestinations.length)setStep(current=>current==="destination"?"session":current);
       setSession(current=>current||nextSessions.find(item=>Date.parse(item.expiresAt)>Date.now())||null);
     }catch(error){setNotice(error instanceof Error?error.message:(ar?"تعذر تحميل الوجهات والجلسات":"Could not load destinations and sessions"));}
   }
@@ -70,6 +85,7 @@ export default function BrowserPublishingPanel({apiBase,token,workspaceId,articl
       const payload=await request(destinationsPath,{method:"POST",body:JSON.stringify({name,homepage,editorUrl,approvedHosts:approvedHosts.split(/[\\s,]+/).map(value=>value.trim()).filter(Boolean),titleSelector,bodySelector,authorityConfirmed,policyReviewed})});
       const item:Destination=payload.destination;
       setDestinations(current=>[item,...current.filter(existing=>existing.id!==item.id)]);setDestinationId(item.id);
+      setStep("session");
       setNotice(ar?"حُفظت الوجهة كإعداد غير متحقق؛ لم تُنشر أي مادة.":"Destination saved as operator-declared and unverified; nothing was published.");
     }catch(error){setNotice(error instanceof Error?error.message:(ar?"تعذر حفظ الوجهة":"Could not save destination"));}
     finally{setBusy(false);}
@@ -120,35 +136,43 @@ export default function BrowserPublishingPanel({apiBase,token,workspaceId,articl
   }
 
   return <section className="page-section browser-publishing-page">
-    <div className="page-heading"><div><span className="tiny-overline">USER-CONTROLLED BROWSER HANDOFF</span><h1>{ar?"النشر عبر المتصفح":"Browser publishing handoff"}</h1><p>{ar?"افتح وجهة تملكها أو لديك تفويض لها، سجّل الدخول بنفسك، وانقل نص المقال المعتمد للمراجعة. لا يوجد نشر آلي.":"Open a destination you own or are authorized to use, sign in yourself, and transfer approved article text for review. No automated publishing."}</p></div><span className="status-chip"><MonitorPlay size={14}/>{ar?"مراجعة بشرية":"Human-controlled"}</span></div>
-    {!token.trim()&&<div className="form-note"><ShieldCheck size={15}/>{ar?"أدخل ADMIN_API_TOKEN في صفحة المقالات أولاً.":"Enter ADMIN_API_TOKEN on the Articles page first."}</div>}
+    <div className="page-heading"><div><span className="tiny-overline">{ar?"مساعدة المتصفح بموافقتك":"USER-CONTROLLED BROWSER"}</span><h1>{ar?"النشر عبر المتصفح":"Browser handoff"}</h1><p>{ar?"افتح وجهة تملكها أو لديك تفويض لها، سجّل الدخول بنفسك، وراجع المقال قبل المتابعة.":"Open a destination you own or are authorized to use, sign in yourself, and review the article before continuing."}</p></div><span className="status-chip"><MonitorPlay size={14}/>{ar?"مراجعة بشرية":"Human review"}</span></div>
+    {!token.trim()&&<div className="form-note workspace-token-note"><ShieldCheck size={15}/><span>{ar?"اربط مساحة العمل من الإعدادات مرة واحدة للمتابعة.":"Connect this workspace from Settings once to continue."}</span><button className="secondary-button" type="button" onClick={onOpenSettings}>{ar?"فتح الإعدادات":"Open Settings"}<ArrowUpLeft size={14}/></button></div>}
     <div className="browser-safety-note"><AlertTriangle size={17}/><div><b>{ar?"لا تُدخل بيانات الدخول في إعدادات الوجهة":"Never put login credentials in destination settings"}</b><p>{ar?"استخدم لقطة المتصفح التفاعلية لتسجيل الدخول. لا يحفظ التطبيق كلمات المرور، ولا يتجاوز MFA أو CAPTCHA. راجع النص والوجهة في الموقع قبل أن تضغط أي زر إرسال بنفسك.":"Use the interactive browser screenshot to sign in. The app does not store passwords or bypass MFA/CAPTCHA. Review the text and destination on the site before you personally press any submit button."}</p></div></div>
+    <div className="browser-stepper" role="group" aria-label={ar?"خطوات جلسة المتصفح":"Browser session steps"}>
+      <button type="button" className={step==="destination"?"browser-step active":"browser-step"} aria-current={step==="destination"?"step":undefined} onClick={()=>setStep("destination")}><b>01</b><span>{ar?"الوجهة":"Destination"}</span></button><i aria-hidden="true"/>
+      <button type="button" className={step==="session"?"browser-step active":"browser-step"} aria-current={step==="session"?"step":undefined} disabled={!destinationId} onClick={()=>setStep("session")}><b>02</b><span>{ar?"الدخول والمراجعة":"Sign in & review"}</span></button>
+    </div>
     <div className="browser-layout">
-      <section className="surface-card create-card browser-setup-card">
-        <div className="section-heading"><div><span className="tiny-overline">DESTINATION PROFILE</span><h2>{ar?"تسجيل وجهة مسموح بها":"Register an allowed destination"}</h2><p>{ar?"أدخل نطاق الموقع وصفحة المحرر ومحددات الحقول المناسبة له.":"Enter the site domain, editor page, and selectors for its fields."}</p></div><Globe2 size={18}/></div>
+      {step==="destination"&&<section className="surface-card create-card browser-setup-card">
+        <div className="section-heading"><div><span className="tiny-overline">{ar?"الخطوة الأولى":"STEP 01"}</span><h2>{ar?"اختر وجهة النشر":"Choose a destination"}</h2><p>{ar?"أدخل اسم الموقع ورابط المحرر. أضف نطاقاً آخر من الإعدادات المتقدمة فقط إذا احتاج تسجيل الدخول إليه.":"Enter the site and editor URL. Add another domain in advanced settings only if sign-in redirects there."}</p></div><Globe2 size={18}/></div>
         <form className="article-form" onSubmit={saveDestination}>
           <label>{ar?"اسم الوجهة":"Destination name"}<input required minLength={2} maxLength={120} value={name} onChange={event=>setName(event.target.value)} placeholder={ar?"مثال: مدونة الشركة":"e.g. Company blog"}/></label>
           <label>{ar?"رابط الموقع (HTTPS)":"Homepage URL (HTTPS)"}<input required type="url" value={homepage} onChange={event=>setHomepage(event.target.value)} placeholder="https://example.com"/></label>
           <label>{ar?"رابط صفحة المحرر أو الدخول":"Editor or login URL"}<input type="url" value={editorUrl} onChange={event=>setEditorUrl(event.target.value)} placeholder="https://example.com/editor"/></label>
-          <label>{ar?"المضيفون المسموحون (سطر أو فاصلة لكل مضيف)":"Approved hosts (one per line or comma-separated)"}<textarea required rows={2} value={approvedHosts} onChange={event=>setApprovedHosts(event.target.value)} placeholder="example.com\naccounts.example.com"/></label>
-          <label>{ar?"محدد CSS لحقل العنوان":"CSS selector for title field"}<input required maxLength={500} value={titleSelector} onChange={event=>setTitleSelector(event.target.value)} placeholder='input[name="title"]'/></label>
-          <label>{ar?"محدد CSS لحقل النص":"CSS selector for article body"}<input required maxLength={500} value={bodySelector} onChange={event=>setBodySelector(event.target.value)} placeholder='[contenteditable="true"]'/></label>
+          <details className="browser-advanced-fields"><summary>{ar?"إعدادات متقدمة (اختيارية)":"Advanced setup (optional)"}</summary><p>{ar?"أضف نطاقات تسجيل الدخول الإضافية إذا كان الموقع يحوّلك إليها. أضف حقلي العنوان والنص فقط إذا أردت إدراج المسودة تلقائياً.":"Add extra sign-in domains only if the site redirects to them. Add both article field selectors only if you want automatic draft insertion."}</p>
+            <label>{ar?"نطاقات إضافية مسموح بها":"Additional allowed domains"}<textarea rows={2} value={approvedHosts} onChange={event=>setApprovedHosts(event.target.value)} placeholder="accounts.example.com"/></label>
+            <div className="form-pair"><label>{ar?"حقل العنوان (CSS selector)":"Title field (CSS selector)"}<input maxLength={500} value={titleSelector} onChange={event=>setTitleSelector(event.target.value)} placeholder='input[name="title"]'/></label><label>{ar?"حقل النص (CSS selector)":"Article field (CSS selector)"}<input maxLength={500} value={bodySelector} onChange={event=>setBodySelector(event.target.value)} placeholder='[contenteditable="true"]'/></label></div>
+          </details>
           <label className="browser-confirm"><input type="checkbox" required checked={authorityConfirmed} onChange={event=>setAuthorityConfirmed(event.target.checked)}/>{ar?"أؤكد أنني أملك هذه الوجهة أو مفوض بالنشر فيها.":"I confirm I own this destination or am authorized to publish there."}</label>
           <label className="browser-confirm"><input type="checkbox" required checked={policyReviewed} onChange={event=>setPolicyReviewed(event.target.checked)}/>{ar?"راجعت سياسة الموقع وقواعد النشر المناسبة.":"I reviewed the site's terms and applicable publishing rules."}</label>
           <button className="secondary-button" disabled={busy||!token.trim()}><Check size={14}/>{ar?"حفظ الوجهة":"Save destination"}</button>
         </form>
-        {!!destinations.length&&<div className="browser-destination-list"><h3>{ar?"الوجهات المحفوظة":"Saved destinations"}</h3>{destinations.map(item=><label key={item.id} className="browser-destination-row"><input type="radio" name="browser-destination" checked={destinationId===item.id} onChange={()=>setDestinationId(item.id)}/><span><b>{item.name}</b><small>{item.homepage} · {item.status}</small></span></label>)}</div>}
-      </section>
-      <section className="surface-card create-card browser-session-card">
-        <div className="section-heading"><div><span className="tiny-overline">REMOTE BROWSER</span><h2>{ar?"جلسة الدخول والمعاينة":"Sign-in and review session"}</h2><p>{ar?"تفاعل مع الصفحة الظاهرة كما في المتصفح؛ تنتهي الجلسة بعد مدة أو عند إغلاقها.":"Interact with the visible page as in a browser; the session expires or closes on request."}</p></div><LogIn size={18}/></div>
+        {!!destinations.length&&<div className="browser-destination-list"><h3>{ar?"الوجهات المحفوظة":"Saved destinations"}</h3>{destinations.map(item=><label key={item.id} className="browser-destination-row"><input type="radio" name="browser-destination" checked={destinationId===item.id} onChange={()=>setDestinationId(item.id)}/><span><b>{item.name}</b><small>{item.homepage} · {item.status==="operator-declared-unverified"?(ar?"غير متحقق":"Unverified"):item.status}</small></span></label>)}</div>}
+      </section>}
+      {step==="session"&&<section className="surface-card create-card browser-session-card">
+        <div className="section-heading"><div><span className="tiny-overline">{ar?"الخطوة الثانية":"STEP 02"}</span><h2>{ar?"افتح المتصفح وسجّل الدخول":"Open the browser and sign in"}</h2><p>{ar?"ستظهر صفحة الموقع هنا. أدخل بياناتك بنفسك؛ لا تُحفظ كلمة المرور.":"The website will appear here. Sign in yourself; your password is not saved."}</p></div><LogIn size={18}/></div>
+        {destinations.length>0&&<label className="browser-session-select">{ar?"الوجهة":"Destination"}<select value={destinationId} onChange={event=>setDestinationId(event.target.value)}>{destinations.map(item=><option key={item.id} value={item.id}>{item.name} · {item.status==="operator-declared-unverified"?(ar?"غير متحقق":"Unverified"):item.status}</option>)}</select></label>}
+        <button className="browser-manage-destination" type="button" onClick={()=>setStep("destination")}>{ar?"إدارة الوجهات وإعداد الحقول":"Manage destinations and field setup"}</button>
         <div className="browser-session-controls"><button className="primary-button" disabled={busy||!token.trim()||!destinationId} onClick={startSession}><LogIn size={14}/>{ar?"فتح جلسة المتصفح":"Open browser session"}</button>{session&&<button className="secondary-button" disabled={busy} onClick={closeSession}><X size={14}/>{ar?"إغلاق الجلسة":"Close session"}</button>}</div>
-        {sessions.length>0&&<label className="browser-session-select">{ar?"جلسة نشطة":"Active session"}<select value={session?.id||""} onChange={event=>{setSession(sessions.find(item=>item.id===event.target.value)||null);setScreenshot(null);}}>{sessions.map(item=><option key={item.id} value={item.id}>{item.title||item.id} · {item.state}</option>)}</select></label>}
-        {session&&<div className="browser-session-meta"><b>{session.title||session.state}</b><small>{session.currentUrl}</small><small>{ar?"تنتهي:":"Expires:"} {new Date(session.expiresAt).toLocaleString(ar?"ar-IQ":"en-US")}</small></div>}
+        {sessions.length>0&&<label className="browser-session-select">{ar?"جلسة نشطة":"Active session"}<select value={session?.id||""} onChange={event=>{setSession(sessions.find(item=>item.id===event.target.value)||null);setScreenshot(null);}}>{sessions.map((item,index)=><option key={item.id} value={item.id}>{item.title||`${ar?"جلسة":"Session"} ${index+1}`} · {sessionStateLabel(item.state,ar)}</option>)}</select></label>}
+        {session&&<div className="browser-session-meta"><b>{session.title||sessionStateLabel(session.state,ar)}</b><small>{session.currentUrl}</small><small>{ar?"تنتهي:":"Expires:"} {new Date(session.expiresAt).toLocaleString(ar?"ar-IQ":"en-US")}</small></div>}
         {session&&screenshot&&<div className="browser-remote-frame"><button className="browser-screenshot" type="button" onClick={clickRemote} aria-label={ar?"انقر داخل لقطة المتصفح":"Click inside browser screenshot"}><img src={`data:${screenshot.contentType};base64,${screenshot.base64}`} alt={ar?"لقطة شاشة تفاعلية للمتصفح البعيد":"Interactive remote browser screenshot"}/><span><MousePointer2 size={13}/>{ar?"انقر داخل الصفحة لإدخال المؤشر":"Click the page to focus an element"}</span></button></div>}
-        {session&&<div className="browser-interaction-controls"><label>{ar?"اكتب في الحقل المركّز (لا يُحفظ نص الإدخال)":"Type into the focused field (input is not saved)"}<input type="password" autoComplete="off" value={typingText} onChange={event=>setTypingText(event.target.value)} onKeyDown={event=>{if(event.key==="Enter"){event.preventDefault();void typeText();}}}/></label><button className="secondary-button" disabled={busy||!typingText} onClick={()=>void typeText()}>{ar?"إرسال الكتابة":"Send keystrokes"}</button><label>{ar?"مفتاح مسموح":"Allowed key"}<select value={key} onChange={event=>setKey(event.target.value)}>{keys.map(item=><option key={item}>{item}</option>)}</select></label><button className="secondary-button" disabled={busy} onClick={()=>void act({type:"press",key})}>{ar?"ضغط المفتاح":"Press key"}</button><button className="secondary-button" disabled={busy} onClick={()=>void act({type:"scroll",deltaY:500})}>{ar?"تمرير لأسفل":"Scroll down"}</button><button className="secondary-button" disabled={busy} onClick={()=>void act({type:"scroll",deltaY:-500})}>{ar?"تمرير لأعلى":"Scroll up"}</button></div>}
-        {session&&<div className="browser-fill-article"><label>{ar?"مقالة معتمدة لإدراجها":"Approved article to insert"}<select value={taskId} onChange={event=>setTaskId(event.target.value)}><option value="">{ar?"اختر مقالة جاهزة ومعتمدة":"Select a ready, approved article"}</option>{readyArticles.map(article=><option key={article.id} value={article.id}>{article.topic}</option>)}</select></label><button className="secondary-button" disabled={busy||!taskId||!readyArticles.some(article=>article.id===taskId)} onClick={()=>void fillApprovedArticle()}><Upload size={14}/>{ar?"إدراج النص في المحرر":"Insert text into editor"}</button><p className="form-note">{ar?"لا تُرفق ملفات الوسائط في هذه الدفعة. لا يضغط التطبيق زر الحفظ أو النشر؛ راجع الصفحة وأكمل يدوياً.":"Media files are not attached in this phase. The app does not click Save or Publish; review the page and continue manually."}</p></div>}
-        {!session&&<div className="browser-empty"><MonitorPlay size={23}/><p>{ar?"احفظ وجهة مفوضاً بها ثم افتح جلسة لتسجيل الدخول. يتطلب تشغيل العامل الخاص إعداد BROWSER_AGENT_TOKEN وتثبيت Chromium.":"Save an authorized destination, then open a session to sign in. The private worker requires BROWSER_AGENT_TOKEN and an installed Chromium browser."}</p></div>}
-      </section>
+        {session&&<div className="browser-control-group"><div className="browser-interaction-controls"><label>{ar?"اكتب في الحقل المحدد (لا يُحفظ النص)":"Type into the focused field (text is not saved)"}<input type="password" autoComplete="off" value={typingText} onChange={event=>setTypingText(event.target.value)} onKeyDown={event=>{if(event.key==="Enter"){event.preventDefault();void typeText();}}}/></label><button className="secondary-button" disabled={busy||!typingText} onClick={()=>void typeText()}>{ar?"كتابة":"Type"}</button></div><details className="browser-advanced-fields browser-key-controls"><summary>{ar?"عناصر تحكم إضافية":"More browser controls"}</summary><div className="browser-key-actions"><label>{ar?"المفتاح":"Key"}<select value={key} onChange={event=>setKey(event.target.value)}>{keys.map(item=><option key={item}>{item}</option>)}</select></label><button className="secondary-button" disabled={busy} onClick={()=>void act({type:"press",key})}>{ar?"ضغط المفتاح":"Press key"}</button><button className="secondary-button" disabled={busy} onClick={()=>void act({type:"scroll",deltaY:500})}>{ar?"تمرير لأسفل":"Scroll down"}</button><button className="secondary-button" disabled={busy} onClick={()=>void act({type:"scroll",deltaY:-500})}>{ar?"تمرير لأعلى":"Scroll up"}</button></div></details></div>}
+        {session&&canInsertArticle&&<div className="browser-fill-article"><label>{ar?"مقالة معتمدة لإدراجها":"Approved article to insert"}<select value={taskId} onChange={event=>setTaskId(event.target.value)}><option value="">{ar?"اختر مقالة جاهزة ومعتمدة":"Select a ready, approved article"}</option>{readyArticles.map(article=><option key={article.id} value={article.id}>{article.topic}</option>)}</select></label><button className="secondary-button" disabled={busy||!taskId||!readyArticles.some(article=>article.id===taskId)} onClick={()=>void fillApprovedArticle()}><Upload size={14}/>{ar?"إدراج النص في المحرر":"Insert text into editor"}</button><p className="form-note">{ar?"لا تُرفق ملفات الوسائط في هذه الدفعة. لا يضغط التطبيق زر الحفظ أو النشر؛ راجع الصفحة وأكمل يدوياً.":"Media files are not attached in this phase. The app does not click Save or Publish; review the page and continue manually."}</p></div>}
+        {session&&!canInsertArticle&&<div className="browser-manual-insert"><p>{ar?"يمكنك تسجيل الدخول والتفاعل مع المتصفح الآن. لإدراج المقال المعتمد بضغطة واحدة، أضف حقلي العنوان والنص من الإعدادات المتقدمة للوجهة.":"You can sign in and use the browser now. To insert an approved article in one step, add the title and body fields in the destination's advanced settings."}</p><button className="text-action" type="button" onClick={()=>setStep("destination")}>{ar?"إعداد حقول المقال":"Set up article fields"}<ArrowUpLeft size={14}/></button></div>}
+        {!session&&<div className="browser-empty"><MonitorPlay size={23}/><p>{ar?"احفظ وجهة مفوضاً بها ثم افتح جلسة لتسجيل الدخول. سيظهر المتصفح هنا.":"Save an authorized destination and open a session to sign in. The browser will appear here."}</p></div>}
+      </section>}
     </div>
     {notice&&<p className="inline-feedback">{notice}</p>}
     <div className="browser-footer-note"><ExternalLink size={14}/>{ar?"هذه جلسة وسيطة للتعبئة والمراجعة فقط؛ حالة الوجهة غير متحققة، والنشر الفعلي والتحقق من الرابط غير متاحين بعد.":"This is a fill-and-review handoff only; the destination remains unverified, and external publishing/link verification are not implemented."}</div>

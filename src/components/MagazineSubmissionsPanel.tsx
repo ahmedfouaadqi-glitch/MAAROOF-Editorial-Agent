@@ -46,7 +46,7 @@ export default function MagazineSubmissionsPanel({apiBase,token,workspaceId,arti
   }
   return <section className="page-section">
     <div className="page-heading"><div><span className="tiny-overline">EDITORIAL SUBMISSIONS</span><h1>{ar?"إدارة تقديمات المجلات":"Magazine submissions"}</h1><p>{ar?"إنشاء pitch ومتابعة الموافقات والردود. كل الحالات تسجل محلياً ولا تعني إرسالاً خارجياً.":"Create pitches and track approvals and editor responses. Statuses are local records, not external submissions."}</p></div><span className="status-chip"><BookOpenText size={14}/>{items.length} {ar?"تقديم":"records"}</span></div>
-    {!token.trim()&&<div className="form-note"><ShieldCheck size={15}/>{ar?"أدخل مفتاح الإدارة من صفحة المقالات أولاً.":"Enter the backend admin token on the Articles page first."}</div>}
+    {!token.trim()&&<div className="form-note"><ShieldCheck size={15}/>{ar?"أضف رمز الوصول إلى مساحة العمل من الإعدادات أولاً.":"Add the workspace access key in Settings first."}</div>}
     <div className="article-layout">
       <section className="surface-card create-card"><div className="card-topline"><span className="section-icon"><Send size={16}/></span><span className="tiny-overline">{ar?"تقديم جديد":"NEW PITCH"}</span></div>
         <form className="article-form" onSubmit={create}>

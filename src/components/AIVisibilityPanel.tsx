@@ -17,7 +17,7 @@ const labels = {
     note: "ملاحظات التحقق", verified: "تم التحقق من الدليل", add: "تسجيل الرصد",
     crawl: "زيارة زاحف / قراءة تقنية", index: "فهرسة مؤكدة", citation: "استشهاد مؤكد في إجابة", training: "إفادة صريحة عن استخدام التدريب", referral: "زيارة إحالة",
     crawls: "زيارات الزواحف المسجلة", indexes: "صفحات مفهرسة (موثقة)", citations: "استشهادات موثقة", trainingCount: "إفادات تدريب موثقة",
-    empty: "لا توجد أحداث مسجلة بعد.", noToken: "أدخل مفتاح الإدارة في صفحة المقالات أو إعدادات البحث أولاً.",
+    empty: "لا توجد أحداث مسجلة بعد.", noToken: "أضف رمز الوصول لمساحة العمل من الإعدادات أولاً.",
     warning: "مهم: ظهور GPTBot أو ClaudeBot في السجلات لا يثبت أن المقال دُرّب عليه. وظهور OAI-SearchBot أو Googlebot لا يثبت الفهرسة أو الاستشهاد.",
     sourceManual: "المصدر يدوي", sourceLog: "سجل خادم", sourceConsole: "أداة مشرف الموقع", sourceSearch: "نتيجة بحث/إجابة",
     statusVerified: "موثق", statusUnverified: "غير موثق", error: "تعذر تنفيذ الطلب"
@@ -30,7 +30,7 @@ const labels = {
     note: "Verification notes", verified: "Evidence verified", add: "Record observation",
     crawl: "Crawler fetch / technical read", index: "Verified indexing", citation: "Verified answer citation", training: "Explicit training-use attestation", referral: "Referral visit",
     crawls: "Recorded crawler fetches", indexes: "Verified indexed pages", citations: "Verified citations", trainingCount: "Training attestations",
-    empty: "No observations recorded yet.", noToken: "Enter the admin token on the Articles or Research settings page first.",
+    empty: "No observations recorded yet.", noToken: "Add the workspace access key in Settings first.",
     warning: "Important: GPTBot or ClaudeBot access does not prove an article was used for training. OAI-SearchBot or Googlebot access does not prove indexing or citation.",
     sourceManual: "Manual", sourceLog: "Server log", sourceConsole: "Search console", sourceSearch: "Search / answer result",
     statusVerified: "Verified", statusUnverified: "Unverified", error: "Request failed"

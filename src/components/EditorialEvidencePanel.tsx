@@ -95,7 +95,7 @@ export default function EditorialEvidencePanel({ apiBase, token, workspaceId, ar
 
   return <section className="surface-card evidence-panel">
     <div className="section-heading"><div><span className="tiny-overline">EDITORIAL EVIDENCE</span><h2>{ar ? "ملف الأدلة والادعاءات" : "Evidence & claims workspace"}</h2><p>{article.topic}</p></div><span className="count-badge">{sources.length} {ar ? "مصادر" : "sources"}</span></div>
-    {!token.trim() ? <p className="evidence-notice"><ShieldAlert size={15}/>{ar ? "أدخل مفتاح الإدارة لتحميل ملف الأدلة." : "Enter the admin token to load the evidence workspace."}</p> : <>
+    {!token.trim() ? <p className="evidence-notice"><ShieldAlert size={15}/>{ar ? "أضف رمز الوصول لمساحة العمل من الإعدادات لتحميل ملف الأدلة." : "Add the workspace access key in Settings to load evidence."}</p> : <>
       <div className="evidence-summary"><div><b>{summary.total}</b><span>{ar ? "إجمالي الادعاءات" : "Claims"}</span></div><div><b>{summary.sourceLinked}</b><span>{ar ? "مرتبطة بمصدر" : "Source linked"}</span></div><div><b>{summary.coveragePercent}%</b><span>{ar ? "تغطية الإسناد" : "Link coverage"}</span></div></div>
       <div className="evidence-grid">
         <form className="evidence-form" onSubmit={addSource}>

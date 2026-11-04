@@ -11,7 +11,7 @@ Lovable-compatible editorial operations platform with a prototype user-controlle
 - This project has no MAAROOF AI connection, API integration, shared database, or workspace data exchange.
 
 ## Current implementation
-- Responsive Linear-inspired editorial workspace with vector-first dashboard, Arabic RTL default, English shell labels, light/dark themes, and mobile navigation.
+- Responsive original yellow-and-black editorial workspace with custom line-vector dashboard, Arabic RTL default, bilingual controls, light/dark themes, and a side-drawer browser handoff that becomes full-screen on phones.
 - React Bits SpotlightCard integration for restrained pointer-reactive lighting.
 - Conservative platform capability profiles, policy constraints, and verification checklists.
 - Article task creation, deterministic Arabic/English outline scaffold, human editing, and controlled stage progression.
@@ -55,6 +55,10 @@ Requires Node.js 22 or newer.
 4. In a second terminal, run npm run dev.
 5. For browser handoff, set the same random 32+ character BROWSER_AGENT_TOKEN for both processes, run npm run browser:install once, then run npm run browser:worker in a third terminal. Keep the worker bound to 127.0.0.1.
 6. Validate with npm run typecheck, npm test and npm run build.
+
+In the browser panel, the homepage host and its subdomains are allowlisted automatically. Add a separate editor or sign-in domain explicitly under advanced settings. Title/body selectors are optional and are needed only for one-step insertion of an approved article. Leaving them blank still allows a browser-only login/review session.
+
+Open the browser assistant from the app's top bar. It stays beside the current page on desktop and uses the full screen on phones, so the user keeps the article context while signing in and reviewing.
 
 The API defaults to http://127.0.0.1:8787. Set HOST=0.0.0.0 only when external access is required, and configure CORS_ORIGIN to the exact frontend origin. The JSON data file is written to ./data/editorial-agent.json and excluded from Git.
 
