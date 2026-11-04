@@ -1,0 +1,315 @@
+{
+  "version": 1,
+  "purpose": "Separate editorial publications and long-form publishing destinations from social networks, communities, research repositories, and data sources.",
+  "sourcePreservation": {
+    "originalSeed": "Preserve the user-provided initial 17-destination list as recorded in docs/PLATFORM-REGISTRY.md and src/data/platforms.ts.",
+    "originalEditorialDestinations": [
+      "Medium",
+      "Substack",
+      "WordPress",
+      "Blogger",
+      "Ghost"
+    ],
+    "note": "The remaining original entries are retained in the existing general platform registry and are not reclassified as magazines."
+  },
+  "rules": {
+    "candidateDoesNotMeanApproved": true,
+    "editorialSubmissionIsNotDirectPublishing": true,
+    "noGuaranteedAcceptance": true,
+    "requireEditorialPolicyReview": true,
+    "requireAccountOrContributorAuthorization": true,
+    "noDuplicateSyndicationWithoutRightsAndDisclosureReview": true,
+    "neverPromiseBacklinksOrSearchRanking": true,
+    "statusDefault": "candidate_not_assessed"
+  },
+  "destinations": [
+    {
+      "id": "medium",
+      "name": "Medium",
+      "type": "self_publishing_platform",
+      "contentFit": [
+        "analysis",
+        "opinion",
+        "professional_articles",
+        "how_to"
+      ],
+      "submissionRoute": "author_account",
+      "automationStatus": "not_assessed",
+      "directPublishingAdapter": "not_implemented",
+      "editorialProfile": "Long-form article with clear thesis, readable structure, original perspective and appropriate publication selection.",
+      "officialUrl": "https://medium.com/",
+      "notes": [
+        "Not a traditional magazine accepting pitches through a central editorial desk.",
+        "Check account and publication-specific rules before submission."
+      ]
+    },
+    {
+      "id": "substack",
+      "name": "Substack",
+      "type": "newsletter_publication_platform",
+      "contentFit": [
+        "newsletters",
+        "analysis",
+        "opinion",
+        "serial_articles"
+      ],
+      "submissionRoute": "publication_owner_or_author_account",
+      "automationStatus": "not_assessed",
+      "directPublishingAdapter": "not_implemented",
+      "editorialProfile": "Recurring editorial voice, strong subject line/title, reader relationship, and newsletter-aware introduction.",
+      "officialUrl": "https://substack.com/",
+      "notes": [
+        "Requires access to the target publication/account.",
+        "Do not assume public API publishing is available."
+      ]
+    },
+    {
+      "id": "wordpress",
+      "name": "WordPress",
+      "type": "publishing_cms",
+      "contentFit": [
+        "digital_magazine",
+        "news_site",
+        "brand_editorial",
+        "long_form"
+      ],
+      "submissionRoute": "site_author_account_or_editor_invitation",
+      "automationStatus": "api_candidate",
+      "directPublishingAdapter": "not_implemented",
+      "editorialProfile": "Structured CMS article with title, slug, body, taxonomy, featured image, excerpt, SEO fields where supported.",
+      "officialUrl": "https://wordpress.org/",
+      "developerDocs": "https://developer.wordpress.org/rest-api/",
+      "notes": [
+        "WordPress is a CMS, not a single magazine.",
+        "Each target site must be registered and authorized separately."
+      ]
+    },
+    {
+      "id": "blogger",
+      "name": "Blogger",
+      "type": "publishing_cms",
+      "contentFit": [
+        "blogs",
+        "opinion",
+        "general_articles"
+      ],
+      "submissionRoute": "blog_author_account",
+      "automationStatus": "api_candidate",
+      "directPublishingAdapter": "not_implemented",
+      "editorialProfile": "Blog-style article with clear headings, labels, images, and source links.",
+      "officialUrl": "https://www.blogger.com/",
+      "developerDocs": "https://developers.google.com/blogger/docs/3.0/using",
+      "notes": [
+        "A blog host rather than an editorial magazine.",
+        "OAuth and blog-level permissions required."
+      ]
+    },
+    {
+      "id": "ghost",
+      "name": "Ghost",
+      "type": "publishing_cms",
+      "contentFit": [
+        "independent_magazines",
+        "newsletters",
+        "professional_publications"
+      ],
+      "submissionRoute": "publication_owner_or_editor_invitation",
+      "automationStatus": "api_candidate",
+      "directPublishingAdapter": "not_implemented",
+      "editorialProfile": "Magazine/newsletter article with editorial metadata, tags, feature image, excerpt, and publication state.",
+      "officialUrl": "https://ghost.org/",
+      "developerDocs": "https://ghost.org/docs/admin-api/",
+      "notes": [
+        "Each Ghost publication is a separate destination and needs its own credentials."
+      ]
+    },
+    {
+      "id": "linkedin-articles",
+      "name": "LinkedIn Articles",
+      "type": "professional_long_form",
+      "contentFit": [
+        "business_analysis",
+        "leadership",
+        "industry_commentary"
+      ],
+      "submissionRoute": "authorized_account_or_page",
+      "automationStatus": "capability_review_required",
+      "directPublishingAdapter": "not_implemented",
+      "editorialProfile": "Professional argument, evidence, implications, and practitioner insight.",
+      "officialUrl": "https://www.linkedin.com/",
+      "notes": [
+        "Also appears in the social registry; long-form article handling remains distinct from feed-post adaptation.",
+        "Do not assume API support for long-form article publishing."
+      ]
+    },
+    {
+      "id": "hackernoon",
+      "name": "HackerNoon",
+      "type": "editorially_reviewed_technology_publication",
+      "contentFit": [
+        "technology",
+        "software",
+        "startups",
+        "AI",
+        "engineering"
+      ],
+      "submissionRoute": "contributor_submission_and_editorial_review",
+      "automationStatus": "candidate_needs_current_guideline_check",
+      "directPublishingAdapter": "manual_submission_first",
+      "editorialProfile": "Original technical story with practical detail, a clear point of view, substantiated claims, and relevant technical visuals.",
+      "officialUrl": "https://hackernoon.com/",
+      "notes": [
+        "Candidate added for technology-focused editorial submissions.",
+        "Acceptance and current submission workflow must be checked before each campaign."
+      ]
+    },
+    {
+      "id": "dzone",
+      "name": "DZone",
+      "type": "editorially_reviewed_technology_publication",
+      "contentFit": [
+        "software_engineering",
+        "devops",
+        "cloud",
+        "data",
+        "architecture"
+      ],
+      "submissionRoute": "contributor_program_or_editorial_submission",
+      "automationStatus": "candidate_needs_current_guideline_check",
+      "directPublishingAdapter": "manual_submission_first",
+      "editorialProfile": "Technical article with actionable implementation detail, code/examples where relevant, and expert review.",
+      "officialUrl": "https://dzone.com/",
+      "notes": [
+        "Candidate added for technical articles, not general brand promotion.",
+        "Confirm current contributor program and editorial rules."
+      ]
+    },
+    {
+      "id": "the-gulf-magazine",
+      "name": "The Gulf Magazine",
+      "type": "editorial_magazine",
+      "contentFit": [
+        "Gulf_region",
+        "business",
+        "regional_analysis",
+        "reported_features",
+        "opinion"
+      ],
+      "submissionRoute": "guest_article_form_or_editorial_pitch",
+      "automationStatus": "submission_route_verified",
+      "directPublishingAdapter": "manual_submission_first",
+      "editorialProfile": "Original reporting, sourced analysis or evidence-backed opinion relevant to Gulf readers; disclose conflicts and provide author bio and source links.",
+      "officialUrl": "https://thegulfmagazine.com/submit-article",
+      "sourceUrl": "https://thegulfmagazine.com/contribution-guidelines",
+      "notes": [
+        "The publication states that an editor reviews submissions and publishes accepted work; submission is not guaranteed publication.",
+        "Do not automate submission until the user approves the exact pitch/article and disclosures."
+      ]
+    },
+    {
+      "id": "dawn-prism",
+      "name": "DAWN Prism",
+      "type": "editorial_magazine_section",
+      "contentFit": [
+        "South_Asia",
+        "Pakistan_and_diaspora",
+        "features",
+        "analysis",
+        "culture_and_society"
+      ],
+      "submissionRoute": "email_pitch_or_article_submission",
+      "automationStatus": "submission_guidelines_verified",
+      "directPublishingAdapter": "manual_submission_first",
+      "editorialProfile": "Original feature or analysis with a clear regional relevance, careful sourcing, short author bio, and separately supplied image captions and credits.",
+      "officialUrl": "https://www.dawn.com/prism/submit",
+      "sourceUrl": "https://www.dawn.com/contribution-guidelines/",
+      "notes": [
+        "DAWN asks contributors not to submit the same piece simultaneously to multiple desks or other newspapers.",
+        "Publication follows editorial review; no guarantee."
+      ]
+    },
+    {
+      "id": "i-by-imd",
+      "name": "I by IMD",
+      "type": "business_school_editorial_magazine",
+      "contentFit": [
+        "leadership",
+        "strategy",
+        "innovation",
+        "AI",
+        "digital_transformation",
+        "business"
+      ],
+      "submissionRoute": "formal_proposal_first",
+      "automationStatus": "submission_guidelines_verified",
+      "directPublishingAdapter": "manual_submission_first",
+      "editorialProfile": "Well-grounded, thought-provoking and actionable insights for leaders; proposal must precede a full article draft.",
+      "officialUrl": "https://www.imd.org/ibyimd/how-to-submit-content-to-ibyimd/",
+      "sourceUrl": "https://www.imd.org/ibyimd/how-to-submit-content-to-ibyimd/",
+      "notes": [
+        "The publication explicitly requests a formal proposal first and does not review unsolicited full drafts without proposal approval."
+      ]
+    },
+    {
+      "id": "972-magazine",
+      "name": "+972 Magazine",
+      "type": "independent_editorial_magazine",
+      "contentFit": [
+        "Middle_East",
+        "Palestine_Israel",
+        "regional_analysis",
+        "reported_features",
+        "investigations",
+        "opinion"
+      ],
+      "submissionRoute": "pitch_or_op_ed_submission",
+      "automationStatus": "submission_guidelines_verified",
+      "directPublishingAdapter": "manual_submission_first",
+      "editorialProfile": "Original reporting, analysis or opinion with a distinct insight, transparent sourcing, and clear explanation of why the story matters now.",
+      "officialUrl": "https://www.972mag.com/how-to-submit/",
+      "sourceUrl": "https://www.972mag.com/how-to-submit/",
+      "notes": [
+        "The magazine asks for a pitch explaining significance, reporting plan, access and expertise.",
+        "Editorial review and acceptance are required; do not auto-publish."
+      ]
+    }
+  ],
+  "excludedFromMagazineAutoPublishing": [
+    {
+      "id": "reddit",
+      "reason": "Community discussion platform; not a magazine submission destination."
+    },
+    {
+      "id": "quora",
+      "reason": "Question-and-answer platform; not a general article submission destination."
+    },
+    {
+      "id": "stack-exchange",
+      "reason": "Specialist Q&A communities; answers must directly solve questions."
+    },
+    {
+      "id": "wikipedia",
+      "reason": "Encyclopedia with neutrality, notability, sourcing and conflict-of-interest requirements; not a promotional publishing destination."
+    },
+    {
+      "id": "arxiv",
+      "reason": "Research preprint repository with scholarly eligibility requirements; not a press or marketing magazine."
+    },
+    {
+      "id": "pubmed-central",
+      "reason": "Biomedical literature repository; not a general editorial submission outlet."
+    },
+    {
+      "id": "github",
+      "reason": "Code and project hosting; not a general magazine."
+    },
+    {
+      "id": "common-crawl",
+      "reason": "Web archive/data source; not a publication destination."
+    },
+    {
+      "id": "huggingface-datasets",
+      "reason": "Dataset hosting; not a magazine."
+    }
+  ]
+}
