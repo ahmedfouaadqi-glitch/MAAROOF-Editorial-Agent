@@ -30,4 +30,33 @@ describe("editorial task lifecycle", () => {
     expect(() => advanceEditorialTask(state, { workspaceId: "workspace-1", taskId: task.id, nextStage: "drafting" })).toThrow("Invalid editorial transition");
     expect(advanceEditorialTask(state, { workspaceId: "workspace-1", taskId: task.id, nextStage: "planning" }).stage).toBe("planning");
   });
+  it("blocks drafting until an outline exists", () => {
+    const state = { tasks: {} as Record<string, any> };
+    const task = createEditorialTask(state, { workspaceId: "workspace-1", topic: "A sufficiently detailed topic" });
+    task.article.stage = "outline";
+    expect(() => advanceEditorialTask(state, { workspaceId: "workspace-1", taskId: task.id, nextStage: "drafting" }))
+      .toThrow("Create the editorial outline before drafting");
+  });
+
+  it("blocks source review until the full draft metadata and at least one source are present", () => {
+    const state = {
+      tasks: {} as Record<string, any>,
+      editorialDrafts: [{ workspaceId: "workspace-1", taskId: "task-id", title: "Title", metaTitle: "Meta", metaDescription: "Description", sections: [{ heading: "One", body: "Too short" }, { heading: "Two", body: "Too short" }] }],
+      sources: []
+    };
+    const task = createEditorialTask(state, { workspaceId: "workspace-1", topic: "A sufficiently detailed topic" });
+    state.editorialDrafts[0].taskId = task.id;
+    task.article.stage = "drafting";
+    expect(() => advanceEditorialTask(state, { workspaceId: "workspace-1", taskId: task.id, nextStage: "source-review" }))
+      .toThrow("Complete the article draft and register source references");
+  });
+
+  it("blocks publication readiness without a current human editorial approval", () => {
+    const state = { tasks: {} as Record<string, any>, editorialDrafts: [], sources: [], claims: [], researchEvidence: [], originalityChecks: [], editorialReviews: [] };
+    const task = createEditorialTask(state, { workspaceId: "workspace-1", topic: "A sufficiently detailed topic" });
+    task.article.stage = "editorial-approval";
+    expect(() => advanceEditorialTask(state, { workspaceId: "workspace-1", taskId: task.id, nextStage: "ready-to-publish" }))
+      .toThrow("current human approval");
+  });
+
 });
