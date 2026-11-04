@@ -10,7 +10,9 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "server": "node --env-file-if-exists=.env server/main.mjs",
-    "dev:api": "node --env-file-if-exists=.env server/main.mjs"
+    "dev:api": "node --env-file-if-exists=.env server/main.mjs",
+    "browser:worker": "node --env-file-if-exists=.env server/browser-worker.mjs",
+    "browser:install": "playwright install chromium"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -20,7 +22,8 @@
     "react-router-dom": "latest",
     "clsx": "latest",
     "tailwind-merge": "latest",
-    "class-variance-authority": "latest"
+    "class-variance-authority": "latest",
+    "playwright": "1.64.1"
   },
   "devDependencies": {
     "@types/react": "latest",
