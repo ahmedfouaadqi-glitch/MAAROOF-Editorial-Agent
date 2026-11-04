@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { FileCheck2, Link2, Plus, ScanSearch, ShieldAlert } from "lucide-react";
 import EditorialEntityPanel from "./EditorialEntityPanel";
+import EditorialResearchPanel from "./EditorialResearchPanel";
 
 type Source = { id: string; url: string; title: string; notes: string; registeredAt: string; fetched: false };
 type Claim = { id: string; text: string; sourceIds: string[]; evidenceState: string; createdAt: string };
@@ -123,6 +124,7 @@ export default function EditorialEvidencePanel({ apiBase, token, workspaceId, ar
         {originality && <pre className="originality-result">{JSON.stringify(originality, null, 2)}</pre>}
       </form>
       <EditorialEntityPanel apiBase={apiBase} token={token} workspaceId={workspaceId} taskId={article.id} locale={locale}/>
+      <EditorialResearchPanel apiBase={apiBase} token={token} workspaceId={workspaceId} taskId={article.id} locale={locale}/>
       <p className="evidence-disclaimer">{ar ? "تنبيه: ربط الادعاء بمصدر لا يعني التحقق من صحة المصدر أو الادعاء. فحص الأصالة يقارن فقط بالنصوص التي سبق إدخالها عبر هذه الأداة ضمن مساحة العمل، ولا يكشف إعادة الصياغة الدلالية أو الترجمة." : "Linking a claim to a source does not verify either one. Originality checks compare only text previously submitted through this tool in this workspace; semantic paraphrases and translations are not detected."}</p>
     </>}
     {notice && <p className="inline-feedback">{notice}</p>}
