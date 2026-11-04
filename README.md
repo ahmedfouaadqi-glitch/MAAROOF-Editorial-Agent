@@ -16,7 +16,9 @@ Lovable-compatible editorial production and verified publishing platform.
 - Platform profiles with conservative capability declarations, policy constraints, official documentation links where identified, and per-platform verification checklists.
 - Editorial workflow TypeScript contracts for intake, planning, research, entity analysis, drafting, evidence review, originality review, media review, editorial approval, publishing, and publication verification.
 - Fail-closed publishing gate: registry metadata cannot authorize publishing. Every adapter remains blocked until implementation, policy, account, credentials, human approval (when required), and idempotency checks pass.
-- Vitest test cases for registry completeness and fail-closed publishing behavior.
+- Vitest test cases for registry completeness, fail-closed publishing behavior, and per-article research budget enforcement.
+- Admin UI draft for configuring per-article Firecrawl crawl URL, search, and inspection limits (3 / 5 / 5 defaults).
+- Provider-neutral research budget ledger with independent per-task counters, pre-call reservation, limit blocking, and failed-call release.
 
 ## Platform registry policy
 The 17 listed entries are not all magazines. The registry separates editorial destinations, professional networks, communities, encyclopedic knowledge bases, research repositories, code hosts, and data sources. A listed platform is not presumed to accept promotional articles or automated publishing.
@@ -26,6 +28,7 @@ Official APIs are preferred where appropriate and authorized. Browser automation
 ## Deliberately not implemented yet
 - Supabase, database persistence, authentication, and RLS (deferred per current implementation instruction).
 - Live AI model calls, paid research, and provider credentials.
+- Durable server-side storage and atomic cross-worker enforcement for research budgets; the current admin controls are session-local UI state and are not yet production enforcement.
 - Real platform publishing adapters.
 - Playwright browser runtime and persistent authenticated sessions.
 - MAAROOF AI API integration.
