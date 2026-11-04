@@ -9,7 +9,7 @@ export function validateSearchRequest(input){
  if(!["auto","ar","en"].includes(language))fail("language must be auto, ar, or en");
  const country=typeof input.country==="string"?input.country.trim().toUpperCase():"IQ";
  if(!/^[A-Z]{2}$/.test(country))fail("country must be a two-letter ISO country code");
- return {query:input.query.trim(),limit,language,country,region:typeof input.region==="string"?input.region.trim().slice(0,80):""};
+ return {query:input.query.trim(),limit,language,country};
 }
 function normalizeResult(item,provider,retrievedAt){
  if(!item||typeof item.url!=="string"||typeof item.title!=="string")return null;
@@ -35,5 +35,5 @@ export async function executeResearchSearch(input,{provider}={}){
   seen.add(normalized.url);results.push(normalized);
   if(results.length>=request.limit)break;
  }
- return {query:request.query,language:request.language,region:request.region,provider:provider.id||"unidentified-provider",retrievedAt,results,limitations:["Search results are discovery leads, not verified sources.","Open and assess each result before citing it.","No source content was fetched or independently checked."]};
+ return {query:request.query,language:request.language,country:request.country,provider:provider.id||"unidentified-provider",retrievedAt,results,limitations:["Search results are discovery leads, not verified sources.","Open and assess each result before citing it.","No source content was fetched or independently checked."]};
 }
