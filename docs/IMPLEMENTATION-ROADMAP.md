@@ -19,7 +19,7 @@
 - [x] Add idempotent reservation, commit, and release operations for search/inspection quotas.
 - [ ] Connect a selected external search provider if live research is later required; no Firecrawl or crawler integration is planned.
 - [x] Implement claim-to-source linking with workspace/task isolation and source-link coverage reporting.\n- [ ] Implement evidence quality review (source credibility, recency, and whether the source actually supports each claim).
-- [ ] Implement entity and search-intent extraction.
+- [x] Add a typed, article-scoped entity registry with canonical names, aliases, and disambiguation notes.\n- [x] Add deterministic matching of registered aliases against editorial claims.\n- [x] Add explicit entity relationships linked to supporting claim IDs, with unverified evidence states.\n- [ ] Implement model-assisted named-entity recognition, entity resolution, and search-intent extraction after provider contracts and evaluation sets are ready.
 - [ ] Implement outline and bilingual article draft assembly.
 - [x] Add deterministic exact-match and token-overlap near-duplicate checks against previously submitted workspace text.\n- [ ] Add semantic, cross-language, and external-corpus originality checks; these require validated embeddings/models and a wider corpus.
 - [x] Add deterministic tests for evidence linking, workspace isolation, Arabic normalization, and exact-match detection.\n- [ ] Add deterministic tests for the remaining editorial engines.
@@ -52,7 +52,7 @@
 - [x] Add controlled one-stage-at-a-time article progression in the UI.
 - [x] Retain platform registry, capability inspector, and backend research settings.
 - [ ] Add authenticated user/workspace switching and role-based navigation.\n- [x] Add article-level evidence workspace UI for manual sources, claim linking, and local originality checks.
-- [ ] Add functional notifications, file/media upload, editorial evidence workspace, and approval inbox.
+- [ ] Add functional notifications, file/media upload, and approval inbox.\n- [x] Add article-level editorial evidence and entity intelligence workspaces.
 - [ ] Add browser-level responsive and accessibility tests.
 
 ## Acceptance rules
