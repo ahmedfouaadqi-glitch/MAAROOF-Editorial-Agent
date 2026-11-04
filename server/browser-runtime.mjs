@@ -50,13 +50,10 @@ function isPublicIp(address) {
   if (value === null) return false;
   const prefix = (bits, base) => (value >> BigInt(128 - bits)) === BigInt(base);
   if (value === 0n || value === 1n) return false;
-  if (prefix(7, 0x7en) || prefix(10, 0x3fan) || prefix(8, 0xffn) || prefix(32, 0x20010db8n)) return false;
-  const mappedPrefix = value >> 32n;
-  if (mappedPrefix === ((1n << 96n) - (1n << 32n))) {
-    const embedded = Number(value & 0xffffffffn);
-    const v4 = [24, 16, 8, 0].map(shift => (embedded >> shift) & 255).join(".");
-    return isPublicIp(v4);
-  }
+  // Permit only global-unicast IPv6 (2000::/3), then exclude special-purpose ranges.
+  if ((value >> 125n) !== 1n) return false;
+  if (prefix(7, 0x7en) || prefix(10, 0x3fan) || prefix(8, 0xffn)
+    || prefix(32, 0x20010db8n) || prefix(16, 0x2002n) || prefix(32, 0x20010000n)) return false;
   return true;
 }
 
@@ -74,12 +71,12 @@ function hostAllowed(host, approvedHosts) {
   return approvedHosts.some(allowed => value === allowed || value.endsWith("." + allowed));
 }
 
-export async function validatePublicUrl(input, approvedHosts, { resolveHost = lookup } = {}) {
+export async function validatePublicUrl(input, approvedHosts, { resolveHost = lookup, requireApprovedHost = true } = {}) {
   let url;
   try { url = new URL(input); } catch { fail("A valid destination URL is required", 400); }
   if (url.protocol !== "https:" || url.username || url.password) fail("Browser publishing accepts HTTPS URLs without embedded credentials only", 400);
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (!hostAllowed(host, approvedHosts)) fail("Navigation is outside the approved destination hosts", 403);
+  if (requireApprovedHost && !hostAllowed(host, approvedHosts)) fail("Navigation is outside the approved destination hosts", 403);
   if (isIP(host)) {
     if (!isPublicIp(host)) fail("Private or reserved IP targets are blocked", 403);
   } else {
@@ -125,8 +122,9 @@ export class BrowserSessionManager {
           const request = route.request();
           const raw = request.url();
           if (/^(about:|data:|blob:)/i.test(raw)) return route.continue();
-          const url = await validatePublicUrl(raw, hosts, { resolveHost: this.resolveHost });
-          if (request.isNavigationRequest() && !hostAllowed(url.hostname, hosts)) return route.abort("blockedbyclient");
+          const navigation = request.isNavigationRequest();
+          const url = await validatePublicUrl(raw, hosts, { resolveHost: this.resolveHost, requireApprovedHost: navigation });
+          if (navigation && !hostAllowed(url.hostname, hosts)) return route.abort("blockedbyclient");
           return route.continue();
         } catch {
           return route.abort("blockedbyclient");
