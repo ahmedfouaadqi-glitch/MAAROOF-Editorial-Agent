@@ -190,6 +190,18 @@ The adapter is disabled by default. No credentials, live requests, or paid API c
 
 The outline generator is deterministic and creates section prompts only. It does not generate factual prose, perform live research, or call an LLM. All draft operations verify that the task belongs to the requested workspace.
 
+## Draft-bound review, media rights, and final approval
+
+- `POST /api/v1/workspaces/:workspaceId/tasks/:taskId/originality/check-draft` — record a local originality result for the saved draft during the `originality-review` stage.
+- `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/media-review` — read the latest media decision and whether it still matches the saved draft.
+- `POST /api/v1/workspaces/:workspaceId/tasks/:taskId/media-review` — record `approved`, `not-required`, or `changes-requested` during `media-review`.
+- `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/approval` — return blockers, warnings, evidence counts, and current-version review state.
+- `POST /api/v1/workspaces/:workspaceId/tasks/:taskId/approval` — record `approved`, `changes-requested`, or `rejected` with reviewer and rationale during `editorial-approval`.
+
+Editorial and media decisions store a SHA-256 fingerprint of normalized draft text. Any subsequent edit makes the recorded decision stale for the new version. The current approval gate requires a complete draft, source references, linked claims and manual evidence excerpts, assessed sources, a current-draft local originality check, and a current media decision. The final `ready-to-publish` transition requires explicit human approval for that exact draft version.
+
+An approved media record requires an HTTP(S) asset reference, creator, license, attribution, alt text, and a human confirmation of usage rights. `not-required` explicitly records that the article has no media. This is not a file upload or independent license verification. A local originality no-match result is not proof of originality. Reaching `ready-to-publish` does not publish the article.
+
 ## Magazine pitch and submission tracking (manual handoff)
 
 - `POST /api/v1/workspaces/:workspaceId/tasks/:taskId/magazine-submissions` — create a local pitch record.
