@@ -1,8 +1,8 @@
-const MAX_QUERY_LENGTH = 500;
+const MAX_QUERY_LENGTH = 400;
 const MAX_RESULTS = 20;
 function fail(message,status=400){const error=new Error(message);error.status=status;throw error;}
 export function validateSearchRequest(input){
- if(!input||typeof input.query!=="string"||input.query.trim().length<2||input.query.length>400 || input.query.trim().split(/\\s+/).length>50)fail("query must contain 2-500 characters");
+ if(!input||typeof input.query!=="string"||input.query.trim().length<2||input.query.length>MAX_QUERY_LENGTH || input.query.trim().split(/\s+/).length>50)fail("query must contain 2-400 characters and at most 50 words");
  const limit=input.limit===undefined?10:input.limit;
  if(!Number.isSafeInteger(limit)||limit<1||limit>MAX_RESULTS)fail("limit must be an integer from 1 to 20");
  const language=input.language??"auto";
