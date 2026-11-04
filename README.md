@@ -21,6 +21,9 @@ Lovable-compatible editorial production and verified publishing platform.
 - Standalone Node.js API with admin bearer-token protection and local JSON persistence.
 - Workspace-scoped article research counters, idempotent reservations, commit/release operations, and source URL registration.
 - Manual source URLs are stored with title/notes and provenance. Their contents are not fetched or verified.
+- Article-level evidence workspace: manually register references, add factual claims, and link claims only to sources from the same workspace and article.
+- Claim coverage reports source-link completeness only; linked sources remain unverified until an evidence review is implemented.
+- Deterministic originality baseline: normalized SHA-256 exact-match checks and token-overlap near-match heuristics against text previously submitted in the same workspace.
 
 See [API route documentation](docs/API.md) for task creation, source registration, research reservations, and admin configuration. See [UI design system](docs/UI-DESIGN-SYSTEM.md) for the visual system and [React Bits integration notes](src/components/SpotlightCard.LICENSE.md) for component attribution and license.
 
