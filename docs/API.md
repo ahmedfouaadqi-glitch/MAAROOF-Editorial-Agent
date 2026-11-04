@@ -121,6 +121,9 @@ Supported entity types: `person`, `organization`, `place`, `product`, `event`, `
 The current scanner is deliberately limited to exact normalized matches against aliases entered by an operator. It does not perform named-entity recognition, discover new entities, resolve ambiguous identities across sources, infer relations from prose, or establish that a claim supports a relationship. Relationship evidence states remain `claim-linked-unverified` or `unsubstantiated`.
 
 
+## Live research search provider boundary
+A provider-neutral contract is implemented in `server/research-provider.mjs`. It validates bounded queries, normalizes and deduplicates HTTP(S) result URLs, and labels every result `search-result-unverified`. It fails closed when no provider is injected. No live search provider, API key, paid request, page fetch, or Firecrawl integration is configured. Search results are discovery leads and must be opened and assessed before they can support a claim.
+
 ## Editorial research and source assessment
 - `GET /api/v1/workspaces/:workspaceId/tasks/:taskId/research` — return article-scoped source assessments, evidence excerpts, and claim conflict summaries.
 - `PUT /api/v1/sources/assessment` — manually record source author, publisher, type, publication/update dates, effective period, jurisdiction, methodology, quality rating, and rationale.
