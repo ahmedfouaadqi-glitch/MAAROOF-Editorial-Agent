@@ -10,7 +10,7 @@ import { assessSource, recordEvidence, listResearch } from "./editorial-research
 import { recordVisibilityEvent, listVisibilityEvents, summarizeVisibility } from "./ai-visibility.mjs";
 import { createMagazineSubmission, listMagazineSubmissions, transitionMagazineSubmission } from "./magazine-submissions.mjs";
 import { buildEditorialOutline, getEditorialDraft, updateEditorialDraft } from "./editorial-drafts.mjs";
-import { executeResearchSearch, validateSearchRequest } from "./research-provider.mjs";
+import { runMeteredResearchSearch } from "./research-search-service.mjs";
 import { createBraveSearchProvider } from "./brave-search-provider.mjs";
 
 const port = Number(process.env.PORT || 8787);
@@ -187,36 +187,14 @@ const server = createServer(async (req, res) => {
       return send(res, 200, { searches, usage: task.usage || { search: 0 }, limitations: ["Search results are discovery leads, not verified evidence."] });
     }
     if (req.method === "POST" && searchCollection) {
-      if (!searchProvider) return send(res, 503, { error: "Live search is disabled. Configure RESEARCH_SEARCH_PROVIDER=brave and BRAVE_SEARCH_API_KEY on the server." });
       const body = await readJson(req);
       const workspaceId = decodeURIComponent(searchCollection[1]);
       const taskId = decodeURIComponent(searchCollection[2]);
-      const checked = validateSearchRequest(body);
-      const state = await store.read();
-      const task = state.tasks?.[taskId];
-      if (!task || task.workspaceId !== workspaceId || !task.article) return send(res, 404, { error: "Editorial task not found" });
-      const reservationId = "search-" + randomUUID();
-      const reservation = await store.transact(current => reserveBudget(current, {
-        workspaceId, taskId, operation: "search", units: 1, reservationId
-      }));
-      if (!reservation.allowed) return send(res, 429, { error: "Per-article search limit reached", quota: reservation });
-      let result;
-      try {
-        result = await executeResearchSearch(checked, { provider: searchProvider });
-      } catch (error) {
-        // Count a provider attempt conservatively: a timeout may occur after the request reached the provider.
-        await store.transact(current => commitReservation(current, { workspaceId, taskId, reservationId }));
-        throw error;
-      }
-      await store.transact(current => {
-        commitReservation(current, { workspaceId, taskId, reservationId });
-        current.researchSearches ||= [];
-        current.researchSearches.push({
-          id: randomUUID(), workspaceId, taskId, ...result, reservationId,
-          recordedAt: new Date().toISOString()
-        });
+      const outcome = await runMeteredResearchSearch({
+        store, provider: searchProvider, workspaceId, taskId, input: body
       });
-      return send(res, 200, { result, quota: reservation, verification: "unverified-search-results" });
+      if (!outcome.allowed) return send(res, 429, { error: "Per-article search limit reached", quota: outcome.quota });
+      return send(res, 200, outcome);
     }
 
     const reservationMatch = url.pathname.match(/^\/api\/v1\/tasks\/([^/]+)\/research-reservations$/);
