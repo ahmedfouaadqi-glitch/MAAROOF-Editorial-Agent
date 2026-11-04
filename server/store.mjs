@@ -5,7 +5,8 @@ const EMPTY = {
   version: 1,
   limits: { sourceUrlsPerArticle: 3, searchesPerArticle: 5, inspectionsPerArticle: 5 },
   tasks: {},
-  sources: []
+  sources: [],
+  researchSearches: []
 };
 
 export class JsonStore {
