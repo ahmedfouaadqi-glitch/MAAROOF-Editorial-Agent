@@ -4,7 +4,7 @@ Lovable-compatible editorial production and verified publishing platform.
 
 ## Architecture constraints
 - Frontend: React + Vite + TypeScript, Tailwind CSS, React Router.
-- Database/authentication: intentionally deferred in the current implementation track. Supabase is not being configured in this phase.
+- No Supabase or managed database is used. Local JSON persistence is used for the current single-process API prototype.
 - Application service: independent Node.js HTTP API with atomic single-process JSON persistence (implemented prototype; not horizontally scalable).
 - Browser publishing: isolated Playwright + Chromium runtime (planned; not implemented yet). Browser automation must never run in the frontend.
 - AI: provider-agnostic gateway (planned). No paid model calls are made by the current foundation.
@@ -29,7 +29,7 @@ Official APIs are preferred where appropriate and authorized. Browser automation
 - Supabase (explicitly excluded).
 - Automated web crawling, Firecrawl, and external search/inspection provider integrations (explicitly excluded/not configured).
 - Live AI model calls, paid research, and provider credentials.
-- Durable server-side storage and atomic cross-worker enforcement for research budgets; the current admin controls are session-local UI state and are not yet production enforcement.
+- Multi-instance durable database, user identity authentication, and cross-process quota coordination; current JSON persistence is single-process and admin-token protected.
 - Real platform publishing adapters.
 - Playwright browser runtime and persistent authenticated sessions.
 - MAAROOF AI API integration.
@@ -51,4 +51,4 @@ npm run build
 - Keep credentials and API secrets out of model prompts and frontend bundles.
 - Do not enable a platform adapter until its policy, account access, and end-to-end behavior have been verified.
 - Do not use research repositories, Q&A communities, or data archives as generic promotional publishing destinations.
-\n## Research acquisition policy\n\nNo Firecrawl or automated crawler is used. Source URLs are registered manually and are not fetched. Search and inspection quotas are available to a future explicitly configured provider; no live search provider is currently connected.\n
+\n## Research acquisition policy\n\nNo Firecrawl or automated crawler is used. Source URLs are registered manually and are not fetched. Search and inspection quotas are reserved by backend API endpoints, but no live search or inspection provider is currently connected.\n
