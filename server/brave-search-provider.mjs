@@ -6,11 +6,12 @@ export function createBraveSearchProvider({apiKey=process.env.BRAVE_SEARCH_API_K
  return {
   id:"brave-web-search",
   async search(request){
-   const params=new URLSearchParams({q:request.query,count:String(Math.min(request.limit,20)),country:(request.country||"IQ").toUpperCase(),safesearch:"moderate"});
-   if(request.language!=="auto")params.set("search_lang",request.language);
-   const response=await fetchImpl(ENDPOINT+"?"+params.toString(),{
-    method:"GET",headers:{"Accept":"application/json","X-Subscription-Token":apiKey},
-    signal:AbortSignal.timeout(timeoutMs)
+   const body={q:request.query,count:Math.min(request.limit,20),safesearch:"moderate"};
+   if(request.country)body.country=request.country;
+   if(request.language!=="auto")body.search_lang=request.language;
+   const response=await fetchImpl(ENDPOINT,{
+    method:"POST",headers:{"Accept":"application/json","Content-Type":"application/json","X-Subscription-Token":apiKey},
+    body:JSON.stringify(body),signal:AbortSignal.timeout(timeoutMs)
    }).catch(error=>{
     if(error?.name==="TimeoutError"||error?.name==="AbortError")throw providerError("Search provider timed out",504);
     throw providerError("Search provider could not be reached",502);
