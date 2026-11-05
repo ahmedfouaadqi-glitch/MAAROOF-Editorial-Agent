@@ -81,7 +81,7 @@ Model states explicitly: draft -> review-required -> approved-for-specific-actio
 ### 8. History and Memory
 History is conversation-centric. Workspace memory stores only useful, scoped facts such as brand voice, preferred terminology, target audiences, and approved destinations. Provide provenance and allow users to correct workspace context. Never blend memories across workspaces.
 
-## Skill intake policy — 84 archives / 69 unique skill names
+## Skill intake policy — 80 ZIP archives / 69 unique skill names
 
 The uploaded archives contain repeated versions and duplicated packages. Merge by capability, not by archive count. Inspect the complete SKILL.md, references, scripts, assets, licenses, runtime assumptions, and evaluation files before importing any skill.
 
