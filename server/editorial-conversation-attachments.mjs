@@ -22,7 +22,8 @@ const MIME_PROFILES = {
   "application/pdf": { kind: "document", extension: ".pdf", maxBytes: 25 * 1024 * 1024, matches: bytes => bytes.length >= 5 && bytes.toString("ascii", 0, 5) === "%PDF-" },
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { kind: "document", extension: ".docx", maxBytes: 25 * 1024 * 1024, matches: bytes => bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04 },
   "text/plain": { kind: "document", extension: ".txt", maxBytes: 5 * 1024 * 1024, matches: bytes => bytes.length > 0 && !bytes.subarray(0, Math.min(bytes.length, 4096)).includes(0) },
-  "text/markdown": { kind: "document", extension: ".txt", maxBytes: 5 * 1024 * 1024, matches: bytes => bytes.length > 0 && !bytes.subarray(0, Math.min(bytes.length, 4096)).includes(0) }
+  "text/markdown": { kind: "document", extension: ".txt", maxBytes: 5 * 1024 * 1024, matches: bytes => bytes.length > 0 && !bytes.subarray(0, Math.min(bytes.length, 4096)).includes(0) },
+  "text/csv": { kind: "document", extension: ".csv", maxBytes: 10 * 1024 * 1024, matches: bytes => bytes.length > 0 && !bytes.subarray(0, Math.min(bytes.length, 4096)).includes(0) }
 };
 
 function fail(message, status = 400) {
@@ -70,6 +71,7 @@ export async function createConversationAttachment({ req, store, workspaceId, co
   if (profile.extension === ".docx" && !originalName.toLowerCase().endsWith(".docx")) fail("The uploaded Word file must use the .docx extension", 415);
   if (profile.extension === ".pdf" && !originalName.toLowerCase().endsWith(".pdf")) fail("The uploaded PDF file must use the .pdf extension", 415);
   if (profile.extension === ".txt" && !/\.(txt|md)$/i.test(originalName)) fail("Text files must use .txt or .md", 415);
+  if (profile.extension === ".csv" && !originalName.toLowerCase().endsWith(".csv")) fail("CSV files must use the .csv extension", 415);
   const lengthHeader = header(req, "content-length");
   if (lengthHeader) {
     const length = Number(lengthHeader);
@@ -162,6 +164,41 @@ export async function deleteConversationAttachment({ store, workspaceId, convers
   return { id: removed.id, deleted: true };
 }
 
+export function parseCsvRows(input, { maxRows = 200, maxColumns = 40, maxCellChars = 4000 } = {}) {
+  if (typeof input !== "string") fail("CSV content must be text");
+  const rows = [];
+  let row = [], cell = "", quoted = false;
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+    if (quoted) {
+      if (char === '"' && input[index + 1] === '"') { cell += '"'; index += 1; }
+      else if (char === '"') quoted = false;
+      else cell += char;
+    } else if (char === '"' && cell.length === 0) quoted = true;
+    else if (char === ",") { row.push(cell.slice(0, maxCellChars)); cell = ""; }
+    else if (char === "\n" || char === "\r") {
+      if (char === "\r" && input[index + 1] === "\n") index += 1;
+      row.push(cell.slice(0, maxCellChars)); cell = "";
+      if (row.some(value => value.trim())) rows.push(row);
+      row = [];
+      if (rows.length > maxRows) fail(`CSV exceeds the ${maxRows}-row analysis limit`, 413);
+    } else cell += char;
+    if (row.length >= maxColumns) fail(`CSV exceeds the ${maxColumns}-column analysis limit`, 413);
+  }
+  if (quoted) fail("CSV contains an unterminated quoted field");
+  if (cell.length || row.length) { row.push(cell.slice(0, maxCellChars)); if (row.some(value => value.trim())) rows.push(row); }
+  if (rows.length > maxRows) fail(`CSV exceeds the ${maxRows}-row analysis limit`, 413);
+  if (!rows.length) return { headers: [], rows: [] };
+  const rawHeaders = rows[0].slice(0, maxColumns);
+  const headers = rawHeaders.map((value, index) => {
+    const base = value.trim().slice(0, 120) || `Column ${index + 1}`;
+    const duplicateCount = rawHeaders.slice(0, index).filter(item => item.trim() === value.trim()).length;
+    return duplicateCount ? `${base} (${duplicateCount + 1})` : base;
+  });
+  const records = rows.slice(1, maxRows + 1).map(values => Object.fromEntries(headers.map((header, index) => [header, (values[index] || "").slice(0, maxCellChars)])));
+  return { headers, rows: records };
+}
+
 async function videoFrames(filePath) {
   const frames = [];
   const warnings = [];
@@ -196,7 +233,10 @@ export async function extractConversationAttachmentContext({ store, workspaceId,
       let text = "";
       try {
         if (asset.mimeType === "text/plain" || asset.mimeType === "text/markdown") text = buffer.toString("utf8");
-        else if (asset.mimeType === "application/pdf") {
+        else if (asset.mimeType === "text/csv") {
+          const parsed = parseCsvRows(buffer.toString("utf8"));
+          text = `CSV HEADERS: ${JSON.stringify(parsed.headers)}\nCSV ROWS: ${JSON.stringify(parsed.rows)}`;
+        } else if (asset.mimeType === "application/pdf") {
           const parsed = await pdfParse(buffer, { max: 60 });
           text = parsed.text || "";
         } else if (asset.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
