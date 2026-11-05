@@ -151,6 +151,14 @@ export async function cancelEditorialConversationRun({ store, workspaceId, conve
     workspaceId, conversationId, runId: run.id, status: "cancelled",
     metadata: { ...(run.metadata || {}), cancelledAt: new Date().toISOString() }
   });
+  await store.transact(state => {
+    const job = (state.editorialJobQueue || []).find(item => item.id === run.id);
+    if (job?.status === "queued") {
+      job.status = "cancelled";
+      job.finishedAt = new Date().toISOString();
+      job.updatedAt = job.finishedAt;
+    }
+  });
   return { cancelled: true, activeRun, conversation: await getEditorialConversation(store, workspaceId, conversationId) };
 }
 
