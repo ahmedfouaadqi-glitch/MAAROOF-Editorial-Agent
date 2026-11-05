@@ -119,3 +119,17 @@ Decision record: `docs/ARCHITECTURE-DECISION-SINGLE-ADMIN.md`.
 - No tool-level cost estimator/approval ledger is wired into the conversation orchestrator yet.
 - There is no durable background queue across process restarts; execution currently uses in-process scheduling and JSON persistence.
 - Retry is explicit and bounded by run state, but exponential backoff, retryable error classification, and idempotent tool-level replay are not implemented.
+
+## Stage 4 — Multimodal intake (CSV increment)
+
+- Added CSV as an accepted conversation attachment type with a bounded local parser; no spreadsheet provider or external API is used.
+- CSV extraction handles quoted commas, escaped quotes, CRLF/newline records, UTF-8 BOM, duplicate/blank headers, and enforces row/column/cell limits before passing structured records into the model context.
+- Added tests for CSV parsing limits, malformed quoted fields, and attachment-to-context extraction.
+- Updated the conversation upload picker to accept .csv files.
+- CI commit 11e575cd827dec6ca8cf6c1a0d4162def33f66c4 passed TypeScript typecheck, 212 tests across 40 files, and production build (run 41963872970).
+
+### Stage 4 still incomplete
+- XLSX workbook parsing, multiple sheets, formulas/cell types, and size/sheet bounds are not implemented.
+- Video audio extraction/transcription is not implemented; current video processing remains limited to supported frame extraction and metadata.
+- URL ingestion/retrieval is not wired into conversation intake.
+- Image semantic understanding depends on a configured vision-capable model; metadata extraction is not visual fact verification.
