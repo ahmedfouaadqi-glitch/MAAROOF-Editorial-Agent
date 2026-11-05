@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { resolve } from "node:path";
 import { JsonStore } from "./store.mjs";
+import { createWorkspace, getWorkspace, listWorkspaces, updateWorkspace } from "./editorial-workspaces.mjs";
 import { DEFAULT_LIMITS, validateLimits, reserveBudget, releaseReservation, commitReservation } from "./research-budget.mjs";
 import { createEditorialTask, listEditorialTasks, advanceEditorialTask } from "./editorial-tasks.mjs";
 import { registerClaim, listClaims, checkOriginality } from "./editorial-evidence.mjs";
@@ -123,6 +124,28 @@ const server = createServer(async (req, res) => {
     }
 
     requireAdmin(req);
+
+    if (url.pathname === "/api/v1/workspaces" && req.method === "GET") {
+      const state = await store.read();
+      return send(res, 200, { workspaces: listWorkspaces(state) });
+    }
+    if (url.pathname === "/api/v1/workspaces" && req.method === "POST") {
+      const body = await readJson(req);
+      const workspace = await store.transact(state => createWorkspace(state, body));
+      return send(res, 201, { workspace });
+    }
+    const workspaceItem = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)$/);
+    if (workspaceItem && req.method === "GET") {
+      const workspaceId = decodeURIComponent(workspaceItem[1]);
+      const state = await store.read();
+      return send(res, 200, { workspace: getWorkspace(state, workspaceId) });
+    }
+    if (workspaceItem && req.method === "PATCH") {
+      const workspaceId = decodeURIComponent(workspaceItem[1]);
+      const body = await readJson(req);
+      const workspace = await store.transact(state => updateWorkspace(state, workspaceId, body));
+      return send(res, 200, { workspace });
+    }
 
     if (req.method === "GET" && url.pathname === "/api/v1/editorial-targets") {
       return send(res, 200, { targets: listEditorialTargets() });
