@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { commitReservation, reserveBudget } from "./research-budget.mjs";
 import { executeResearchSearch, validateSearchRequest } from "./research-provider.mjs";
 function fail(message,status=400){const error=new Error(message);error.status=status;throw error;}
@@ -8,9 +8,11 @@ export async function runMeteredResearchSearch({store,provider,workspaceId,taskI
  const snapshot=await store.read();
  const task=snapshot.tasks?.[taskId];
  if(!task||task.workspaceId!==workspaceId||!task.article)fail("Editorial task not found",404);
- const reservationId=typeof operationId==="string"&&operationId.length>=8&&operationId.length<=128 ? "search-"+operationId : "search-"+randomUUID();
+ if(operationId!==undefined&&operationId!==null&&(typeof operationId!=="string"||operationId.length<8||operationId.length>128||!/^[A-Za-z0-9._:-]+$/.test(operationId)))fail("operationId must be 8-128 safe characters");
+ const reservationId=typeof operationId==="string" ? "search-"+operationId : "search-"+randomUUID();
+ const requestFingerprint=createHash("sha256").update(JSON.stringify(request)).digest("hex");
  const prior=(snapshot.researchSearches||[]).find(item=>item.workspaceId===workspaceId&&item.taskId===taskId&&item.reservationId===reservationId);
- if(prior)return {allowed:true,replayed:true,result:prior,verification:"unverified-search-results"};
+ if(prior){if(prior.requestFingerprint!==requestFingerprint)fail("This operation ID was already used for a different search request.",409);return {allowed:true,replayed:true,result:prior,verification:"unverified-search-results"};}
  if(snapshot.tasks[taskId].reservations?.[reservationId])fail("This search operation was already started but has no saved result. Check its state before using a new operation ID.",409);
  const reservation=await store.transact(state=>reserveBudget(state,{workspaceId,taskId,operation:"search",units:1,reservationId}));
  if(!reservation.allowed)return {allowed:false,quota:reservation};
@@ -25,7 +27,7 @@ export async function runMeteredResearchSearch({store,provider,workspaceId,taskI
  const saved=await store.transact(state=>{
   commitReservation(state,{workspaceId,taskId,reservationId});
   state.researchSearches||=[];
-  const record={id:randomUUID(),workspaceId,taskId,...result,reservationId,recordedAt:new Date().toISOString()};
+  const record={id:randomUUID(),workspaceId,taskId,...result,reservationId,requestFingerprint,recordedAt:new Date().toISOString()};
   state.researchSearches.push(record);
   const current=state.tasks[taskId];const limit=state.limits.searchesPerArticle;
   return {record,quota:{operation:"search",used:current.usage.search,limit,remaining:Math.max(0,limit-current.usage.search),reservationId,status:current.reservations[reservationId].status}};
