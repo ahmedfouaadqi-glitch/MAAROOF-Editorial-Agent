@@ -128,11 +128,13 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
   }
   const language = initialConversation.language;
   const steps = stepsFor(language);
+  const runContext = { ...(initialConversation.activeRun?.metadata || {}) };
   const setRun = async (status = "running", extra = {}) => {
     if (controller.signal.aborted) throw Object.assign(new Error("Editorial run cancelled"), { name: "AbortError" });
+    Object.assign(runContext, extra);
     return updateEditorialConversationRun(store, {
       workspaceId, conversationId, runId, status,
-      metadata: { ...progress(steps), ...extra }
+      metadata: { ...runContext, ...progress(steps) }
     });
   };
   const setStep = async (id, status, note = "") => {
