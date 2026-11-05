@@ -67,3 +67,9 @@ Decision record: `docs/ARCHITECTURE-DECISION-SINGLE-ADMIN.md`.
 - Vercel status is FAILURE with a target URL indicating a build-rate-limit/plan restriction (upgradeToPro=build-rate-limit). This is an infrastructure/account limit signal, not a code-level build result; no successful preview build is claimed.
 - No local test execution is available through the current connected repository tools.
 - PR remains open and draft. No merge or production deployment was performed.
+
+### Workspace-switch cleanup follow-up
+- Chat state is reset when the active workspace changes; the conversation list reloads against the new workspace route.
+- Pending conversation handoffs and browser publishing drawer/draft state are cleared on workspace change.
+- Latest recorded code commit: fbae9fecc9b82d7779d3c71a4ccfe35531d6061c.
+- Latest Vercel check remains failed due to the build-rate-limit/plan restriction; GitHub Actions workflow lookup still returns no run. Code validation remains outstanding.
