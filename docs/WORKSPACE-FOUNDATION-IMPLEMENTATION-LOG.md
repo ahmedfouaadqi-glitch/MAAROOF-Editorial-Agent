@@ -104,3 +104,18 @@ Decision record: `docs/ARCHITECTURE-DECISION-SINGLE-ADMIN.md`.
 2. Resolve Vercel preview build availability or provide another controlled preview environment.
 3. Complete the broader browser-worker adversarial review, especially DNS rebinding/TOCTOU behavior and redirect/subresource edge cases.
 4. Continue Stage 3: formalize and test the conversation orchestrator's plan/act/observe/reflect lifecycle, retry/cancel behavior, step provenance, and cost gates.
+## Stage 3 — Orchestration controls (initial increment)
+
+- Added a persisted, structured execution plan to each conversation run: task type, workspace, language, destination, input message, attachment IDs, external-action flags, and per-step requirement/status/reason.
+- The plan explicitly marks web search, page crawl, and publishing as disabled in this conversation execution path; discovery, retrieval, and external evidence remain skipped rather than being presented as completed.
+- Progress updates now preserve run metadata (including startedAt, retryCount, retryOfRunId, and the execution plan) instead of overwriting it on every step transition.
+- Added an explicit retry API for failed/cancelled runs. It reuses the last user message without duplicating it, refuses retries while a run is queued/running or after a completed run, and scopes retry to the owning workspace.
+- Added a Retry control in the conversation UI for failed/cancelled runs. This is a user-initiated retry, not an automatic loop.
+- CI commit 5980ccfa7fa3273a7be816568358746d5fca78b5 passed typecheck, 210 tests across 40 files, and production build (GitHub Actions run 41963607922).
+
+### Stage 3 still incomplete
+- The runner still executes a fixed editorial-draft workflow; it does not yet dynamically choose arbitrary internal tools based on a structured intent classifier.
+- Live research discovery/retrieval/evidence collection is not integrated into the chat runner and remains explicitly skipped.
+- No tool-level cost estimator/approval ledger is wired into the conversation orchestrator yet.
+- There is no durable background queue across process restarts; execution currently uses in-process scheduling and JSON persistence.
+- Retry is explicit and bounded by run state, but exponential backoff, retryable error classification, and idempotent tool-level replay are not implemented.
