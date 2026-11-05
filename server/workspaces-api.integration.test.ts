@@ -184,6 +184,34 @@ describe("workspace API integration", () => {
     expect(archivedWrite.status).toBe(404);
   });
 
+  it("isolates browser publishing destinations and session listings", async () => {
+    const aResponse = await api("/api/v1/workspaces", { method: "POST", body: JSON.stringify({ name: "Browser Boundary A" }) });
+    const bResponse = await api("/api/v1/workspaces", { method: "POST", body: JSON.stringify({ name: "Browser Boundary B" }) });
+    const a = (await aResponse.json() as any).workspace;
+    const b = (await bResponse.json() as any).workspace;
+
+    const destinationResponse = await api(`/api/v1/workspaces/${a.id}/browser-destinations`, {
+      method: "POST",
+      body: JSON.stringify({
+        name: "Authorized Publisher", homepage: "https://publisher.example",
+        editorUrl: "https://publisher.example/editor", approvedHosts: [],
+        titleSelector: "", bodySelector: "", authorityConfirmed: true, policyReviewed: true
+      })
+    });
+    expect(destinationResponse.status).toBe(201);
+    const destination = (await destinationResponse.json() as any).destination;
+
+    const ownDestinations = await api(`/api/v1/workspaces/${a.id}/browser-destinations`);
+    const foreignDestinations = await api(`/api/v1/workspaces/${b.id}/browser-destinations`);
+    expect((await ownDestinations.json() as any).destinations.map((item: any) => item.id)).toContain(destination.id);
+    expect((await foreignDestinations.json() as any).destinations).toHaveLength(0);
+
+    const ownSessions = await api(`/api/v1/workspaces/${a.id}/browser-sessions`);
+    const foreignSessions = await api(`/api/v1/workspaces/${b.id}/browser-sessions`);
+    expect((await ownSessions.json() as any).sessions).toHaveLength(0);
+    expect((await foreignSessions.json() as any).sessions).toHaveLength(0);
+  });
+
   it("rejects unknown workspace IDs in body-scoped operations", async () => {
     const response = await api("/api/v1/claims", {
       method: "POST",
