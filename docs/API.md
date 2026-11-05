@@ -324,3 +324,8 @@ The default quota is 5 inspections per article. An inspection reports word count
 
 - `GET /api/v1/workspaces/:workspaceId/library` — list saved conversation drafts for the requested workspace. Results are derived from persisted conversation drafts and are filtered by workspace ownership.
 - `POST /api/v1/workspaces/:workspaceId/conversations/:conversationId/cancel` — cooperatively cancel the queued/running editorial generation for that conversation. The server aborts the in-flight model request when it is active and records the run as cancelled. It does not undo already completed external actions; the conversation runner performs no publishing.
+
+
+### Conversation run execution metadata
+
+Conversation run metadata now records a bounded `lifecycle` trace for the Plan/Act/Observe/Reflect phases and structured `toolOutcomes` entries. Each outcome contains a tool identifier, one of `completed`, `skipped`, `failed`, or `needs-review`, a timestamp, and a small allow-listed details object. Provider errors, prompts, credentials, source URLs, and raw model output are not copied into these outcome records. Research discovery, page retrieval, and evidence review are explicitly recorded as skipped while those capabilities remain disconnected from the chat runner. These records are execution telemetry, not evidence that an external tool ran.
