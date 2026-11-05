@@ -6,7 +6,7 @@ import { createServer as createNetServer } from "node:net";
 import { spawn } from "node:child_process";
 
 const token = "test-admin-token-for-workspace-api";
-let directory: string;
+let directory = "";
 let baseUrl = "";
 let child: ReturnType<typeof spawn> | null = null;
 
