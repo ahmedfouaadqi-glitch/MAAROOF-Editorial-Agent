@@ -62,7 +62,7 @@ export async function createConversationAttachment({ req, store, workspaceId, co
   if (storedBytes >= MAX_TOTAL_BYTES) fail("Local media storage quota is full", 413);
   const mimeType = header(req, "content-type").split(";")[0].trim().toLowerCase();
   const profile = MIME_PROFILES[mimeType];
-  if (!profile) fail("Supported files: JPEG, PNG, WebP, MP4, WebM, PDF, DOCX, and TXT", 415);
+  if (!profile) fail("Supported files: JPEG, PNG, WebP, MP4, WebM, PDF, DOCX, TXT, Markdown, and CSV", 415);
   const descriptionHeader = header(req, "x-media-description");
   const description = descriptionHeader ? decodeHeader(descriptionHeader, "File description").trim() : "";
   if (description.length > 800) fail("File description must be at most 800 characters");
@@ -183,7 +183,7 @@ export function parseCsvRows(input, { maxRows = 200, maxColumns = 40, maxCellCha
       row = [];
       if (rows.length > maxRows) fail(`CSV exceeds the ${maxRows}-row analysis limit`, 413);
     } else cell += char;
-    if (row.length >= maxColumns) fail(`CSV exceeds the ${maxColumns}-column analysis limit`, 413);
+    if (row.length > maxColumns) fail(`CSV exceeds the ${maxColumns}-column analysis limit`, 413);
   }
   if (quoted) fail("CSV contains an unterminated quoted field");
   if (cell.length || row.length) { row.push(cell.slice(0, maxCellChars)); if (row.some(value => value.trim())) rows.push(row); }
