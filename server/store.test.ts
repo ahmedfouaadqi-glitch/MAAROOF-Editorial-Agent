@@ -6,7 +6,7 @@ import { JsonStore, migrateLegacyWorkspaceOwnership } from "./store.mjs";
 
 describe("legacy workspace ownership migration", () => {
   it("assigns unscoped legacy conversations and their uniquely linked attachments to the default workspace", () => {
-    const state = {
+    const state: any = {
       editorialConversations: [
         { id: "legacy-1", messages: [] },
         { id: "already-scoped", workspaceId: "client-workspace", messages: [] }
