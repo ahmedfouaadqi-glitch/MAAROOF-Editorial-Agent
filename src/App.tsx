@@ -378,7 +378,7 @@ export default function App() {
       </header>
 
       <div className={`page-content ${view === "chat" ? "chat-page" : ""}`}>
-        {view === "history" && <ConversationHistoryView apiBase={apiBase} token={adminToken} workspaceId={workspaceId} locale={locale} onOpenConversation={id => { setPendingConversationId(id); setView("chat"); }}/>}
+        {view === "history" && <ConversationHistoryView apiBase={apiBase} token={adminToken} workspaceId={workspaceId} locale={locale} onOpenConversation={id => { setPendingConversationId(id || null); setView("chat"); }}/>}
         {view === "workspaces" && <section className="page-section workspace-page">
           <PageHeading eyebrow={locale === "ar" ? "إدارة السياقات المستقلة" : "WORKSPACE MANAGEMENT"} title={locale === "ar" ? "مساحات العمل" : "Workspaces"} subtitle={locale === "ar" ? "كل مساحة تحتفظ بمحادثاتها وملفاتها ومخرجاتها بصورة مستقلة." : "Each workspace keeps its conversations, files, and outputs isolated."}/>
           <div className="workspace-manager surface-card">
