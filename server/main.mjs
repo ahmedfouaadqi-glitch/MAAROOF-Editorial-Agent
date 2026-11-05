@@ -26,7 +26,7 @@ import { createMediaAsset, deleteMediaAsset, listMediaAssets, resolveMediaAssetF
 import { getGeoBrief, getGeoReadiness, updateGeoBrief } from "./editorial-geo.mjs";
 import { listEditorialBrands, listEditorialClients } from "./editorial-identities.mjs";
 import { createBrowserAgentClient } from "./browser-agent-client.mjs";
-import { createEditorialConversation, listEditorialConversations, getEditorialConversation, appendEditorialConversationMessage, updateEditorialConversationRun, recoverInterruptedEditorialConversationRuns } from "./editorial-conversations.mjs";
+import { createEditorialConversation, listEditorialConversations, getEditorialConversation, appendEditorialConversationMessage, updateEditorialConversationRun, recoverInterruptedEditorialConversationRuns, enqueueEditorialConversationJob, claimNextEditorialConversationJob, finishEditorialConversationJob } from "./editorial-conversations.mjs";
 import { listEditorialLibraryItems } from "./editorial-library.mjs";
 import { createConversationAttachment, listConversationAttachments, resolveConversationAttachmentFile, deleteConversationAttachment } from "./editorial-conversation-attachments.mjs";
 import { listEditorialTargets } from "./editorial-targets.mjs";
@@ -61,6 +61,44 @@ const configuredModelTokens = Number(process.env.MODEL_MAX_OUTPUT_TOKENS || 3000
 const modelMaxOutputTokens = Number.isSafeInteger(configuredModelTokens) && configuredModelTokens >= 256 && configuredModelTokens <= 8192 ? configuredModelTokens : 3000;
 const configuredModelRequests = Number(process.env.MODEL_REQUESTS_PER_ARTICLE || 2);
 const modelRequestsPerArticle = Number.isSafeInteger(configuredModelRequests) && configuredModelRequests >= 1 && configuredModelRequests <= 10 ? configuredModelRequests : 2;
+
+let editorialQueueDrainScheduled = false;
+let editorialQueueDraining = false;
+function scheduleEditorialQueueDrain() {
+  if (editorialQueueDrainScheduled || editorialQueueDraining) return;
+  editorialQueueDrainScheduled = true;
+  setImmediate(() => { void drainEditorialConversationQueue(); });
+}
+async function drainEditorialConversationQueue() {
+  if (editorialQueueDraining) return;
+  editorialQueueDrainScheduled = false;
+  editorialQueueDraining = true;
+  try {
+    while (true) {
+      const job = await claimNextEditorialConversationJob(store);
+      if (!job) break;
+      try {
+        const outcome = await runEditorialConversation({
+          store, provider: modelProvider, workspaceId: job.workspaceId,
+          conversationId: job.conversationId, runId: job.id,
+          userMessageId: job.userMessageId, mediaDir: job.mediaDir || mediaDir
+        });
+        const status = outcome.status === "completed" ? "completed"
+          : outcome.status === "cancelled" ? "cancelled" : "failed";
+        await finishEditorialConversationJob(store, job.id, status, outcome.errorCode || null);
+      } catch (error) {
+        await finishEditorialConversationJob(store, job.id, "failed", "worker-error").catch(() => {});
+        console.error("Editorial queue worker failed:", error?.message || "unknown error");
+      }
+    }
+  } catch (error) {
+    console.error("Editorial queue drain failed:", error?.message || "unknown error");
+  } finally {
+    editorialQueueDraining = false;
+    const state = await store.read().catch(() => null);
+    if (state?.editorialJobQueue?.some(job => job.type === "editorial-conversation" && job.status === "queued")) scheduleEditorialQueueDrain();
+  }
+}
 
 function send(res, status, payload) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
@@ -231,10 +269,8 @@ const server = createServer(async (req, res) => {
         workspaceId, conversationId, runId, status: "queued",
         metadata: { ...initialProgress, queuedAt: new Date().toISOString(), userMessageId: message.id }
       });
-      setImmediate(() => {
-        void runEditorialConversation({ store, provider: modelProvider, workspaceId, conversationId, runId, userMessageId: message.id, mediaDir })
-          .catch(error => console.error("Editorial conversation run failed:", error?.message || "unknown error"));
-      });
+      await enqueueEditorialConversationJob(store, { workspaceId, conversationId, runId, userMessageId: message.id, mediaDir });
+      scheduleEditorialQueueDrain();
       return send(res, 202, { accepted: true, runId, message, conversation: await getEditorialConversation(store, workspaceId, conversationId) });
     }
 
@@ -256,10 +292,8 @@ const server = createServer(async (req, res) => {
         workspaceId, conversationId, runId, status: "queued",
         metadata: { ...initialProgress, queuedAt: new Date().toISOString(), retryCount, retryOfRunId: previousRun?.id || null }
       });
-      setImmediate(() => {
-        void runEditorialConversation({ store, provider: modelProvider, workspaceId, conversationId, runId, userMessageId: userMessage.id, mediaDir })
-          .catch(error => console.error("Editorial conversation retry failed:", error?.message || "unknown error"));
-      });
+      await enqueueEditorialConversationJob(store, { workspaceId, conversationId, runId, userMessageId: userMessage.id, mediaDir });
+      scheduleEditorialQueueDrain();
       return send(res, 202, { accepted: true, runId, retriedMessageId: userMessage.id, conversation: await getEditorialConversation(store, workspaceId, conversationId) });
     }
 
@@ -862,8 +896,9 @@ const server = createServer(async (req, res) => {
 
 await store.init();
 const recovery = await recoverInterruptedEditorialConversationRuns(store);
-if (recovery.recovered) console.warn(`Recovered ${recovery.recovered} interrupted editorial run(s); manual retry is required.`);
+if (recovery.recovered || recovery.recoveredJobs) console.warn(`Recovered ${recovery.recovered} interrupted editorial run(s) and ${recovery.recoveredJobs} uncertain queue job(s); manual retry is required for interrupted work.`);
 server.listen(port, host, () => {
+  scheduleEditorialQueueDrain();
   console.log(`MAAROOF Editorial API listening on http://${host}:${port}`);
   console.log(`Supabase: disabled | Firecrawl: ${firecrawlProvider ? "enabled" : "disabled"} | Persistence: local JSON`);
 });
