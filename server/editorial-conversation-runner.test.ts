@@ -85,6 +85,12 @@ describe("editorial conversation workflow", () => {
     expect(savedFirst.activeRun?.metadata?.executionPlan).toMatchObject({ taskType: "editorial-draft", externalActions: { webSearch: false, pageCrawl: false, publish: false } });
     expect(savedFirst.activeRun?.metadata?.executionPlan?.steps.find((step: any) => step.id === "draft")?.status).toBe("completed");
     expect(savedFirst.activeRun?.metadata?.finishedAt).toBeTruthy();
+    expect(savedFirst.activeRun?.metadata?.lifecycle?.map((event: any) => event.phase)).toEqual(expect.arrayContaining(["plan", "act", "observe", "reflect"]));
+    expect(savedFirst.activeRun?.metadata?.toolOutcomes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ tool: "research-discovery", status: "skipped" }),
+      expect.objectContaining({ tool: "model-draft-generation", status: "completed" }),
+      expect.objectContaining({ tool: "workspace-originality-screen", status: "completed" })
+    ]));
 
     const secondUserMessage = await appendEditorialConversationMessage(store, {
       workspaceId: "workspace-1", conversationId: conversation.id, role: "user", targetId: "linkedin",
