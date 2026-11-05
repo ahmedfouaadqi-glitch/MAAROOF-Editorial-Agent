@@ -66,10 +66,10 @@ export function analyzeOriginality(state, workspaceId, candidateText, {
     comparedByType: comparison.comparedByType,
     signal: {
       strongestLexicalSimilarity: Number(strongestSimilarity.toFixed(4)),
-      interpretation: reviewRequired
-        ? "Potential overlap detected; a human must inspect the matched passages, context, attribution, and reuse permissions."
-        : candidateWordCount < minCandidateWords
-          ? "The candidate is too short for a useful comparison."
+      interpretation: candidateWordCount < minCandidateWords
+        ? "The candidate is too short for a useful comparison; human review is required."
+        : reviewRequired
+          ? "Potential overlap detected; a human must inspect the matched passages, context, attribution, and reuse permissions."
           : "No qualifying match was found in the available workspace corpus. This is not proof of originality."
     },
     findings,
