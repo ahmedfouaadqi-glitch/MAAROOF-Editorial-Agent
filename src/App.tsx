@@ -21,7 +21,7 @@ import { adapterRegistry } from "./data/adapter-registry";
 import { magazinePublications } from "./data/magazine-publications";
 import editorialTargetCatalog from "../config/editorial-targets.json";
 
-type View = "chat" | "home" | "articles" | "library" | "registry" | "research-settings" | "ai-visibility" | "magazine-submissions";
+type View = "chat" | "history" | "workspaces" | "home" | "articles" | "library" | "registry" | "research-settings" | "ai-visibility" | "magazine-submissions";
 type Article = { id: string; topic: string; language: string; objective: string; stage: string; createdAt: string; clientId?: string; clientName?: string; brandId?: string; brandName?: string };
 type Locale = "ar" | "en";
 const NEXT_STAGE: Record<string, string> = { intake: "planning", planning: "research", research: "entity-analysis", "entity-analysis": "outline", outline: "drafting", drafting: "source-review", "source-review": "originality-review", "originality-review": "media-review", "media-review": "editorial-approval", "editorial-approval": "ready-to-publish" };
@@ -331,21 +331,13 @@ export default function App() {
   }
 
   const navItems = [
-    { id: "chat" as const, label: copy.chat, icon: MessageSquare },
-    { id: "home" as const, label: copy.overview, icon: LayoutDashboard },
-    { id: "articles" as const, label: copy.articles, icon: FileText },
-    { id: "library" as const, label: copy.library, icon: Library },
-    { id: "magazine-submissions" as const, label: locale === "ar" ? "تقديمات المجلات" : "Magazine submissions", icon: BookOpenText },
-    { id: "registry" as const, label: copy.registry, icon: Globe2 },
-    { id: "research-settings" as const, label: copy.settings, icon: SlidersHorizontal },
-    { id: "ai-visibility" as const, label: copy.visibility, icon: Activity }
+    { id: "chat" as const, label: locale === "ar" ? "المحادثة" : "Conversation", icon: MessageSquare },
+    { id: "history" as const, label: locale === "ar" ? "السجل" : "History", icon: History },
+    { id: "workspaces" as const, label: locale === "ar" ? "مساحات العمل" : "Workspaces", icon: Layers3 }
   ];
-  const navGroups = [
-    { label: locale === "ar" ? "الإنتاج التحريري" : "EDITORIAL", items: navItems.filter(item => ["chat", "home", "articles", "library", "magazine-submissions"].includes(item.id)) },
-    { label: locale === "ar" ? "الاستكشاف والأدلة" : "DISCOVERY & EVIDENCE", items: navItems.filter(item => ["registry", "ai-visibility"].includes(item.id)) },
-    { label: locale === "ar" ? "الإدارة" : "MANAGEMENT", items: navItems.filter(item => ["research-settings"].includes(item.id)) }
-  ];
+  const navGroups = [{ label: locale === "ar" ? "مساحة العمل" : "WORKSPACE", items: navItems }];
   const destinationCount = platforms.filter(p => p.category === "editorial").length;
+  const activeWorkspace = workspaces.find(item => item.id === workspaceId);
 
   return <div className={`app-shell ${theme === "dark" ? "theme-dark" : "theme-light"} ${browserDrawerOpen ? "browser-drawer-open" : ""}`} dir={locale === "ar" ? "rtl" : "ltr"} lang={locale}>
     <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
@@ -354,23 +346,7 @@ export default function App() {
         <span className="brand-copy"><strong>MAAROOF</strong><small>EDITORIAL AGENT</small></span>
         <span className="brand-version">BETA</span>
       </button>
-        <section className="workspace-manager surface-card" aria-label={locale === "ar" ? "إدارة مساحات العمل" : "Workspace manager"}>
-          <label className="workspace-select-label">{locale === "ar" ? "مساحة العمل الحالية" : "Current workspace"}</label>
-          <select aria-label={locale === "ar" ? "اختيار مساحة العمل" : "Select workspace"} value={workspaceId} disabled={!adminToken.trim() || busy} onChange={event => setWorkspaceId(event.target.value)}>
-            {workspaces.filter(item => item.status !== "archived").map(item => <option key={item.id} value={item.id}>{item.name}{item.isDefault ? (locale === "ar" ? " · افتراضية" : " · Default") : ""}</option>)}
-            {!workspaces.length && <option value="main-workspace">{locale === "ar" ? "مساحة العمل الرئيسية" : "Main workspace"}</option>}
-          </select>
-          <input value={workspaceNameDraft} onChange={event => setWorkspaceNameDraft(event.target.value)} disabled={!adminToken.trim() || busy} maxLength={100} placeholder={locale === "ar" ? "اسم مساحة العمل" : "Workspace name"} aria-label={locale === "ar" ? "اسم مساحة العمل" : "Workspace name"}/>
-          <div className="workspace-manager-actions">
-            <button type="button" disabled={!adminToken.trim() || busy || workspaceNameDraft.trim().length < 2} onClick={createWorkspace}>{locale === "ar" ? "إنشاء" : "Create"}</button>
-            <button type="button" disabled={!adminToken.trim() || busy || workspaceNameDraft.trim().length < 2 || workspaceId === "main-workspace"} onClick={renameWorkspace}>{locale === "ar" ? "إعادة تسمية" : "Rename"}</button>
-            <button type="button" disabled={!adminToken.trim() || busy || workspaceId === "main-workspace"} onClick={archiveWorkspace}>{locale === "ar" ? "أرشفة" : "Archive"}</button>
-          </div>
-          <button type="button" className="workspace-archived-toggle" disabled={!adminToken.trim()} onClick={() => setShowArchivedWorkspaces(value => !value)}>{showArchivedWorkspaces ? (locale === "ar" ? "إخفاء المؤرشفة" : "Hide archived") : (locale === "ar" ? "عرض المساحات المؤرشفة" : "Show archived workspaces")}</button>
-          {showArchivedWorkspaces && workspaces.filter(item => item.status === "archived").map(item => <div className="workspace-restore-row" key={item.id}><span>{item.name}</span><button type="button" disabled={busy} onClick={() => restoreWorkspace(item.id)}>{locale === "ar" ? "استعادة" : "Restore"}</button></div>)}
-          {workspaceNotice && <small className="workspace-feedback" role="status">{workspaceNotice}</small>}
-          {!adminToken.trim() && <small className="workspace-feedback">{locale === "ar" ? "أدخل رمز المسؤول من الإعدادات لإدارة المساحات." : "Enter the admin key in Settings to manage workspaces."}</small>}
-        </section>
+        <button type="button" className="workspace-context-button" onClick={() => { setView("workspaces"); setMobileNav(false); }}><span className="workspace-avatar">W</span><span><b>{activeWorkspace?.name || (locale === "ar" ? "مساحة العمل الرئيسية" : "Main workspace")}</b><small>{locale === "ar" ? "إدارة المساحات" : "Manage workspaces"}</small></span><ArrowUpLeft size={14}/></button>
       {navGroups.map(group => <section className="nav-group" key={group.label}>
         <div className="side-label">{group.label}</div>
         <nav className="side-nav">
@@ -390,11 +366,11 @@ export default function App() {
       <header className="topbar">
         <div className="topbar-start">
           <button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label={locale === "ar" ? "فتح التنقل" : "Open navigation"}><Menu size={19}/></button>
-          <div className="breadcrumbs"><span>MAAROOF</span><span className="crumb-slash">/</span><b>{navItems.find(item => item.id === view)?.label}</b></div>
+          <div className="breadcrumbs"><span>MAAROOF</span><span className="crumb-slash">/</span><b>{navItems.find(item => item.id === view)?.label || (locale === "ar" ? "إعدادات داخلية" : "Internal settings")}</b><span className="workspace-context-pill">{activeWorkspace?.name || (locale === "ar" ? "المساحة الرئيسية" : "Main workspace")}</span></div>
         </div>
         <div className="topbar-actions">
-          <label className="global-search"><Search size={15}/><input value={globalQuery} onChange={e=>setGlobalQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){setQuery(globalQuery);setCategory("all");setView("registry");}}} placeholder={copy.search} aria-label={copy.search}/></label>
-          {view !== "chat" && <button ref={browserOpenButtonRef} className={`browser-open-button ${browserDrawerOpen ? "active" : ""}`} onClick={() => { setBrowserChatDraft(null); setBrowserDrawerOpen(true); }} aria-expanded={browserDrawerOpen} aria-controls="browser-agent-panel" aria-label={locale === "ar" ? "فتح مساعد النشر في لوحة جانبية" : "Open publishing assistant side panel"} title={locale === "ar" ? "فتح جلسة المتصفح بجانب مساحة العمل" : "Open the browser beside your workspace"}><Globe2 size={16}/><span>{locale === "ar" ? "المتصفح" : "Browser"}</span><i/></button>}
+
+          {view === "chat" && <button ref={browserOpenButtonRef} className={`browser-open-button ${browserDrawerOpen ? "active" : ""}`} onClick={() => { setBrowserChatDraft(null); setBrowserDrawerOpen(true); }} aria-expanded={browserDrawerOpen} aria-controls="browser-agent-panel" aria-label={locale === "ar" ? "فتح مساعد النشر في لوحة جانبية" : "Open publishing assistant side panel"} title={locale === "ar" ? "فتح جلسة المتصفح بجانب مساحة العمل" : "Open the browser beside your workspace"}><Globe2 size={16}/><span>{locale === "ar" ? "المتصفح" : "Browser"}</span><i/></button>}
           <button className="top-icon" onClick={() => setLocale(locale === "ar" ? "en" : "ar")} title={copy.langToggle}><span className="language-code">{locale === "ar" ? "EN" : "ع"}</span></button>
           <button className="top-icon" onClick={() => setTheme(theme === "light" ? "dark" : "light")} title={theme === "light" ? copy.dark : copy.light}>{theme === "light" ? <Moon size={17}/> : <Sun size={17}/>}</button>
           <div className="top-avatar">M</div>
@@ -402,6 +378,28 @@ export default function App() {
       </header>
 
       <div className={`page-content ${view === "chat" ? "chat-page" : ""}`}>
+        {view === "history" && <ConversationHistoryView apiBase={apiBase} token={adminToken} workspaceId={workspaceId} locale={locale} onOpenConversation={id => { setPendingConversationId(id); setView("chat"); }}/>}
+        {view === "workspaces" && <section className="page-section workspace-page">
+          <PageHeading eyebrow={locale === "ar" ? "إدارة السياقات المستقلة" : "WORKSPACE MANAGEMENT"} title={locale === "ar" ? "مساحات العمل" : "Workspaces"} subtitle={locale === "ar" ? "كل مساحة تحتفظ بمحادثاتها وملفاتها ومخرجاتها بصورة مستقلة." : "Each workspace keeps its conversations, files, and outputs isolated."}/>
+          <div className="workspace-manager surface-card">
+            <label className="workspace-select-label">{locale === "ar" ? "المساحة النشطة" : "Active workspace"}</label>
+            <select aria-label={locale === "ar" ? "اختيار مساحة العمل" : "Select workspace"} value={workspaceId} disabled={!adminToken.trim() || busy} onChange={event => setWorkspaceId(event.target.value)}>
+              {workspaces.filter(item => item.status !== "archived").map(item => <option key={item.id} value={item.id}>{item.name}{item.isDefault ? (locale === "ar" ? " · افتراضية" : " · Default") : ""}</option>)}
+              {!workspaces.length && <option value="main-workspace">{locale === "ar" ? "مساحة العمل الرئيسية" : "Main workspace"}</option>}
+            </select>
+            <input value={workspaceNameDraft} onChange={event => setWorkspaceNameDraft(event.target.value)} disabled={!adminToken.trim() || busy} maxLength={100} placeholder={locale === "ar" ? "اسم مساحة العمل الجديدة أو الاسم البديل" : "New workspace name or replacement name"} aria-label={locale === "ar" ? "اسم مساحة العمل" : "Workspace name"}/>
+            <div className="workspace-manager-actions">
+              <button type="button" disabled={!adminToken.trim() || busy || workspaceNameDraft.trim().length < 2} onClick={createWorkspace}>{locale === "ar" ? "إنشاء مساحة" : "Create"}</button>
+              <button type="button" disabled={!adminToken.trim() || busy || workspaceNameDraft.trim().length < 2 || workspaceId === "main-workspace"} onClick={renameWorkspace}>{locale === "ar" ? "إعادة تسمية" : "Rename"}</button>
+              <button type="button" disabled={!adminToken.trim() || busy || workspaceId === "main-workspace"} onClick={archiveWorkspace}>{locale === "ar" ? "أرشفة" : "Archive"}</button>
+            </div>
+            <button type="button" className="workspace-archived-toggle" disabled={!adminToken.trim()} onClick={() => setShowArchivedWorkspaces(value => !value)}>{showArchivedWorkspaces ? (locale === "ar" ? "إخفاء المساحات المؤرشفة" : "Hide archived") : (locale === "ar" ? "عرض المساحات المؤرشفة" : "Show archived workspaces")}</button>
+            {showArchivedWorkspaces && workspaces.filter(item => item.status === "archived").map(item => <div className="workspace-restore-row" key={item.id}><span>{item.name}</span><button type="button" disabled={busy} onClick={() => restoreWorkspace(item.id)}>{locale === "ar" ? "استعادة" : "Restore"}</button></div>)}
+            {workspaceNotice && <p className="workspace-feedback" role="status">{workspaceNotice}</p>}
+            {!adminToken.trim() && <p className="workspace-feedback">{locale === "ar" ? "أدخل رمز المسؤول من إعدادات الوصول داخل المحادثة لإدارة المساحات." : "Enter the admin key from conversation access settings to manage workspaces."}</p>}
+          </div>
+          <div className="surface-card workspace-info-card"><span className="tiny-overline">{locale === "ar" ? "عزل البيانات" : "DATA ISOLATION"}</span><h2>{activeWorkspace?.name || "Main workspace"}</h2><p>{activeWorkspace?.description || (locale === "ar" ? "المحادثات والمرفقات والمهام ووجهات المتصفح مرتبطة بهذه المساحة." : "Conversations, attachments, tasks, and browser destinations are scoped to this workspace.")}</p><span className="status-chip"><ShieldCheck size={14}/>{locale === "ar" ? "مساحة مستقلة" : "Isolated workspace"}</span></div>
+        </section>}
         {view === "chat" && <EditorialChatWorkspace apiBase={apiBase} token={adminToken} workspaceId={workspaceId} locale={locale} targets={chatTargets} onOpenSettings={() => setView("research-settings")} openConversationId={pendingConversationId} onConversationOpened={()=>setPendingConversationId(null)} onPrepareBrowser={draft=>{setBrowserChatDraft(draft);setBrowserDrawerOpen(true);}}/>}
         {view === "library" && <LibraryView apiBase={apiBase} token={adminToken} workspaceId={workspaceId} locale={locale} copy={copy} onOpenConversation={id=>{setPendingConversationId(id);setView("chat");}}/>}
         {view === "home" && <HomeView copy={copy} articles={articles} onCreate={() => setView("articles")} onRegistry={() => setView("registry")} onViewAll={() => setView("articles")} locale={locale} theme={theme}/>}
@@ -521,6 +519,28 @@ function HomeView({copy,articles,onCreate,onRegistry,onViewAll,locale,theme}:{co
   </section>;
 }
 
+
+
+function ConversationHistoryView({apiBase,token,workspaceId,locale,onOpenConversation}:{apiBase:string;token:string;workspaceId:string;locale:Locale;onOpenConversation:(id:string)=>void}) {
+  const [items,setItems]=useState<Array<{id:string;title:string|null;targetName:string;language:string;status:string;activeRun:any;updatedAt:string;lastMessagePreview:string}>>([]);
+  const [loading,setLoading]=useState(false);
+  const [notice,setNotice]=useState("");
+  useEffect(()=>{
+    if(!token.trim()){setItems([]);return;}
+    let cancelled=false;setLoading(true);setNotice("");
+    fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/conversations`,{headers:{authorization:`Bearer ${token}`}})
+      .then(async response=>{const payload=await response.json();if(!response.ok)throw new Error(payload.error||"تعذر تحميل سجل المحادثات");return payload.conversations||[];})
+      .then(data=>{if(!cancelled)setItems(data);})
+      .catch(error=>{if(!cancelled)setNotice(error instanceof Error?error.message:"تعذر تحميل سجل المحادثات");})
+      .finally(()=>{if(!cancelled)setLoading(false);});
+    return ()=>{cancelled=true;};
+  },[apiBase,token,workspaceId]);
+  return <section className="page-section history-view">
+    <PageHeading eyebrow={locale==="ar"?"ذاكرة العمل":"WORK HISTORY"} title={locale==="ar"?"سجل المحادثات":"Conversation history"} subtitle={locale==="ar"?"استعد محادثة سابقة وتابع العمل من سياقها داخل مساحة العمل الحالية.":"Reopen a previous conversation and continue from its context in the active workspace."} action={<span className="status-chip"><MessageSquare size={14}/>{items.length}</span>}/>
+    {!token.trim()?<div className="surface-card history-empty"><ShieldCheck size={22}/><b>{locale==="ar"?"يلزم رمز المسؤول":"Admin key required"}</b><p>{locale==="ar"?"أدخل رمز الوصول من إعدادات المحادثة لعرض السجل.":"Enter the access key in conversation settings to load history."}</p></div>:loading?<div className="surface-card history-empty">{locale==="ar"?"جارٍ تحميل المحادثات...":"Loading conversations..."}</div>:items.length===0?<div className="surface-card history-empty"><MessageSquare size={22}/><b>{locale==="ar"?"لا توجد محادثات محفوظة":"No saved conversations"}</b><p>{locale==="ar"?"ابدأ محادثة جديدة وستظهر هنا تلقائياً.":"Start a conversation and it will appear here."}</p><button className="primary-button" onClick={()=>onOpenConversation("")}>{locale==="ar"?"بدء محادثة":"Start conversation"}</button></div>:<div className="surface-card history-list">{items.map(item=><button type="button" className="history-item" key={item.id} onClick={()=>onOpenConversation(item.id)}><span className="history-item-icon"><MessageSquare size={17}/></span><span className="history-item-copy"><b>{item.title|| (locale==="ar"?"محادثة جديدة":"New conversation")}</b><small>{item.targetName} · {item.language.toUpperCase()} · {new Date(item.updatedAt).toLocaleString(locale==="ar"?"ar-IQ":"en-US")}</small>{item.lastMessagePreview&&<span>{item.lastMessagePreview}</span>}</span><span className="history-item-state">{item.activeRun?.status==="running"?(locale==="ar"?"قيد التنفيذ":"Running"):(locale==="ar"?"فتح":"Open")}<ArrowUpLeft size={14}/></span></button>)}</div>}
+    {notice&&<p className="inline-feedback" role="status">{notice}</p>}
+  </section>;
+}
 
 type LibraryDraft = {
   id: string; conversationId: string; messageId: string; title: string; targetId: string; targetName: string;
