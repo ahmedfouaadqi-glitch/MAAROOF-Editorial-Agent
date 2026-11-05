@@ -35,6 +35,9 @@
 - [ ] Add validated semantic/paraphrase and cross-language similarity using evaluated multilingual embeddings; no semantic capability is claimed by the current lexical engine.
 - [ ] Add external-corpus checks against permitted web, academic, and publisher sources; no public-web or paid plagiarism database is queried by the current engine.
 - [x] Add deterministic tests for evidence linking, workspace isolation, Arabic normalization, exact-match detection, near-overlap signals, insufficient text, and no cross-workspace leakage.
+
+- [x] Add deterministic Editorial Intelligence checks for draft structure, readability indicators, GEO phrase/entity/question coverage, and metadata suggestions; expose the report in the draft review UI.
+- [ ] Add evaluated semantic, cross-language, and external-corpus originality checks; these require validated multilingual models and a permitted source corpus.
 - [ ] Add deterministic tests for the remaining editorial engines.
 - [x] Keep the existing optional model adapter disabled; article-writing model calls are deferred until a later phase.
 - [ ] Add model-assisted named-entity recognition, entity resolution, and search intent extraction after evaluation sets are ready.
