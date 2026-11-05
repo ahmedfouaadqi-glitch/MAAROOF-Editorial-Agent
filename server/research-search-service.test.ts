@@ -28,6 +28,12 @@ describe("metered research search",()=>{
   expect(replay.result.id).toBe(first.result.id);expect(provider.search).toHaveBeenCalledTimes(1);
   expect(f.state.tasks.t1.usage.search).toBe(1);
  });
+ it("rejects reuse of an idempotency key with different search parameters",async()=>{
+  const f=fixture();const provider={id:"mock",search:vi.fn().mockResolvedValue({results:[{title:"Source",url:"https://example.org",snippet:"Snippet"}]})};
+  await runMeteredResearchSearch({store:f.store,provider,workspaceId:"w1",taskId:"t1",input:{query:"research query"},operationId:"same-key-001"});
+  await expect(runMeteredResearchSearch({store:f.store,provider,workspaceId:"w1",taskId:"t1",input:{query:"different query"},operationId:"same-key-001"})).rejects.toMatchObject({status:409});
+  expect(provider.search).toHaveBeenCalledTimes(1);expect(f.state.tasks.t1.usage.search).toBe(1);
+ });
  it("rejects a duplicate uncertain search operation instead of charging again",async()=>{
   const f=fixture();const provider={id:"mock",search:vi.fn()};
   f.state.tasks.t1.reservations["search-inflight-01"]={operation:"search",units:1,status:"committed"};
