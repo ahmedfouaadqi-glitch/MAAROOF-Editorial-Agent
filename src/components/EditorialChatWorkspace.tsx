@@ -196,6 +196,33 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
     } catch (error) { setNotice(error instanceof Error ? error.message : errorText); }
   }
 
+  function prepareFollowUp(value: string) {
+    setContent(value);
+    setNotice("");
+    window.requestAnimationFrame(() => composerRef.current?.focus());
+  }
+
+  function downloadDraft(draft: NonNullable<DraftResult["draft"]>) {
+    const sections = [
+      draft.title ? "# " + draft.title : "",
+      draft.hook ? "## " + (ar ? "الافتتاحية" : "Hook") + "\n" + draft.hook : "",
+      draft.body || "",
+      draft.callToAction ? "## " + t.cta + "\n" + draft.callToAction : "",
+      draft.videoScript ? "## " + (ar ? "سيناريو الفيديو" : "Video script") + "\n" + draft.videoScript : "",
+      draft.onScreenText ? "## " + (ar ? "نص الشاشة" : "On-screen text") + "\n" + draft.onScreenText : "",
+      draft.hashtags?.length ? draft.hashtags.map(tag => tag.startsWith("#") ? tag : "#" + tag).join(" ") : "",
+      draft.geo?.primaryPhrase ? "## GEO\n- " + t.intent + ": " + (draft.geo.intent || "—") + "\n- " + t.primary + ": " + draft.geo.primaryPhrase + "\n- " + t.related + ": " + (draft.geo.supportingTerms || []).join(", ") + "\n- " + t.questions + ": " + (draft.geo.questions || []).join("; ") + "\n- " + t.entities + ": " + (draft.geo.entities || []).join(", ") : "",
+      draft.factCheckNotes?.length ? "## " + t.factChecks + "\n" + draft.factCheckNotes.map(note => "- " + note).join("\n") : "",
+      draft.mediaNotes ? "## " + t.mediaNotes + "\n" + draft.mediaNotes : ""
+    ].filter(Boolean);
+    const url = URL.createObjectURL(new Blob([sections.join("\n\n")], { type: "text/markdown;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = (draft.title || "editorial-draft").replace(/[^a-z0-9\u0600-\u06ff-]+/gi, "-").slice(0, 70) + ".md";
+    document.body.appendChild(link); link.click(); link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   async function sendMessage(event: FormEvent) {
     event.preventDefault();
     if (busy || (!content.trim() && files.length === 0) || !token.trim()) return;
