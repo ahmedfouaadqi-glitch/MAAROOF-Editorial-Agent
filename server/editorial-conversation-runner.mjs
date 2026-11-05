@@ -5,6 +5,13 @@ import { analyzeEditorialDraft } from "./editorial-intelligence.mjs";
 import { getEditorialTarget } from "./editorial-targets.mjs";
 import { classifyEditorialRunFailure } from "./editorial-run-failures.mjs";
 
+const TOOL_OUTCOME_STATUSES = new Set(["completed", "skipped", "failed", "needs-review"]);
+function safeOutcomeDetails(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const allowed = ["reason", "provider", "model", "recordCount", "warningCount", "reviewRequired", "code"];
+  return Object.fromEntries(allowed.filter(key => value[key] !== undefined).map(key => [key, typeof value[key] === "string" ? value[key].slice(0, 240) : value[key]]));
+}
+
 const MAX_TOTAL_DOCUMENT_CHARS = 20_000;
 const activeRunControllers = new Map();
 const STEP_IDS = ["request", "identity", "destination", "attachments", "discovery", "retrieval", "evidence", "geo", "draft", "originality"];
@@ -160,6 +167,17 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
   const language = initialConversation.language;
   const steps = stepsFor(language);
   const runContext = { ...(initialConversation.activeRun?.metadata || {}) };
+  runContext.toolOutcomes = Array.isArray(runContext.toolOutcomes) ? runContext.toolOutcomes : [];
+  runContext.lifecycle = Array.isArray(runContext.lifecycle) ? runContext.lifecycle : [];
+  const recordLifecycle = (phase, note) => {
+    runContext.lifecycle.push({ phase, note: String(note || "").slice(0, 240), at: new Date().toISOString() });
+    if (runContext.lifecycle.length > 40) runContext.lifecycle = runContext.lifecycle.slice(-40);
+  };
+  const recordToolOutcome = (tool, status, details = {}) => {
+    if (!TOOL_OUTCOME_STATUSES.has(status)) throw new Error("Invalid tool outcome status.");
+    runContext.toolOutcomes.push({ tool, status, details: safeOutcomeDetails(details), at: new Date().toISOString() });
+    if (runContext.toolOutcomes.length > 30) runContext.toolOutcomes = runContext.toolOutcomes.slice(-30);
+  };
   const setRun = async (status = "running", extra = {}) => {
     if (controller.signal.aborted) throw Object.assign(new Error("Editorial run cancelled"), { name: "AbortError" });
     Object.assign(runContext, extra);
@@ -183,7 +201,9 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
     const target = getEditorialTarget(userMessage.targetId || conversation.targetId);
     const executionPlan = buildEditorialExecutionPlan({ conversation, userMessage, target, providerAvailable: Boolean(provider) });
     runContext.executionPlan = executionPlan;
+    recordLifecycle("plan", "Execution plan created; only locally available and configured capabilities may run.");
     await setRun("running", { startedAt: new Date().toISOString() });
+    recordLifecycle("act", "Validated request, workspace identity, and destination.");
     await setStep("request", "completed");
     await setStep("identity", "completed", conversation.clientName || conversation.brandName ? "Brand identity is included in this workspace." : "No client or brand identity was selected.");
     await setStep("destination", "completed", `${target.name} · ${target.type}`);
@@ -191,13 +211,17 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
     if (!provider) {
       await setStep("attachments", userMessage.attachmentIds?.length ? "skipped" : "completed", userMessage.attachmentIds?.length ? "Files are stored, but model analysis is unavailable until the provider is configured." : "No attachments were added.");
       await setStep("discovery", "skipped", "No Firecrawl Alexandria discovery was run; no search was billed.");
+      recordToolOutcome("research-discovery", "skipped", { reason: "provider-not-connected" });
       await setStep("retrieval", "skipped", "No source retrieval was run; no crawl was billed.");
+      recordToolOutcome("page-retrieval", "skipped", { reason: "provider-not-connected" });
       await setStep("evidence", "skipped", "No external evidence was retrieved or inspected.");
+      recordToolOutcome("evidence-review", "skipped", { reason: "no-retrieved-sources" });
       for (const id of ["geo", "draft", "originality"]) await setStep(id, "skipped", "Waiting for the server-side model provider.");
       const message = await appendEditorialConversationMessage(store, {
         workspaceId, conversationId, role: "assistant", content: userFacingFailure(language),
         result: { kind: "notice", code: "model-provider-unavailable" }
       });
+      recordLifecycle("reflect", "Run stopped safely because no model provider is configured.");
       await setRun("failed", { error: "model-provider-unavailable", assistantMessageId: message.id, finishedAt: new Date().toISOString() });
       return { status: "failed", assistantMessageId: message.id };
     }
@@ -207,8 +231,11 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
     });
     await setStep("attachments", "completed", attachmentContext.warnings.join(" ") || "Local text extraction and selected visual frames are ready.");
     await setStep("discovery", "skipped", "Firecrawl Alexandria discovery is not configured for this chat run; no search was billed.");
+    recordToolOutcome("research-discovery", "skipped", { reason: "not-enabled-in-chat-runner" });
     await setStep("retrieval", "skipped", "No source pages were retrieved; no crawl was billed.");
+    recordToolOutcome("page-retrieval", "skipped", { reason: "not-enabled-in-chat-runner" });
     await setStep("evidence", "skipped", "No external sources were retrieved, so factual claims remain unverified.");
+    recordToolOutcome("evidence-review", "skipped", { reason: "no-retrieved-sources" });
 
     await setStep("geo", "running");
     await setStep("draft", "running");
@@ -216,6 +243,8 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
     const modelResult = await provider.generateJSON({ system, prompt, images: attachmentContext.images, maxTokens: 3800, temperature: 0.35, signal: controller.signal });
     if (controller.signal.aborted) throw Object.assign(new Error("Editorial run cancelled"), { name: "AbortError" });
     const draft = validateDraft(modelResult.output, target);
+    recordToolOutcome("model-draft-generation", "completed", { provider: modelResult.provider || "openai-compatible", model: modelResult.model || "unspecified" });
+    recordLifecycle("observe", "Model returned a structured draft; schema validation passed.");
     const intelligence = analyzeEditorialDraft(draft, { targetName: target.name, targetType: target.type });
     await setStep("geo", "completed", "Intent, natural-language phrases, questions and entities are included in the draft.");
     await setStep("draft", "completed");
@@ -235,6 +264,8 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
       nearMatches: originality.findings.filter(item => item.matchType !== "exact")
     };
     const needsReview = originality.reviewRequired;
+    recordToolOutcome("workspace-originality-screen", needsReview ? "needs-review" : "completed", { recordCount: originality.comparedContentCount, reviewRequired: needsReview });
+    recordLifecycle("reflect", needsReview ? "Originality screening requires human review." : "Draft and workspace-scoped originality screening completed.");
     await store.transact(state => {
       state.conversationDrafts ||= [];
       state.conversationDrafts.push({
@@ -292,6 +323,8 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
       });
       assistantMessageId = message.id;
       const failure = classifyEditorialRunFailure(error);
+      recordToolOutcome(failedStep?.id || "editorial-run", "failed", { code: failure.code, reason: failure.category });
+      recordLifecycle("reflect", "Execution stopped after a classified failure; no automatic replay was attempted.");
       await setRun("failed", {
         error: failure.code,
         failure,
