@@ -48,6 +48,8 @@ describe("conversation attachments", () => {
 
   it("parses bounded CSV rows with quoted commas and escaped quotes", () => {
     const parsed = parseCsvRows('Name,Notes,Count\r\n"Brand A","A, B and ""C""",12\r\nBrand B,"Second row",8');
+    const bomPrefixed = parseCsvRows("\uFEFFName,Value\\nA,1");
+    expect(bomPrefixed.headers).toEqual(["Name", "Value"]);
     expect(parsed.headers).toEqual(["Name", "Notes", "Count"]);
     expect(parsed.rows).toEqual([
       { Name: "Brand A", Notes: 'A, B and "C"', Count: "12" },
