@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowUp, Check, ChevronDown, Download, File, Globe2, Image, LoaderCircle, Mail, MessageSquare, MessagesSquare, Newspaper, Plus, Search, Settings, Upload, Video, X, AlertTriangle, Sparkles } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, Download, File, Globe2, Image, LoaderCircle, Mail, MessageSquare, MessagesSquare, Newspaper, PencilLine, Plus, RotateCcw, Search, Settings, Upload, Video, X, AlertTriangle, Sparkles } from "lucide-react";
 import type { EditorialChatBrowserDraft } from "../types/editorial-chat";
 
 export type ChatTarget = {
