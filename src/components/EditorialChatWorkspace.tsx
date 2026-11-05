@@ -16,7 +16,7 @@ type DraftResult = {
 type ChatMessage = { id: string; role?: string; content?: string; createdAt?: string; targetId?: string; result?: DraftResult; attachments?: Attachment[] };
 type RunStep = { id: string; label: string; status: "pending" | "running" | "completed" | "skipped" | "needs-review" | "failed"; note?: string };
 type ActiveRun = { id: string; status: "queued" | "running" | "completed" | "failed" | "cancelled"; metadata?: { steps?: RunStep[]; totalSteps?: number; completedSteps?: number } };
-type Conversation = { id: string; title?: string; updatedAt?: string; createdAt?: string; messages?: ChatMessage[]; targetId?: string; clientName?: string; brandName?: string; activeRun?: ActiveRun | null };
+type Conversation = { id: string; title?: string; updatedAt?: string; createdAt?: string; messages?: ChatMessage[]; targetId?: string; targetName?: string; clientName?: string; brandName?: string; activeRun?: ActiveRun | null };
 type PendingFile = { file: File; preview: string };
 
 const ACCEPTED_TYPES = new Set([
