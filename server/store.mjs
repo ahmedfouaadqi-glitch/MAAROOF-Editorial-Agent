@@ -1,10 +1,12 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { ensureDefaultWorkspace } from "./editorial-workspaces.mjs";
 
 const EMPTY = {
   version: 1,
   limits: { sourceUrlsPerArticle: 3, scrapesPerArticle: 3, searchesPerArticle: 5, inspectionsPerArticle: 5 },
   tasks: {},
+  workspaces: [],
   editorialConversations: [],
   conversationAttachments: [],
   sources: [],
@@ -24,6 +26,8 @@ export class JsonStore {
       const state = JSON.parse(raw);
       let changed = false;
       state.limits = { ...EMPTY.limits, ...(state.limits || {}) };
+      if (!Array.isArray(state.workspaces)) { state.workspaces = []; changed = true; }
+      ensureDefaultWorkspace(state);
       state.researchScrapes ||= [];
       state.researchInspections ||= [];
       state.researchSearches ||= [];
@@ -41,7 +45,7 @@ export class JsonStore {
         }
         task.reservations ||= {};
       }
-      if (changed || !raw.includes('"scrapesPerArticle"') || !raw.includes('"researchScrapes"') || !raw.includes('"researchInspections"') || !raw.includes('"editorialConversations"') || !raw.includes('"conversationAttachments"')) await this.#write(state);
+      if (changed || !raw.includes('"workspaces"') || !raw.includes('"scrapesPerArticle"') || !raw.includes('"researchScrapes"') || !raw.includes('"researchInspections"') || !raw.includes('"editorialConversations"') || !raw.includes('"conversationAttachments"')) await this.#write(state);
     }
     catch (error) {
       if (error.code !== "ENOENT") throw error;
