@@ -351,7 +351,7 @@ export default function App() {
         <div className="side-label">{group.label}</div>
         <nav className="side-nav">
           {group.items.map(item => <button key={item.id} className={view === item.id ? "nav-item active" : "nav-item"} onClick={() => { setView(item.id); setMobileNav(false); setBrowserDrawerOpen(false); }}>
-            <item.icon size={17} strokeWidth={1.8}/><span>{item.label}</span>{item.id === "articles" && articles.length > 0 && <i>{articles.length}</i>}
+            <item.icon size={17} strokeWidth={1.8}/><span>{item.label}</span>
           </button>)}
         </nav>
       </section>)}
