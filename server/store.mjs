@@ -27,7 +27,9 @@ export class JsonStore {
       let changed = false;
       state.limits = { ...EMPTY.limits, ...(state.limits || {}) };
       if (!Array.isArray(state.workspaces)) { state.workspaces = []; changed = true; }
+      const workspaceCount = state.workspaces.length;
       ensureDefaultWorkspace(state);
+      if (state.workspaces.length !== workspaceCount) changed = true;
       state.researchScrapes ||= [];
       state.researchInspections ||= [];
       state.researchSearches ||= [];
@@ -49,7 +51,9 @@ export class JsonStore {
     }
     catch (error) {
       if (error.code !== "ENOENT") throw error;
-      await this.#write(EMPTY);
+      const initial = structuredClone(EMPTY);
+      ensureDefaultWorkspace(initial);
+      await this.#write(initial);
     }
   }
 
