@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { appendEditorialConversationMessage, createEditorialConversation, getEditorialConversation, updateEditorialConversationRun } from "./editorial-conversations.mjs";
-import { createEditorialConversationProgress, runEditorialConversation, cancelEditorialConversationRun } from "./editorial-conversation-runner.mjs";
+import { createEditorialConversationProgress, buildEditorialExecutionPlan, runEditorialConversation, cancelEditorialConversationRun } from "./editorial-conversation-runner.mjs";
 
 function makeStore() {
   const state: any = {
@@ -36,6 +36,25 @@ const validOutput = {
   }, mediaNotes: "Use a simple workflow diagram.", factCheckNotes: []
 };
 
+describe("editorial conversation execution plan", () => {
+  it("declares unavailable external research as skipped and publishing as disabled", async () => {
+    const store = makeStore();
+    const { conversation, userMessage } = await startConversation(store);
+    const plan = buildEditorialExecutionPlan({
+      conversation, userMessage,
+      target: { id: "linkedin", name: "LinkedIn", type: "social" },
+      providerAvailable: false
+    });
+    expect(plan).toMatchObject({
+      taskType: "editorial-draft",
+      workspaceId: "workspace-1",
+      externalActions: { webSearch: false, pageCrawl: false, publish: false }
+    });
+    expect(plan.steps.find((step: any) => step.id === "discovery")).toMatchObject({ status: "skipped", required: false });
+    expect(plan.steps.find((step: any) => step.id === "draft")).toMatchObject({ required: false });
+  });
+});
+
 describe("editorial conversation workflow", () => {
   it("shows unavailable model and external research steps honestly", async () => {
     const store = makeStore();
@@ -63,6 +82,8 @@ describe("editorial conversation workflow", () => {
     expect(savedFirst.messages.at(-1)?.result).toMatchObject({ kind: "draft", targetId: "linkedin", draft: { geo: { primaryPhrase: "responsible AI adoption for small businesses" } } });
     expect(savedFirst.activeRun?.metadata?.steps.find((step: any) => step.id === "discovery")?.status).toBe("skipped");
     expect(savedFirst.activeRun?.metadata?.startedAt).toBeTruthy();
+    expect(savedFirst.activeRun?.metadata?.executionPlan).toMatchObject({ taskType: "editorial-draft", externalActions: { webSearch: false, pageCrawl: false, publish: false } });
+    expect(savedFirst.activeRun?.metadata?.executionPlan?.steps.find((step: any) => step.id === "draft")?.status).toBe("completed");
     expect(savedFirst.activeRun?.metadata?.finishedAt).toBeTruthy();
 
     const secondUserMessage = await appendEditorialConversationMessage(store, {
