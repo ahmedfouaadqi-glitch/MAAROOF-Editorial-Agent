@@ -155,6 +155,17 @@ describe("workspace API integration", () => {
     expect(foreignCancel.status).toBe(404);
   });
 
+  it("rejects retry unless the conversation's previous run failed or was cancelled", async () => {
+    const created = await api("/api/v1/workspaces/main-workspace/conversations", {
+      method: "POST",
+      body: JSON.stringify({ targetId: "medium", language: "en", title: "Retry boundary" })
+    });
+    expect(created.status).toBe(201);
+    const conversation = (await created.json() as any).conversation;
+    const rejected = await api(`/api/v1/workspaces/main-workspace/conversations/${conversation.id}/retry`, { method: "POST" });
+    expect(rejected.status).toBe(409);
+  });
+
   it("enforces active workspace scope for AI visibility reads and writes", async () => {
     const createdResponse = await api("/api/v1/workspaces", { method: "POST", body: JSON.stringify({ name: "Visibility Boundary Workspace" }) });
     const workspace = (await createdResponse.json() as any).workspace;
