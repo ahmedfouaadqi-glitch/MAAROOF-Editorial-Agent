@@ -4,7 +4,7 @@ import {
   CheckCircle2, ChevronDown, CircleHelp, FileCheck2, FilePlus2,
   Download, FileText, Globe2, Home, Layers3, LayoutDashboard, Library, ListFilter,
   LockKeyhole, Menu, Moon, MoreHorizontal, Plus, Search,
-  ShieldCheck, SlidersHorizontal, Sparkles, Sun, Workflow, X, Zap, MessageSquare
+  ShieldCheck, SlidersHorizontal, Sparkles, Sun, Workflow, X, Zap, MessageSquare, History
 } from "lucide-react";
 import SpotlightCard from "./components/SpotlightCard";
 import EditorialEvidencePanel from "./components/EditorialEvidencePanel";
