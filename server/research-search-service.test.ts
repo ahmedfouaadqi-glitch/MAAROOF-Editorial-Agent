@@ -19,6 +19,21 @@ describe("metered research search",()=>{
   expect(f.state.tasks.t1.usage.search).toBe(1);
   expect(Object.values(f.state.tasks.t1.reservations)[0].status).toBe("committed");
  });
+ it("replays a saved search for the same operation ID without a second provider call",async()=>{
+  const f=fixture();const provider={id:"mock",search:vi.fn().mockResolvedValue({results:[{title:"Source",url:"https://example.org",snippet:"Snippet"}]})};
+  const input={query:"research query",language:"en"};
+  const first=await runMeteredResearchSearch({store:f.store,provider,workspaceId:"w1",taskId:"t1",input,operationId:"search-retry-01"});
+  const replay=await runMeteredResearchSearch({store:f.store,provider,workspaceId:"w1",taskId:"t1",input,operationId:"search-retry-01"});
+  expect(first.replayed).toBe(false);expect(replay.replayed).toBe(true);
+  expect(replay.result.id).toBe(first.result.id);expect(provider.search).toHaveBeenCalledTimes(1);
+  expect(f.state.tasks.t1.usage.search).toBe(1);
+ });
+ it("rejects a duplicate uncertain search operation instead of charging again",async()=>{
+  const f=fixture();const provider={id:"mock",search:vi.fn()};
+  f.state.tasks.t1.reservations["search-inflight-01"]={operation:"search",units:1,status:"committed"};
+  await expect(runMeteredResearchSearch({store:f.store,provider,workspaceId:"w1",taskId:"t1",input:{query:"research query"},operationId:"inflight-01"})).rejects.toMatchObject({status:409});
+  expect(provider.search).not.toHaveBeenCalled();expect(f.state.tasks.t1.usage.search).toBe(0);
+ });
  it("does not call the provider after the per-article limit is reached",async()=>{
   const f=fixture(5);const provider={id:"mock",search:vi.fn()};
   const result=await runMeteredResearchSearch({store:f.store,provider,workspaceId:"w1",taskId:"t1",input:{query:"research query"}});
