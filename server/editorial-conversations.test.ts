@@ -5,7 +5,8 @@ import {
   createEditorialConversation,
   getEditorialConversation,
   listEditorialConversations,
-  updateEditorialConversationRun
+  updateEditorialConversationRun,
+  recoverInterruptedEditorialConversationRuns
 } from "./editorial-conversations.mjs";
 
 function initialState() {
@@ -84,4 +85,25 @@ describe("editorial conversations", () => {
     await expect(updateEditorialConversationRun(store, { workspaceId: "workspaceB", conversationId: conversation.id, runId: "run-2", status: "running" })).rejects.toMatchObject({ status: 404 });
     expect((await getEditorialConversation(store, "workspaceA", conversation.id)).activeRun).toMatchObject({ id: "run-1", status: "completed" });
   });
+  it("recovers queued and running runs as retryable failures without replaying them", async () => {
+    const state = initialState();
+    state.editorialConversations = [
+      { id: "queued", workspaceId: "workspaceA", updatedAt: "old", activeRun: { id: "run-q", status: "queued", metadata: { retryCount: 1 } } },
+      { id: "running", workspaceId: "workspaceA", updatedAt: "old", activeRun: { id: "run-r", status: "running", metadata: { phase: "draft" } } },
+      { id: "done", workspaceId: "workspaceA", updatedAt: "old", activeRun: { id: "run-d", status: "completed", metadata: {} } },
+      { id: "empty", workspaceId: "workspaceA", updatedAt: "old", activeRun: null }
+    ] as any;
+    const store = makeStore(state);
+    const result = await recoverInterruptedEditorialConversationRuns(store, { now: () => "2026-11-05T12:00:00.000Z" });
+    expect(result).toEqual({ recovered: 2 });
+    expect(state.editorialConversations[0].activeRun).toMatchObject({
+      id: "run-q", status: "failed", metadata: { error: "process-restarted", interruptedStatus: "queued", retryable: true, retryCount: 1, recoveredAt: "2026-11-05T12:00:00.000Z" }
+    });
+    expect(state.editorialConversations[1].activeRun).toMatchObject({
+      id: "run-r", status: "failed", metadata: { error: "process-restarted", interruptedStatus: "running", retryable: true, phase: "draft" }
+    });
+    expect(state.editorialConversations[2].activeRun.status).toBe("completed");
+    expect(state.editorialConversations[3].activeRun).toBeNull();
+  });
+
 });
