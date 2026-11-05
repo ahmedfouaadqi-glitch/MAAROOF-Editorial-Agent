@@ -656,8 +656,14 @@ const server = createServer(async (req, res) => {
       const body = await readJson(req);
       const workspaceId = decodeURIComponent(searchCollection[1]);
       const taskId = decodeURIComponent(searchCollection[2]);
+      const headerOperationId = req.headers["idempotency-key"];
+      const bodyOperationId = body.operationId;
+      if (headerOperationId && bodyOperationId && headerOperationId !== bodyOperationId) {
+        return send(res, 400, { error: "Idempotency-Key header and operationId body field must match." });
+      }
+      const operationId = bodyOperationId || headerOperationId || null;
       const outcome = await runMeteredResearchSearch({
-        store, provider: searchProvider, workspaceId, taskId, input: body
+        store, provider: searchProvider, workspaceId, taskId, input: body, operationId
       });
       if (!outcome.allowed) return send(res, 429, { error: "Per-article search limit reached", quota: outcome.quota });
       return send(res, 200, outcome);
