@@ -129,6 +129,11 @@ export default function App() {
   const [budget, setBudget] = useState<ResearchBudgetLimits>({ ...DEFAULT_RESEARCH_BUDGET });
   const [budgetNotice, setBudgetNotice] = useState("");
   const [adminToken, setAdminToken] = useState("");
+  const [workspaces, setWorkspaces] = useState<Array<{id:string;name:string;description?:string;status:string;isDefault:boolean}>>([]);
+  const [workspaceId, setWorkspaceId] = useState("main-workspace");
+  const [workspaceNameDraft, setWorkspaceNameDraft] = useState("");
+  const [workspaceNotice, setWorkspaceNotice] = useState("");
+  const [showArchivedWorkspaces, setShowArchivedWorkspaces] = useState(false);
   const [busy, setBusy] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [locale, setLocale] = useState<Locale>("ar");
@@ -174,6 +179,16 @@ export default function App() {
 
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
   useEffect(() => {
+    if (!adminToken.trim()) { setWorkspaces([]); setWorkspaceId("main-workspace"); return; }
+    let cancelled = false;
+    fetch(`${apiBase}/api/v1/workspaces?includeArchived=true`, { headers: { authorization: `Bearer ${adminToken}` } })
+      .then(async response => { const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "تعذر تحميل مساحات العمل"); return payload.workspaces || []; })
+      .then(items => { if (!cancelled) { setWorkspaces(items); setWorkspaceId(current => items.some((item:any) => item.id === current && item.status !== "archived") ? current : (items.find((item:any) => item.isDefault)?.id || items.find((item:any) => item.status === "active")?.id || "main-workspace")); } })
+      .catch(error => { if (!cancelled) setWorkspaceNotice(error instanceof Error ? error.message : "تعذر تحميل مساحات العمل"); });
+    return () => { cancelled = true; };
+  }, [adminToken, apiBase]);
+  useEffect(() => { setArticles([]); setClientOptions([]); setBrandOptions([]); setEvidenceArticleId(null); setDraftArticleId(null); setReviewArticleId(null); }, [workspaceId]);
+  useEffect(() => {
     if (!browserDrawerOpen) return;
     browserCloseButtonRef.current?.focus();
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setBrowserDrawerOpen(false); };
@@ -183,7 +198,7 @@ export default function App() {
   useEffect(() => {
     if ((view !== "articles" && view !== "magazine-submissions" && !browserDrawerOpen) || !adminToken.trim()) return;
     let cancelled = false;
-    fetch(`${apiBase}/api/v1/workspaces/main-workspace/articles`, { headers: { authorization: `Bearer ${adminToken}` } })
+    fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/articles`, { headers: { authorization: `Bearer ${adminToken}` } })
       .then(async response => {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || "تعذر تحميل المقالات");
@@ -191,17 +206,60 @@ export default function App() {
       })
       .catch(error => { if (!cancelled) setArticleNotice(error instanceof Error ? error.message : "تعذر الاتصال بالخدمة الخلفية."); });
     return () => { cancelled = true; };
-  }, [view, adminToken, apiBase, browserDrawerOpen]);
+  }, [view, adminToken, apiBase, browserDrawerOpen, workspaceId]);
   useEffect(() => {
     if (view !== "articles" || !adminToken.trim()) { setClientOptions([]); setBrandOptions([]); return; }
     let cancelled = false;
     const headers = { authorization: `Bearer ${adminToken}` };
     Promise.all([
-      fetch(`${apiBase}/api/v1/workspaces/main-workspace/clients`, { headers }).then(async response => { const payload=await response.json(); if(!response.ok) throw new Error(payload.error||"Unable to load clients"); return payload.clients||[]; }),
-      fetch(`${apiBase}/api/v1/workspaces/main-workspace/brands`, { headers }).then(async response => { const payload=await response.json(); if(!response.ok) throw new Error(payload.error||"Unable to load brands"); return payload.brands||[]; })
+      fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/clients`, { headers }).then(async response => { const payload=await response.json(); if(!response.ok) throw new Error(payload.error||"Unable to load clients"); return payload.clients||[]; }),
+      fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/brands`, { headers }).then(async response => { const payload=await response.json(); if(!response.ok) throw new Error(payload.error||"Unable to load brands"); return payload.brands||[]; })
     ]).then(([clients,brands])=>{ if(cancelled)return; setClientOptions(clients); setBrandOptions(brands); }).catch(()=>{ if(!cancelled){setClientOptions([]);setBrandOptions([]);} });
     return ()=>{cancelled=true;};
-  }, [view, adminToken, apiBase]);
+  }, [view, adminToken, apiBase, workspaceId]);
+
+  async function refreshWorkspaces() {
+    const response = await fetch(`${apiBase}/api/v1/workspaces?includeArchived=true`, { headers: { authorization: `Bearer ${adminToken}` } });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "تعذر تحميل مساحات العمل");
+    setWorkspaces(payload.workspaces || []);
+  }
+  async function createWorkspace() {
+    if (!workspaceNameDraft.trim() || !adminToken.trim()) return;
+    setBusy(true); setWorkspaceNotice("");
+    try {
+      const response = await fetch(`${apiBase}/api/v1/workspaces`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ name: workspaceNameDraft.trim() }) });
+      const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "تعذر إنشاء مساحة العمل");
+      await refreshWorkspaces(); setWorkspaceId(payload.workspace.id); setWorkspaceNameDraft(""); setWorkspaceNotice(locale === "ar" ? "تم إنشاء مساحة العمل والتبديل إليها." : "Workspace created and selected.");
+    } catch(error) { setWorkspaceNotice(error instanceof Error ? error.message : "تعذر إنشاء مساحة العمل"); } finally { setBusy(false); }
+  }
+  async function renameWorkspace() {
+    if (!workspaceNameDraft.trim() || !adminToken.trim()) return;
+    setBusy(true); setWorkspaceNotice("");
+    try {
+      const response = await fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}`, { method: "PATCH", headers: { "content-type": "application/json", authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ name: workspaceNameDraft.trim() }) });
+      const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "تعذر إعادة تسمية المساحة");
+      await refreshWorkspaces(); setWorkspaceNameDraft(""); setWorkspaceNotice(locale === "ar" ? "تم تحديث اسم مساحة العمل." : "Workspace renamed.");
+    } catch(error) { setWorkspaceNotice(error instanceof Error ? error.message : "تعذر إعادة تسمية المساحة"); } finally { setBusy(false); }
+  }
+  async function archiveWorkspace() {
+    const current = workspaces.find(item => item.id === workspaceId); if (!current || current.isDefault || !adminToken.trim()) return;
+    if (!window.confirm(locale === "ar" ? `أرشفة مساحة «${current.name}»؟ لن تُحذف بياناتها.` : `Archive “${current.name}”? Its data will not be deleted.`)) return;
+    setBusy(true); setWorkspaceNotice("");
+    try {
+      const response = await fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}`, { method: "PATCH", headers: { "content-type": "application/json", authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ status: "archived" }) });
+      const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "تعذر أرشفة المساحة");
+      await refreshWorkspaces(); setWorkspaceId("main-workspace"); setWorkspaceNotice(locale === "ar" ? "تمت الأرشفة. نُقلت إلى المساحة الرئيسية." : "Archived. Switched to the default workspace.");
+    } catch(error) { setWorkspaceNotice(error instanceof Error ? error.message : "تعذر أرشفة المساحة"); } finally { setBusy(false); }
+  }
+  async function restoreWorkspace(workspaceToRestore: string) {
+    setBusy(true); setWorkspaceNotice("");
+    try {
+      const response = await fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceToRestore)}/restore`, { method: "POST", headers: { authorization: `Bearer ${adminToken}` } });
+      const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "تعذر استعادة المساحة");
+      await refreshWorkspaces(); setWorkspaceId(workspaceToRestore); setWorkspaceNotice(locale === "ar" ? "تمت استعادة المساحة والتبديل إليها." : "Workspace restored and selected.");
+    } catch(error) { setWorkspaceNotice(error instanceof Error ? error.message : "تعذر استعادة المساحة"); } finally { setBusy(false); }
+  }
 
   async function saveBudget() {
     if (!budgetValidation.valid || !adminToken.trim()) return;
@@ -238,7 +296,7 @@ export default function App() {
     }
     setBusy(true); setArticleNotice("");
     try {
-      const response = await fetch(`${apiBase}/api/v1/workspaces/main-workspace/articles`, {
+      const response = await fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/articles`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${adminToken}` },
         body: JSON.stringify({ topic, language, objective, clientName: clientName.trim(), brandName: brandName.trim() })
@@ -259,7 +317,7 @@ export default function App() {
     if (!nextStage || !adminToken.trim()) return;
     setAdvancingId(article.id); setArticleNotice("");
     try {
-      const response = await fetch(`${apiBase}/api/v1/workspaces/main-workspace/articles/${encodeURIComponent(article.id)}/stage`, {
+      const response = await fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/articles/${encodeURIComponent(article.id)}/stage`, {
         method: "PUT",
         headers: { "content-type": "application/json", authorization: `Bearer ${adminToken}` },
         body: JSON.stringify({ nextStage })
@@ -296,7 +354,23 @@ export default function App() {
         <span className="brand-copy"><strong>MAAROOF</strong><small>EDITORIAL AGENT</small></span>
         <span className="brand-version">BETA</span>
       </button>
-        <div className="workspace-switch" aria-label={copy.workspace}><span className="workspace-avatar">M</span><span><b>{copy.workspace}</b><small>{locale === "ar" ? "مساحة العمل الرئيسية" : "Main editorial workspace"}</small></span></div>
+        <section className="workspace-manager surface-card" aria-label={locale === "ar" ? "إدارة مساحات العمل" : "Workspace manager"}>
+          <label className="workspace-select-label">{locale === "ar" ? "مساحة العمل الحالية" : "Current workspace"}</label>
+          <select aria-label={locale === "ar" ? "اختيار مساحة العمل" : "Select workspace"} value={workspaceId} disabled={!adminToken.trim() || busy} onChange={event => setWorkspaceId(event.target.value)}>
+            {workspaces.filter(item => item.status !== "archived").map(item => <option key={item.id} value={item.id}>{item.name}{item.isDefault ? (locale === "ar" ? " · افتراضية" : " · Default") : ""}</option>)}
+            {!workspaces.length && <option value="main-workspace">{locale === "ar" ? "مساحة العمل الرئيسية" : "Main workspace"}</option>}
+          </select>
+          <input value={workspaceNameDraft} onChange={event => setWorkspaceNameDraft(event.target.value)} disabled={!adminToken.trim() || busy} maxLength={100} placeholder={locale === "ar" ? "اسم مساحة العمل" : "Workspace name"} aria-label={locale === "ar" ? "اسم مساحة العمل" : "Workspace name"}/>
+          <div className="workspace-manager-actions">
+            <button type="button" disabled={!adminToken.trim() || busy || workspaceNameDraft.trim().length < 2} onClick={createWorkspace}>{locale === "ar" ? "إنشاء" : "Create"}</button>
+            <button type="button" disabled={!adminToken.trim() || busy || workspaceNameDraft.trim().length < 2 || workspaceId === "main-workspace"} onClick={renameWorkspace}>{locale === "ar" ? "إعادة تسمية" : "Rename"}</button>
+            <button type="button" disabled={!adminToken.trim() || busy || workspaceId === "main-workspace"} onClick={archiveWorkspace}>{locale === "ar" ? "أرشفة" : "Archive"}</button>
+          </div>
+          <button type="button" className="workspace-archived-toggle" disabled={!adminToken.trim()} onClick={() => setShowArchivedWorkspaces(value => !value)}>{showArchivedWorkspaces ? (locale === "ar" ? "إخفاء المؤرشفة" : "Hide archived") : (locale === "ar" ? "عرض المساحات المؤرشفة" : "Show archived workspaces")}</button>
+          {showArchivedWorkspaces && workspaces.filter(item => item.status === "archived").map(item => <div className="workspace-restore-row" key={item.id}><span>{item.name}</span><button type="button" disabled={busy} onClick={() => restoreWorkspace(item.id)}>{locale === "ar" ? "استعادة" : "Restore"}</button></div>)}
+          {workspaceNotice && <small className="workspace-feedback" role="status">{workspaceNotice}</small>}
+          {!adminToken.trim() && <small className="workspace-feedback">{locale === "ar" ? "أدخل رمز المسؤول من الإعدادات لإدارة المساحات." : "Enter the admin key in Settings to manage workspaces."}</small>}
+        </section>
       {navGroups.map(group => <section className="nav-group" key={group.label}>
         <div className="side-label">{group.label}</div>
         <nav className="side-nav">
@@ -328,8 +402,8 @@ export default function App() {
       </header>
 
       <div className={`page-content ${view === "chat" ? "chat-page" : ""}`}>
-        {view === "chat" && <EditorialChatWorkspace apiBase={apiBase} token={adminToken} workspaceId="main-workspace" locale={locale} targets={chatTargets} onOpenSettings={() => setView("research-settings")} openConversationId={pendingConversationId} onConversationOpened={()=>setPendingConversationId(null)} onPrepareBrowser={draft=>{setBrowserChatDraft(draft);setBrowserDrawerOpen(true);}}/>}
-        {view === "library" && <LibraryView apiBase={apiBase} token={adminToken} locale={locale} copy={copy} onOpenConversation={id=>{setPendingConversationId(id);setView("chat");}}/>}
+        {view === "chat" && <EditorialChatWorkspace apiBase={apiBase} token={adminToken} workspaceId={workspaceId} locale={locale} targets={chatTargets} onOpenSettings={() => setView("research-settings")} openConversationId={pendingConversationId} onConversationOpened={()=>setPendingConversationId(null)} onPrepareBrowser={draft=>{setBrowserChatDraft(draft);setBrowserDrawerOpen(true);}}/>}
+        {view === "library" && <LibraryView apiBase={apiBase} token={adminToken} workspaceId={workspaceId} locale={locale} copy={copy} onOpenConversation={id=>{setPendingConversationId(id);setView("chat");}}/>}
         {view === "home" && <HomeView copy={copy} articles={articles} onCreate={() => setView("articles")} onRegistry={() => setView("registry")} onViewAll={() => setView("articles")} locale={locale} theme={theme}/>}
         {view === "articles" && <section className="page-section">
           <PageHeading eyebrow={locale === "ar" ? "مسار العمل التحريري" : "EDITORIAL WORKFLOW"} title={copy.newTitle} subtitle={copy.newSub} action={<span className="status-chip"><span className="status-dot"/>{locale==="ar"?"قرار النشر بيدك":"You control publishing"}</span>}/>
@@ -455,7 +529,7 @@ type LibraryDraft = {
   geo?: { intent?: string; primaryPhrase?: string; supportingTerms?: string[]; questions?: string[]; entities?: string[] };
   mediaNotes?: string; factCheckNotes?: string[]; createdAt: string;
 };
-function LibraryView({apiBase,token,locale,copy,onOpenConversation}:{apiBase:string;token:string;locale:Locale;copy:typeof t.ar;onOpenConversation:(id:string)=>void}) {
+function LibraryView({apiBase,token,workspaceId,locale,copy,onOpenConversation}:{apiBase:string;token:string;workspaceId:string;locale:Locale;copy:typeof t.ar;onOpenConversation:(id:string)=>void}) {
   const [items,setItems]=useState<LibraryDraft[]>([]);
   const [selectedId,setSelectedId]=useState("");
   const [loading,setLoading]=useState(false);
@@ -465,7 +539,7 @@ function LibraryView({apiBase,token,locale,copy,onOpenConversation}:{apiBase:str
     if(!token.trim()){setItems([]);return;}
     let cancelled=false;
     setLoading(true);setNotice("");
-    fetch(`${apiBase}/api/v1/workspaces/main-workspace/library`,{headers:{authorization:`Bearer ${token}`}})
+    fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/library`,{headers:{authorization:`Bearer ${token}`}})
       .then(async response=>{const payload=await response.json();if(!response.ok)throw new Error(payload.error||copy.libraryLoadError);return payload.items||[];})
       .then(data=>{if(!cancelled){setItems(data);setSelectedId(current=>data.some((item:LibraryDraft)=>item.id===current)?current:(data[0]?.id||""));}})
       .catch(error=>{if(!cancelled)setNotice(error instanceof Error?error.message:copy.libraryLoadError);})
