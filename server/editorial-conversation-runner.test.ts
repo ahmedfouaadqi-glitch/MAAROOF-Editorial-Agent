@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { appendEditorialConversationMessage, createEditorialConversation, getEditorialConversation, updateEditorialConversationRun } from "./editorial-conversations.mjs";
-import { createEditorialConversationProgress, runEditorialConversation } from "./editorial-conversation-runner.mjs";
+import { createEditorialConversationProgress, runEditorialConversation, cancelEditorialConversationRun } from "./editorial-conversation-runner.mjs";
 
 function makeStore() {
   const state: any = {
@@ -75,6 +75,24 @@ describe("editorial conversation workflow", () => {
     const finalConversation = await getEditorialConversation(store, "workspace-1", conversation.id);
     expect(finalConversation.messages.at(-1)?.result).toMatchObject({ needsReview: true });
     expect(finalConversation.activeRun?.metadata?.steps.find((step: any) => step.id === "originality")?.status).toBe("needs-review");
+  });
+
+  it("cancels an in-flight model request and does not save a draft", async () => {
+    const store = makeStore();
+    const { conversation, userMessage } = await startConversation(store);
+    const provider = { generateJSON: vi.fn(({ signal }: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(Object.assign(new Error("cancelled"), { name: "AbortError" })), { once: true });
+    })) };
+    await updateEditorialConversationRun(store, { workspaceId: "workspace-1", conversationId: conversation.id, runId: "run-cancel", status: "queued", metadata: createEditorialConversationProgress("en") });
+    const running = runEditorialConversation({ store, provider, workspaceId: "workspace-1", conversationId: conversation.id, runId: "run-cancel", userMessageId: userMessage.id, mediaDir: "/tmp/editorial-chat-no-media" });
+    await vi.waitFor(() => expect(provider.generateJSON).toHaveBeenCalledTimes(1));
+    const cancellation = await cancelEditorialConversationRun({ store, workspaceId: "workspace-1", conversationId: conversation.id });
+    const outcome = await running;
+    expect(cancellation.cancelled).toBe(true);
+    expect(outcome.status).toBe("cancelled");
+    const saved = await getEditorialConversation(store, "workspace-1", conversation.id);
+    expect(saved.activeRun?.status).toBe("cancelled");
+    expect(store.state.conversationDrafts).toHaveLength(0);
   });
 
   it("claims a queued run once when two workers receive the same run ID", async () => {
