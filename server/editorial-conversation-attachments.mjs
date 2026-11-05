@@ -175,10 +175,10 @@ export function parseCsvRows(input, { maxRows = 200, maxColumns = 40, maxCellCha
       else if (char === '"') quoted = false;
       else cell += char;
     } else if (char === '"' && cell.length === 0) quoted = true;
-    else if (char === ",") { row.push(cell.slice(0, maxCellChars)); cell = ""; }
+    else if (char === ",") { row.push(cell.slice(0, maxCellChars)); if (row.length > maxColumns) fail(`CSV exceeds the ${maxColumns}-column analysis limit`, 413); cell = ""; }
     else if (char === "\n" || char === "\r") {
       if (char === "\r" && input[index + 1] === "\n") index += 1;
-      row.push(cell.slice(0, maxCellChars)); cell = "";
+      row.push(cell.slice(0, maxCellChars)); if (row.length > maxColumns) fail(`CSV exceeds the ${maxColumns}-column analysis limit`, 413); cell = "";
       if (row.some(value => value.trim())) rows.push(row);
       row = [];
       if (rows.length > maxRows) fail(`CSV exceeds the ${maxRows}-row analysis limit`, 413);
@@ -186,7 +186,7 @@ export function parseCsvRows(input, { maxRows = 200, maxColumns = 40, maxCellCha
     if (row.length > maxColumns) fail(`CSV exceeds the ${maxColumns}-column analysis limit`, 413);
   }
   if (quoted) fail("CSV contains an unterminated quoted field");
-  if (cell.length || row.length) { row.push(cell.slice(0, maxCellChars)); if (row.some(value => value.trim())) rows.push(row); }
+  if (cell.length || row.length) { row.push(cell.slice(0, maxCellChars)); if (row.length > maxColumns) fail(`CSV exceeds the ${maxColumns}-column analysis limit`, 413); if (row.some(value => value.trim())) rows.push(row); }
   if (rows.length > maxRows) fail(`CSV exceeds the ${maxRows}-row analysis limit`, 413);
   if (!rows.length) return { headers: [], rows: [] };
   const rawHeaders = rows[0].slice(0, maxColumns);
