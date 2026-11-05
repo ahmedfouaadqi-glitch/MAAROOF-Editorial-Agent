@@ -8,7 +8,7 @@ function fail(message, status = 400) {
 }
 function normalizeName(value) {
   if (typeof value !== "string") fail("Workspace name is required");
-  const name = value.trim().replace(/\\s+/g, " ");
+  const name = value.trim().replace(/\s+/g, " ");
   if (name.length < 2 || name.length > MAX_NAME) fail("Workspace name must contain 2-100 characters");
   return name;
 }
