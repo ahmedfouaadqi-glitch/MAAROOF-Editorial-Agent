@@ -33,6 +33,7 @@
 - [x] Add deterministic exact-match and token-overlap near-duplicate checks against previously submitted workspace text.
 - [ ] Add semantic, cross-language, and external-corpus originality checks; these require validated embeddings/models and a wider corpus.
 - [x] Add deterministic tests for evidence linking, workspace isolation, Arabic normalization, and exact-match detection.
+- [x] Add deterministic editorial QA for generated conversation drafts: structure, readability indicators, GEO phrase/entity/question coverage, and metadata suggestions; expose the report in the draft review UI. This is a heuristic checklist, not ranking, fact verification, or visibility measurement.
 - [ ] Add deterministic tests for the remaining editorial engines.
 - [x] Keep the existing optional model adapter disabled; article-writing model calls are deferred until a later phase.
 - [ ] Add model-assisted named-entity recognition, entity resolution, and search intent extraction after evaluation sets are ready.
