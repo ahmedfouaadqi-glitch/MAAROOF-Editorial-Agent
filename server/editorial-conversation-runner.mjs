@@ -3,6 +3,7 @@ import { extractConversationAttachmentContext } from "./editorial-conversation-a
 import { analyzeOriginality } from "./editorial-originality.mjs";
 import { analyzeEditorialDraft } from "./editorial-intelligence.mjs";
 import { getEditorialTarget } from "./editorial-targets.mjs";
+import { classifyEditorialRunFailure } from "./editorial-run-failures.mjs";
 
 const MAX_TOTAL_DOCUMENT_CHARS = 20_000;
 const activeRunControllers = new Map();
@@ -290,9 +291,17 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
         result: { kind: "notice", code: "editorial-run-failed" }
       });
       assistantMessageId = message.id;
-      await setRun("failed", { error: "editorial-run-failed", assistantMessageId, finishedAt: new Date().toISOString() });
+      const failure = classifyEditorialRunFailure(error);
+      await setRun("failed", {
+        error: failure.code,
+        failure,
+        failedStep: failedStep?.id || null,
+        assistantMessageId,
+        finishedAt: new Date().toISOString()
+      });
     } catch {}
-    return { status: "failed", assistantMessageId, errorCode: error?.status ? `http-${error.status}` : "editorial-run-failed" };
+    const failure = classifyEditorialRunFailure(error);
+    return { status: "failed", assistantMessageId, errorCode: failure.code, retryable: failure.retryable };
   } finally {
     activeRunControllers.delete(runId);
   }
