@@ -8,6 +8,12 @@ export type ChatTarget = {
 };
 type Attachment = { id: string; originalName?: string; name?: string; kind?: string; mimeType?: string; sizeBytes?: number };
 type DraftResult = {
+  intelligence?: {
+    metrics?: { wordCount?: number; headingCount?: number };
+    geo?: { primaryPhrase?: string; primaryPhraseOccurrences?: number };
+    metadataSuggestions?: { metaDescription?: string };
+    recommendations?: string[];
+  };
   kind?: string; targetId?: string; targetName?: string; needsReview?: boolean; limitations?: string[];
   similarity?: { exactMatches?: unknown[]; nearMatches?: Array<{ title?: string; similarity?: number }> };
   usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number } | null;
