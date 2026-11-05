@@ -100,13 +100,14 @@ function requireAdmin(req) {
   if (!adminToken) throw Object.assign(new Error("ADMIN_API_TOKEN is not configured"), { status: 503 });
   if (req.headers.authorization !== `Bearer ${adminToken}`) throw Object.assign(new Error("Unauthorized"), { status: 401 });
 }
-function validateScope(body) {
+async function validateScope(body) {
   if (typeof body.workspaceId !== "string" || !body.workspaceId.trim() || body.workspaceId.length > 128) {
     throw Object.assign(new Error("workspaceId is required"), { status: 400 });
   }
   if (typeof body.taskId !== "string" || !body.taskId.trim() || body.taskId.length > 128) {
     throw Object.assign(new Error("taskId is required"), { status: 400 });
   }
+  getWorkspace(await store.read(), body.workspaceId);
 }
 
 const server = createServer(async (req, res) => {
@@ -124,6 +125,11 @@ const server = createServer(async (req, res) => {
     }
 
     requireAdmin(req);
+
+    const scopedWorkspace = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)/);
+    if (scopedWorkspace && !url.pathname.endsWith("/restore")) {
+      getWorkspace(await store.read(), decodeURIComponent(scopedWorkspace[1]));
+    }
 
     if (url.pathname === "/api/v1/workspaces" && req.method === "GET") {
       const state = await store.read();
@@ -683,7 +689,7 @@ const server = createServer(async (req, res) => {
     const reservationMatch = url.pathname.match(/^\/api\/v1\/tasks\/([^/]+)\/research-reservations$/);
     if (reservationMatch && req.method === "POST") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const result = await store.transact(state => reserveBudget(state, {
         ...body, taskId: decodeURIComponent(reservationMatch[1])
       }));
@@ -693,7 +699,7 @@ const server = createServer(async (req, res) => {
     const reservationAction = url.pathname.match(/^\/api\/v1\/tasks\/([^/]+)\/research-reservations\/([^/]+)\/(release|commit)$/);
     if (reservationAction && req.method === "POST") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const input = { ...body, taskId: decodeURIComponent(reservationAction[1]), reservationId: decodeURIComponent(reservationAction[2]) };
       const result = await store.transact(state => reservationAction[3] === "release" ? releaseReservation(state, input) : commitReservation(state, input));
       return send(res, 200, result);
@@ -725,7 +731,7 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/v1/claims") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const claim = await store.transact(state => registerClaim(state, body));
       return send(res, 201, { claim });
     }
@@ -737,13 +743,13 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "PUT" && url.pathname === "/api/v1/sources/assessment") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const source = await store.transact(state => assessSource(state, body));
       return send(res, 200, { source, note: "Manual metadata assessment only. The source content was not fetched or independently verified." });
     }
     if (req.method === "POST" && url.pathname === "/api/v1/research/evidence") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const evidence = await store.transact(state => recordEvidence(state, body));
       return send(res, 201, { evidence, note: "This is a manually recorded excerpt and editorial stance, not independent verification." });
     }
@@ -757,13 +763,13 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/v1/entities") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const entity = await store.transact(state => createEntity(state, body));
       return send(res, 201, { entity });
     }
     if (req.method === "POST" && url.pathname === "/api/v1/entities/scan") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const result = await store.transact(state => scanKnownEntities(state, body));
       return send(res, 200, { result });
     }
@@ -774,21 +780,21 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/v1/entity-relationships") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const relationship = await store.transact(state => createEntityRelationship(state, body));
       return send(res, 201, { relationship });
     }
 
     if (req.method === "POST" && url.pathname === "/api/v1/originality/check") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const result = await store.transact(state => checkOriginality(state, body));
       return send(res, 200, { result });
     }
 
     if (req.method === "POST" && url.pathname === "/api/v1/sources") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       if (typeof body.url !== "string" || body.url.length > 2048) return send(res, 400, { error: "A source URL is required" });
       let parsed;
       try { parsed = new URL(body.url); } catch { return send(res, 400, { error: "Invalid source URL" }); }
