@@ -25,8 +25,9 @@ const ACCEPTED_TYPES = new Set([
 ]);
 const ACCEPTED_EXTENSIONS = /\.(jpe?g|png|webp|mp4|webm|pdf|docx|txt|md)$/i;
 
-export default function EditorialChatWorkspace({ apiBase, token, workspaceId, locale, targets, onOpenSettings, onPrepareBrowser }: {
+export default function EditorialChatWorkspace({ apiBase, token, workspaceId, locale, targets, onOpenSettings, onPrepareBrowser, openConversationId, onConversationOpened }: {
   apiBase: string; token: string; workspaceId: string; locale: "ar" | "en"; targets: ChatTarget[]; onOpenSettings: () => void; onPrepareBrowser?: (draft: EditorialChatBrowserDraft) => void;
+  openConversationId?: string | null; onConversationOpened?: () => void;
 }) {
   const ar = locale === "ar";
   const t = ar ? {
@@ -44,7 +45,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
     cta: "دعوة للتفاعل", hashtags: "وسوم", mediaNotes: "ملاحظات الوسائط", factChecks: "نقاط تحتاج إلى تحقق", limitations: "حدود هذه المسودة",
     similarity: "تنبيه التشابه: راجع المسودات المشابهة قبل الاستخدام.", providerFailed: "لم يتم النشر. أعد إعداد مزود النموذج المستقل على الخادم ثم حاول مجدداً.",
     wait: "انتظر اكتمال المسار الحالي قبل إرسال طلب آخر.", noTarget: "اختر منصة أو مجلة أولاً.", noClient: "غير محدد", openSettings: "إعداد النموذج يتم على الخادم، لا في هذه الشاشة.",
-    note: "المسودة لا تُنشر تلقائياً. البحث والكشط الخارجي غير منفّذين في هذه المرحلة.", start: "ابدأ التحرير", runningNote: "تظهر الخطوات المنفذة والمتخطاة بوضوح؛ لا يتم النشر من هنا.", browserHandoff: "المتابعة في المتصفح", browserHandoffHint: "تسجيل الدخول والإدراج اختياريان؛ لن يُضغط زر النشر."
+    note: "المسودة لا تُنشر تلقائياً. البحث والكشط الخارجي غير منفّذين في هذه المرحلة.", start: "ابدأ التحرير", runningNote: "تظهر الخطوات المنفذة والمتخطاة بوضوح؛ لا يتم النشر من هنا.", browserHandoff: "المتابعة في المتصفح", browserHandoffHint: "تسجيل الدخول والإدراج اختياريان؛ لن يُضغط زر النشر.", taskBrief: "ملخص المهمة", editRequest: "تعديل الطلب", retry: "إعادة المحاولة", followUp: "متابعة وتطوير", downloadDraft: "تنزيل المسودة", savedLocally: "حُفظت المسودة في مكتبة مساحة العمل."
   } : {
     history: "Conversation history", newChat: "New conversation", search: "Search destinations...", choose: "Choose a platform or magazine",
     emptyTitle: "What do you want to accomplish?", emptySub: "Start with your own request or choose an editable example. Select a destination and attach files when useful.", startersTitle: "Start from an example", starterArticle: "Write an article", starterArticleHint: "A structured, review-ready article", starterPost: "Professional post", starterPostHint: "A focused idea for LinkedIn", starterVideo: "Video script", starterVideoHint: "Hook, scenes and on-screen text", starterNewsletter: "Editorial newsletter", starterNewsletterHint: "A reader-focused opening and body",
@@ -60,7 +61,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
     cta: "Call to action", hashtags: "Hashtags", mediaNotes: "Media notes", factChecks: "Fact-check notes", limitations: "Draft limitations",
     similarity: "Similarity alert: review matching drafts before use.", providerFailed: "Nothing was published. Configure the independent model provider on the server, then try again.",
     wait: "Wait for the current workflow to finish before sending another request.", noTarget: "Choose a platform or magazine first.", noClient: "Not specified", openSettings: "Model setup is server-side, not on this screen.",
-    note: "Drafts are not published automatically. External search and crawling are not run at this stage.", start: "Start editing", runningNote: "Completed and skipped steps are clearly marked; nothing is published here.", browserHandoff: "Continue in browser", browserHandoffHint: "Sign-in and insertion are optional; Publish will not be clicked."
+    note: "Drafts are not published automatically. External search and crawling are not run at this stage.", start: "Start editing", runningNote: "Completed and skipped steps are clearly marked; nothing is published here.", browserHandoff: "Continue in browser", browserHandoffHint: "Sign-in and insertion are optional; Publish will not be clicked.", taskBrief: "Task brief", editRequest: "Revise request", retry: "Retry request", followUp: "Continue and refine", downloadDraft: "Download draft", savedLocally: "This draft is saved in the workspace library."
   };
   const errorText = ar ? "تعذّر إكمال الطلب. حاول مجدداً." : "The request failed. Please try again.";
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -78,6 +79,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const filesRef = useRef<PendingFile[]>([]);
   const base = `${apiBase.replace(/\/$/, "")}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/conversations`;
@@ -100,6 +102,25 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
   }, [base, request, token, errorText]);
 
   useEffect(() => { void loadList(); }, [loadList]);
+  useEffect(() => {
+    if (!openConversationId || !token.trim()) return;
+    let cancelled = false;
+    setLoading(true); setNotice("");
+    request(`${base}/${encodeURIComponent(openConversationId)}`)
+      .then(data => {
+        if (cancelled) return;
+        const value = data.conversation || data;
+        setConversation(value);
+        setMessages(Array.isArray(value.messages) ? value.messages : []);
+        setTargetId(value.targetId || "");
+        setClientName(value.clientName || "");
+        setBrandName(value.brandName || "");
+        onConversationOpened?.();
+      })
+      .catch(error => { if (!cancelled) setNotice(error instanceof Error ? error.message : errorText); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [openConversationId, base, request, token, errorText, onConversationOpened]);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, conversation?.activeRun?.metadata?.steps]);
   useEffect(() => { filesRef.current = files; }, [files]);
   useEffect(() => () => filesRef.current.forEach(item => { if (item.preview) URL.revokeObjectURL(item.preview); }), []);
@@ -223,6 +244,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
   const completedSteps = currentRun?.metadata?.completedSteps ?? steps.filter(step => ["completed", "skipped", "needs-review"].includes(step.status)).length;
   const totalSteps = currentRun?.metadata?.totalSteps || 10;
   const runLabel = currentRun ? (currentRun.status === "queued" ? t.queued : currentRun.status === "running" ? t.running : currentRun.status === "completed" ? t.completed : currentRun.status === "cancelled" ? t.cancelled : t.failed) : "";
+  const latestUserMessage = [...messages].reverse().find(message => message.role === "user");
 
   if (!token.trim()) return <section className="editorial-chat-workspace" dir={ar ? "rtl" : "ltr"}>
     <div className="editorial-chat-token-prompt"><MessageSquare aria-hidden="true"/><p>{t.settings}</p><button type="button" onClick={onOpenSettings}><Settings size={16}/>{t.goSettings}</button></div>
