@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   createConversationAttachment,
+  parseCsvRows,
   deleteConversationAttachment,
   extractConversationAttachmentContext,
   resolveConversationAttachmentFile
@@ -42,6 +43,31 @@ describe("conversation attachments", () => {
       expect(await readFile(resolved.filePath)).toEqual(text);
       await expect(resolveConversationAttachmentFile({ store, workspaceId: "workspace-other", conversationId: "conv-1", attachmentId: attachment.id, mediaDir })).rejects.toMatchObject({ status: 404 });
       expect(await deleteConversationAttachment({ store, workspaceId: "workspace-1", conversationId: "conv-1", attachmentId: attachment.id, mediaDir })).toMatchObject({ id: attachment.id, deleted: true });
+    } finally { await rm(mediaDir, { recursive: true, force: true }); }
+  });
+
+  it("parses bounded CSV rows with quoted commas and escaped quotes", () => {
+    const parsed = parseCsvRows('Name,Notes,Count\r\n"Brand A","A, B and ""C""",12\r\nBrand B,"Second row",8');
+    expect(parsed.headers).toEqual(["Name", "Notes", "Count"]);
+    expect(parsed.rows).toEqual([
+      { Name: "Brand A", Notes: 'A, B and "C"', Count: "12" },
+      { Name: "Brand B", Notes: "Second row", Count: "8" }
+    ]);
+    expect(() => parseCsvRows("a,b\n1,2\n3,4", { maxRows: 1 })).toThrow(/row analysis limit/);
+    expect(() => parseCsvRows("a,b,c\n1,2,3", { maxColumns: 2 })).toThrow(/column analysis limit/);
+    expect(() => parseCsvRows('a,b\n"unterminated,2')).toThrow(/unterminated quoted field/);
+  });
+
+  it("stores CSV locally and supplies structured rows to the conversation context", async () => {
+    const mediaDir = await mkdtemp(join(tmpdir(), "editorial-chat-csv-"));
+    const store = makeStore();
+    try {
+      const csv = Buffer.from('Keyword,Market,Volume\n"AI content strategy",Iraq,1200\nGEO audit,UAE,450', "utf8");
+      const attachment = await createConversationAttachment({ req: requestFor(csv, "text/csv", "keyword-research.csv"), store, workspaceId: "workspace-1", conversationId: "conv-1", mediaDir });
+      expect(attachment).toMatchObject({ kind: "document", mimeType: "text/csv", originalName: "keyword-research.csv" });
+      const context = await extractConversationAttachmentContext({ store, workspaceId: "workspace-1", conversationId: "conv-1", attachmentIds: [attachment.id], mediaDir });
+      expect(context.documents[0].text).toContain('"AI content strategy"');
+      expect(context.documents[0].text).toContain('"Volume":"1200"');
     } finally { await rm(mediaDir, { recursive: true, force: true }); }
   });
 
