@@ -351,6 +351,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/v1/admin/ai-visibility") {
       const workspaceId = url.searchParams.get("workspaceId") || "main-workspace";
       const state = await store.read();
+      getWorkspace(state, workspaceId);
       const events = listVisibilityEvents(state, workspaceId);
       return send(res, 200, { events, summary: summarizeVisibility(events), limitations: {
         crawlerFetch: "Only observed events explicitly ingested or manually recorded are shown; no server/CDN access-log integration is currently connected.",
@@ -361,7 +362,10 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/v1/admin/ai-visibility/events") {
       const body = await readJson(req);
-      const event = await store.transact(state => recordVisibilityEvent(state, body));
+      const event = await store.transact(state => {
+        getWorkspace(state, body.workspaceId);
+        return recordVisibilityEvent(state, body);
+      });
       return send(res, 201, { event });
     }
 
