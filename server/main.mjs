@@ -26,6 +26,7 @@ import { getGeoBrief, getGeoReadiness, updateGeoBrief } from "./editorial-geo.mj
 import { listEditorialBrands, listEditorialClients } from "./editorial-identities.mjs";
 import { createBrowserAgentClient } from "./browser-agent-client.mjs";
 import { createEditorialConversation, listEditorialConversations, getEditorialConversation, appendEditorialConversationMessage, updateEditorialConversationRun } from "./editorial-conversations.mjs";
+import { listEditorialLibraryItems } from "./editorial-library.mjs";
 import { createConversationAttachment, listConversationAttachments, resolveConversationAttachmentFile, deleteConversationAttachment } from "./editorial-conversation-attachments.mjs";
 import { listEditorialTargets } from "./editorial-targets.mjs";
 import { createEditorialConversationProgress, runEditorialConversation } from "./editorial-conversation-runner.mjs";
@@ -125,6 +126,13 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/api/v1/editorial-targets") {
       return send(res, 200, { targets: listEditorialTargets() });
+    }
+
+    const libraryCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/library$/);
+    if (libraryCollection && req.method === "GET") {
+      const workspaceId = decodeURIComponent(libraryCollection[1]);
+      const state = await store.read();
+      return send(res, 200, { items: listEditorialLibraryItems(state, workspaceId) });
     }
 
     const conversationsCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/conversations$/);
