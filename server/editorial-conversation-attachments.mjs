@@ -234,7 +234,7 @@ export async function extractConversationAttachmentContext({ store, workspaceId,
       try {
         if (asset.mimeType === "text/plain" || asset.mimeType === "text/markdown") text = buffer.toString("utf8");
         else if (asset.mimeType === "text/csv") {
-          const parsed = parseCsvRows(buffer.toString("utf8").replace(/^\\uFEFF/, ""));
+          const parsed = parseCsvRows(buffer.toString("utf8").replace(/^\uFEFF/, ""));
           text = `CSV HEADERS: ${JSON.stringify(parsed.headers)}\nCSV ROWS: ${JSON.stringify(parsed.rows)}`;
         } else if (asset.mimeType === "application/pdf") {
           const parsed = await pdfParse(buffer, { max: 60 });
