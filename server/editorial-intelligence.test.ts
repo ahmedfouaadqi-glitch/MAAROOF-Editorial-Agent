@@ -27,7 +27,7 @@ describe("analyzeEditorialDraft", () => {
     expect(report.geo.primaryPhraseOccurrences).toBeGreaterThan(0);
     expect(report.geo.supportingCoverage[0].occurrences).toBeGreaterThan(0);
     expect(report.geo.entityCoverage.every(item => item.mentioned)).toBe(true);
-    expect(report.limitations).toContain(expect.stringContaining("not a search-engine ranking score"));
+    expect(report.limitations.some(item => item.includes("not a search-engine ranking score"))).toBe(true);
   });
 
   it("does not invent keyword volume, ranking, or verification claims", () => {
