@@ -21,12 +21,12 @@ describe("legacy workspace ownership migration", () => {
 
     expect(migrateLegacyWorkspaceOwnership(state)).toEqual({
       migratedConversations: 1,
-      migratedAttachments: 1
+      migratedAttachments: 2
     });
     expect(state.editorialConversations[0].workspaceId).toBe("main-workspace");
     expect(state.editorialConversations[1].workspaceId).toBe("client-workspace");
     expect(state.conversationAttachments[0].workspaceId).toBe("main-workspace");
-    expect(state.conversationAttachments[1].workspaceId).toBeUndefined();
+    expect(state.conversationAttachments[1].workspaceId).toBe("client-workspace");
     expect(state.conversationAttachments[2].workspaceId).toBeUndefined();
     expect(state.conversationAttachments[3].workspaceId).toBe("other-workspace");
   });
