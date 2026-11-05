@@ -34,7 +34,6 @@
 - [x] Add draft-run integration and an Arabic/English review panel with match type, comparison scope, corpus size, and strongest lexical similarity; short candidates require review rather than receiving a clean result.
 - [ ] Add validated semantic/paraphrase and cross-language similarity using evaluated multilingual embeddings; no semantic capability is claimed by the current lexical engine.
 - [ ] Add external-corpus checks against permitted web, academic, and publisher sources; no public-web or paid plagiarism database is queried by the current engine.
-- [ ] Add semantic, cross-language, and external-corpus originality checks; these require validated embeddings/models and a wider corpus.
 - [x] Add deterministic tests for evidence linking, workspace isolation, Arabic normalization, exact-match detection, near-overlap signals, insufficient text, and no cross-workspace leakage.
 - [ ] Add deterministic tests for the remaining editorial engines.
 - [x] Keep the existing optional model adapter disabled; article-writing model calls are deferred until a later phase.
