@@ -116,7 +116,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
     } catch (error) { setNotice(error instanceof Error ? error.message : errorText); }
   }, [base, request, token, errorText]);
 
-  useEffect(() => { startNew(); setConversations([]); void loadList(); }, [workspaceId]);
+  useEffect(() => { startNew(); setConversations([]); }, [workspaceId]);
   useEffect(() => { void loadList(); }, [loadList]);
   useEffect(() => {
     if (!openConversationId || !token.trim()) return;
