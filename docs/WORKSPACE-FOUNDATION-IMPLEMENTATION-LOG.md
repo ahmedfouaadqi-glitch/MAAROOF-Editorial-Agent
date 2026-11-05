@@ -73,3 +73,34 @@ Decision record: `docs/ARCHITECTURE-DECISION-SINGLE-ADMIN.md`.
 - Pending conversation handoffs and browser publishing drawer/draft state are cleared on workspace change.
 - Latest recorded code commit: fbae9fecc9b82d7779d3c71a4ccfe35531d6061c.
 - Latest Vercel check remains failed due to the build-rate-limit/plan restriction; GitHub Actions workflow lookup still returns no run. Code validation remains outstanding.
+
+## Stage 1 verification and Stage 2 shell update
+
+### Additional workspace-boundary coverage
+- Added API integration coverage for cross-workspace conversation reads, attachment listing, cancellation, browser destination listing, browser session listing, and AI Visibility reads/writes.
+- AI Visibility now validates that the requested workspace exists and is active for both read and write operations.
+- Added browser runtime tests for mixed public/private DNS answers, loopback/private IPv4 and IPv6 literals, IPv4-mapped IPv6 loopback, and hostname suffix boundaries.
+- Corrected the legacy migration test expectation: an unscoped attachment inherits the workspace of its uniquely linked conversation whether that conversation was itself migrated or already scoped.
+
+### Stage 1 CI gate
+- Commit f41cf973279eea8934be6cf90573257499ea4a3b passed GitHub Actions run 41962963041: TypeScript typecheck, all 208 tests across 40 test files, and production build.
+- This is repository CI evidence; it is not a live browser end-to-end test or a production deployment.
+
+### Stage 2 — Agent-first navigation
+- Replaced the old primary navigation with three persistent destinations: Conversation, History, and Workspaces.
+- Added a dedicated conversation history view scoped to the active workspace; selecting a record reopens the original conversation.
+- Moved workspace lifecycle controls into a dedicated Workspaces view and retained the active workspace indicator in the shell.
+- Hid legacy dashboard/registry/library/settings destinations from primary navigation without deleting their underlying code or data.
+- Kept browser handoff available from the conversation surface rather than presenting it as a separate primary destination.
+- Fixed a TypeScript navigation badge comparison identified by CI.
+- Commit bc0059e79642f19f232bfa2f78570f97f130785e passed GitHub Actions run 41963192896: typecheck, 208 tests across 40 files, and production build.
+
+### Current external deployment status
+- Vercel still reports a build-rate-limit/plan restriction. No successful preview deployment is claimed.
+- PR #10 remains draft and unmerged. No production deployment or external publishing action was performed.
+
+### Remaining before this foundation can be approved
+1. Run a browser end-to-end test against a controlled owned publishing site and verify workspace switching/history behavior in the browser.
+2. Resolve Vercel preview build availability or provide another controlled preview environment.
+3. Complete the broader browser-worker adversarial review, especially DNS rebinding/TOCTOU behavior and redirect/subresource edge cases.
+4. Continue Stage 3: formalize and test the conversation orchestrator's plan/act/observe/reflect lifecycle, retry/cancel behavior, step provenance, and cost gates.
