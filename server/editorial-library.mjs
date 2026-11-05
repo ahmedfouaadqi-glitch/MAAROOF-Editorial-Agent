@@ -23,7 +23,7 @@ export function listEditorialLibraryItems(state, workspaceId) {
         clientName: item.clientName || conversation.clientName || null,
         brandName: item.brandName || conversation.brandName || null,
         language: conversation.language || "ar",
-        request: (conversation.messages || []).find(entry => entry.role === "user" && entry.createdAt <= (message?.createdAt || item.createdAt))?.content || "",
+        request: message?.role === "user" ? message.content : (conversation.messages || []).filter(entry => entry.role === "user").at(-1)?.content || "",
         format: item.format || "",
         hook: item.hook || "",
         body: item.body || "",
