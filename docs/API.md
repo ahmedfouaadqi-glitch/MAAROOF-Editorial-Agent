@@ -318,3 +318,9 @@ A successful scrape means content was retrieved, not that it is accurate, origin
 - GET /api/v1/workspaces/:workspaceId/tasks/:taskId/research/inspections — list inspections.
 
 The default quota is 5 inspections per article. An inspection reports word count, Markdown heading count, inline link count and structural warnings. It is a local deterministic check; it does not consume a Firecrawl request and does not establish source credibility or factual accuracy.
+
+
+## Conversation library and run controls
+
+- `GET /api/v1/workspaces/:workspaceId/library` — list saved conversation drafts for the requested workspace. Results are derived from persisted conversation drafts and are filtered by workspace ownership.
+- `POST /api/v1/workspaces/:workspaceId/conversations/:conversationId/cancel` — cooperatively cancel the queued/running editorial generation for that conversation. The server aborts the in-flight model request when it is active and records the run as cancelled. It does not undo already completed external actions; the conversation runner performs no publishing.
