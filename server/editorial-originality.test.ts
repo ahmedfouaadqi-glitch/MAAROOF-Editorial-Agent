@@ -12,7 +12,7 @@ function stateWithDraft(text, workspaceId = "workspace-1") {
       id: "saved-draft-1",
       workspaceId,
       conversationId: "conversation-1",
-      title: "Saved editorial content",
+      title: "",
       body: text,
       clientId: "client-1",
       brandId: "brand-1"
