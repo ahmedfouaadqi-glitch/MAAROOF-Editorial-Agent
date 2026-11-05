@@ -153,6 +153,8 @@ describe("workspace API integration", () => {
     expect(foreignAttachments.status).toBe(404);
     const foreignCancel = await api(`/api/v1/workspaces/${workspaceB.id}/conversations/${conversation.id}/cancel`, { method: "POST" });
     expect(foreignCancel.status).toBe(404);
+    const foreignRetry = await api(`/api/v1/workspaces/${workspaceB.id}/conversations/${conversation.id}/retry`, { method: "POST" });
+    expect(foreignRetry.status).toBe(404);
   });
 
   it("rejects retry unless the conversation's previous run failed or was cancelled", async () => {
