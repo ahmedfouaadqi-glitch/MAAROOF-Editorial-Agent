@@ -428,7 +428,7 @@ body:has(.app-shell.theme-dark){background:#10100F}
 /* Admin single-account workspace lifecycle */
 .workspace-manager{display:grid;gap:7px;margin:0 0 22px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
 .workspace-select-label{font-size:9px;font-weight:700;color:var(--muted-strong)}
-.workspace-manager select,.workspace-manager input{width:100%;min-width:0;height:33px;border:1px solid var(--line);border-radius:7px;background:var(--surface-soft);color:var(--text-strong);padding:0 8px;font:10px inherit;outline:none}
+.workspace-manager select,.workspace-manager input{width:100%;min-width:0;height:33px;border:1px solid var(--line);border-radius:7px;background:var(--surface-soft);color:var(--text-strong);padding:0 8px;font-size:10px;font-family:inherit;outline:none}
 .workspace-manager select:focus,.workspace-manager input:focus{border-color:var(--accent)}
 .workspace-manager-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
 .workspace-manager-actions button,.workspace-archived-toggle,.workspace-restore-row button{min-width:0;border:1px solid var(--line);border-radius:6px;background:var(--surface-soft);color:var(--muted-strong);padding:6px 4px;font-size:8px;cursor:pointer}
