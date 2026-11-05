@@ -37,6 +37,7 @@ const EMPTY = {
   tasks: {},
   workspaces: [],
   editorialConversations: [],
+  editorialJobQueue: [],
   conversationAttachments: [],
   sources: [],
   researchSearches: [],
@@ -66,6 +67,7 @@ export class JsonStore {
       state.tasks ||= {};
       if (!Array.isArray(state.editorialConversations)) { state.editorialConversations = []; changed = true; }
       if (!Array.isArray(state.conversationAttachments)) { state.conversationAttachments = []; changed = true; }
+      if (!Array.isArray(state.editorialJobQueue)) { state.editorialJobQueue = []; changed = true; }
       const ownershipMigration = migrateLegacyWorkspaceOwnership(state);
       if (ownershipMigration.migratedConversations || ownershipMigration.migratedAttachments) changed = true;
       for (const task of Object.values(state.tasks)) {
@@ -78,7 +80,7 @@ export class JsonStore {
         }
         task.reservations ||= {};
       }
-      if (changed || !raw.includes('"workspaces"') || !raw.includes('"scrapesPerArticle"') || !raw.includes('"researchScrapes"') || !raw.includes('"researchInspections"') || !raw.includes('"editorialConversations"') || !raw.includes('"conversationAttachments"')) await this.#write(state);
+      if (changed || !raw.includes('"workspaces"') || !raw.includes('"scrapesPerArticle"') || !raw.includes('"researchScrapes"') || !raw.includes('"researchInspections"') || !raw.includes('"editorialConversations"') || !raw.includes('"conversationAttachments"') || !raw.includes('"editorialJobQueue"')) await this.#write(state);
     }
     catch (error) {
       if (error.code !== "ENOENT") throw error;
