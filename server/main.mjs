@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { resolve } from "node:path";
 import { JsonStore } from "./store.mjs";
+import { createWorkspace, getWorkspace, listWorkspaces, restoreWorkspace, updateWorkspace } from "./editorial-workspaces.mjs";
 import { DEFAULT_LIMITS, validateLimits, reserveBudget, releaseReservation, commitReservation } from "./research-budget.mjs";
 import { createEditorialTask, listEditorialTasks, advanceEditorialTask } from "./editorial-tasks.mjs";
 import { registerClaim, listClaims, checkOriginality } from "./editorial-evidence.mjs";
@@ -25,7 +26,7 @@ import { createMediaAsset, deleteMediaAsset, listMediaAssets, resolveMediaAssetF
 import { getGeoBrief, getGeoReadiness, updateGeoBrief } from "./editorial-geo.mjs";
 import { listEditorialBrands, listEditorialClients } from "./editorial-identities.mjs";
 import { createBrowserAgentClient } from "./browser-agent-client.mjs";
-import { createEditorialConversation, listEditorialConversations, getEditorialConversation, appendEditorialConversationMessage, updateEditorialConversationRun } from "./editorial-conversations.mjs";
+import { createEditorialConversation, listEditorialConversations, getEditorialConversation, appendEditorialConversationMessage, updateEditorialConversationRun, recoverInterruptedEditorialConversationRuns, enqueueEditorialConversationJob, claimNextEditorialConversationJob, finishEditorialConversationJob } from "./editorial-conversations.mjs";
 import { listEditorialLibraryItems } from "./editorial-library.mjs";
 import { createConversationAttachment, listConversationAttachments, resolveConversationAttachmentFile, deleteConversationAttachment } from "./editorial-conversation-attachments.mjs";
 import { listEditorialTargets } from "./editorial-targets.mjs";
@@ -60,6 +61,44 @@ const configuredModelTokens = Number(process.env.MODEL_MAX_OUTPUT_TOKENS || 3000
 const modelMaxOutputTokens = Number.isSafeInteger(configuredModelTokens) && configuredModelTokens >= 256 && configuredModelTokens <= 8192 ? configuredModelTokens : 3000;
 const configuredModelRequests = Number(process.env.MODEL_REQUESTS_PER_ARTICLE || 2);
 const modelRequestsPerArticle = Number.isSafeInteger(configuredModelRequests) && configuredModelRequests >= 1 && configuredModelRequests <= 10 ? configuredModelRequests : 2;
+
+let editorialQueueDrainScheduled = false;
+let editorialQueueDraining = false;
+function scheduleEditorialQueueDrain() {
+  if (editorialQueueDrainScheduled || editorialQueueDraining) return;
+  editorialQueueDrainScheduled = true;
+  setImmediate(() => { void drainEditorialConversationQueue(); });
+}
+async function drainEditorialConversationQueue() {
+  if (editorialQueueDraining) return;
+  editorialQueueDrainScheduled = false;
+  editorialQueueDraining = true;
+  try {
+    while (true) {
+      const job = await claimNextEditorialConversationJob(store);
+      if (!job) break;
+      try {
+        const outcome = await runEditorialConversation({
+          store, provider: modelProvider, workspaceId: job.workspaceId,
+          conversationId: job.conversationId, runId: job.id,
+          userMessageId: job.userMessageId, mediaDir: job.mediaDir || mediaDir
+        });
+        const status = outcome.status === "completed" ? "completed"
+          : outcome.status === "cancelled" ? "cancelled" : "failed";
+        await finishEditorialConversationJob(store, job.id, status, outcome.errorCode || null);
+      } catch (error) {
+        await finishEditorialConversationJob(store, job.id, "failed", "worker-error").catch(() => {});
+        console.error("Editorial queue worker failed:", error?.message || "unknown error");
+      }
+    }
+  } catch (error) {
+    console.error("Editorial queue drain failed:", error?.message || "unknown error");
+  } finally {
+    editorialQueueDraining = false;
+    const state = await store.read().catch(() => null);
+    if (state?.editorialJobQueue?.some(job => job.type === "editorial-conversation" && job.status === "queued")) scheduleEditorialQueueDrain();
+  }
+}
 
 function send(res, status, payload) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
@@ -99,13 +138,14 @@ function requireAdmin(req) {
   if (!adminToken) throw Object.assign(new Error("ADMIN_API_TOKEN is not configured"), { status: 503 });
   if (req.headers.authorization !== `Bearer ${adminToken}`) throw Object.assign(new Error("Unauthorized"), { status: 401 });
 }
-function validateScope(body) {
+async function validateScope(body) {
   if (typeof body.workspaceId !== "string" || !body.workspaceId.trim() || body.workspaceId.length > 128) {
     throw Object.assign(new Error("workspaceId is required"), { status: 400 });
   }
   if (typeof body.taskId !== "string" || !body.taskId.trim() || body.taskId.length > 128) {
     throw Object.assign(new Error("taskId is required"), { status: 400 });
   }
+  getWorkspace(await store.read(), body.workspaceId);
 }
 
 const server = createServer(async (req, res) => {
@@ -123,6 +163,40 @@ const server = createServer(async (req, res) => {
     }
 
     requireAdmin(req);
+
+    const scopedWorkspace = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)/);
+    if (scopedWorkspace && !url.pathname.endsWith("/restore")) {
+      getWorkspace(await store.read(), decodeURIComponent(scopedWorkspace[1]));
+    }
+
+    if (url.pathname === "/api/v1/workspaces" && req.method === "GET") {
+      const state = await store.read();
+      return send(res, 200, { workspaces: listWorkspaces(state, { includeArchived: url.searchParams.get("includeArchived") === "true" }) });
+    }
+    if (url.pathname === "/api/v1/workspaces" && req.method === "POST") {
+      const body = await readJson(req);
+      const workspace = await store.transact(state => createWorkspace(state, body));
+      return send(res, 201, { workspace });
+    }
+    const workspaceRestore = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/restore$/);
+    if (workspaceRestore && req.method === "POST") {
+      const workspaceId = decodeURIComponent(workspaceRestore[1]);
+      const workspace = await store.transact(state => restoreWorkspace(state, workspaceId));
+      return send(res, 200, { workspace });
+    }
+
+    const workspaceItem = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)$/);
+    if (workspaceItem && req.method === "GET") {
+      const workspaceId = decodeURIComponent(workspaceItem[1]);
+      const state = await store.read();
+      return send(res, 200, { workspace: getWorkspace(state, workspaceId) });
+    }
+    if (workspaceItem && req.method === "PATCH") {
+      const workspaceId = decodeURIComponent(workspaceItem[1]);
+      const body = await readJson(req);
+      const workspace = await store.transact(state => updateWorkspace(state, workspaceId, body));
+      return send(res, 200, { workspace });
+    }
 
     if (req.method === "GET" && url.pathname === "/api/v1/editorial-targets") {
       return send(res, 200, { targets: listEditorialTargets() });
@@ -195,11 +269,32 @@ const server = createServer(async (req, res) => {
         workspaceId, conversationId, runId, status: "queued",
         metadata: { ...initialProgress, queuedAt: new Date().toISOString(), userMessageId: message.id }
       });
-      setImmediate(() => {
-        void runEditorialConversation({ store, provider: modelProvider, workspaceId, conversationId, runId, userMessageId: message.id, mediaDir })
-          .catch(error => console.error("Editorial conversation run failed:", error?.message || "unknown error"));
-      });
+      await enqueueEditorialConversationJob(store, { workspaceId, conversationId, runId, userMessageId: message.id, mediaDir });
+      scheduleEditorialQueueDrain();
       return send(res, 202, { accepted: true, runId, message, conversation: await getEditorialConversation(store, workspaceId, conversationId) });
+    }
+
+    const conversationRetry = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/conversations\/([^/]+)\/retry$/);
+    if (conversationRetry && req.method === "POST") {
+      const workspaceId = decodeURIComponent(conversationRetry[1]);
+      const conversationId = decodeURIComponent(conversationRetry[2]);
+      const conversation = await getEditorialConversation(store, workspaceId, conversationId);
+      const previousRun = conversation.activeRun;
+      if (!previousRun || !["failed", "cancelled"].includes(previousRun.status)) {
+        return send(res, 409, { error: "Only a failed or cancelled conversation run can be retried." });
+      }
+      const userMessage = [...conversation.messages].reverse().find(message => message.role === "user");
+      if (!userMessage) return send(res, 409, { error: "There is no user request to retry." });
+      const runId = randomUUID();
+      const retryCount = Number.isSafeInteger(previousRun?.metadata?.retryCount) ? previousRun.metadata.retryCount + 1 : 1;
+      const initialProgress = createEditorialConversationProgress(userMessage.language || conversation.language);
+      await updateEditorialConversationRun(store, {
+        workspaceId, conversationId, runId, status: "queued",
+        metadata: { ...initialProgress, queuedAt: new Date().toISOString(), retryCount, retryOfRunId: previousRun?.id || null }
+      });
+      await enqueueEditorialConversationJob(store, { workspaceId, conversationId, runId, userMessageId: userMessage.id, mediaDir });
+      scheduleEditorialQueueDrain();
+      return send(res, 202, { accepted: true, runId, retriedMessageId: userMessage.id, conversation: await getEditorialConversation(store, workspaceId, conversationId) });
     }
 
     const conversationAttachments = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/conversations\/([^/]+)\/attachments(?:\/([^/]+)(?:\/(file))?)?$/);
@@ -315,6 +410,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/v1/admin/ai-visibility") {
       const workspaceId = url.searchParams.get("workspaceId") || "main-workspace";
       const state = await store.read();
+      getWorkspace(state, workspaceId);
       const events = listVisibilityEvents(state, workspaceId);
       return send(res, 200, { events, summary: summarizeVisibility(events), limitations: {
         crawlerFetch: "Only observed events explicitly ingested or manually recorded are shown; no server/CDN access-log integration is currently connected.",
@@ -325,7 +421,10 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/v1/admin/ai-visibility/events") {
       const body = await readJson(req);
-      const event = await store.transact(state => recordVisibilityEvent(state, body));
+      const event = await store.transact(state => {
+        getWorkspace(state, body.workspaceId);
+        return recordVisibilityEvent(state, body);
+      });
       return send(res, 201, { event });
     }
 
@@ -591,8 +690,14 @@ const server = createServer(async (req, res) => {
       const body = await readJson(req);
       const workspaceId = decodeURIComponent(searchCollection[1]);
       const taskId = decodeURIComponent(searchCollection[2]);
+      const headerOperationId = req.headers["idempotency-key"];
+      const bodyOperationId = body.operationId;
+      if (headerOperationId && bodyOperationId && headerOperationId !== bodyOperationId) {
+        return send(res, 400, { error: "Idempotency-Key header and operationId body field must match." });
+      }
+      const operationId = bodyOperationId || headerOperationId || null;
       const outcome = await runMeteredResearchSearch({
-        store, provider: searchProvider, workspaceId, taskId, input: body
+        store, provider: searchProvider, workspaceId, taskId, input: body, operationId
       });
       if (!outcome.allowed) return send(res, 429, { error: "Per-article search limit reached", quota: outcome.quota });
       return send(res, 200, outcome);
@@ -653,7 +758,7 @@ const server = createServer(async (req, res) => {
     const reservationMatch = url.pathname.match(/^\/api\/v1\/tasks\/([^/]+)\/research-reservations$/);
     if (reservationMatch && req.method === "POST") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const result = await store.transact(state => reserveBudget(state, {
         ...body, taskId: decodeURIComponent(reservationMatch[1])
       }));
@@ -663,7 +768,7 @@ const server = createServer(async (req, res) => {
     const reservationAction = url.pathname.match(/^\/api\/v1\/tasks\/([^/]+)\/research-reservations\/([^/]+)\/(release|commit)$/);
     if (reservationAction && req.method === "POST") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const input = { ...body, taskId: decodeURIComponent(reservationAction[1]), reservationId: decodeURIComponent(reservationAction[2]) };
       const result = await store.transact(state => reservationAction[3] === "release" ? releaseReservation(state, input) : commitReservation(state, input));
       return send(res, 200, result);
@@ -695,7 +800,7 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/v1/claims") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const claim = await store.transact(state => registerClaim(state, body));
       return send(res, 201, { claim });
     }
@@ -707,13 +812,13 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "PUT" && url.pathname === "/api/v1/sources/assessment") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const source = await store.transact(state => assessSource(state, body));
       return send(res, 200, { source, note: "Manual metadata assessment only. The source content was not fetched or independently verified." });
     }
     if (req.method === "POST" && url.pathname === "/api/v1/research/evidence") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const evidence = await store.transact(state => recordEvidence(state, body));
       return send(res, 201, { evidence, note: "This is a manually recorded excerpt and editorial stance, not independent verification." });
     }
@@ -727,13 +832,13 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/v1/entities") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const entity = await store.transact(state => createEntity(state, body));
       return send(res, 201, { entity });
     }
     if (req.method === "POST" && url.pathname === "/api/v1/entities/scan") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const result = await store.transact(state => scanKnownEntities(state, body));
       return send(res, 200, { result });
     }
@@ -744,21 +849,21 @@ const server = createServer(async (req, res) => {
     }
     if (req.method === "POST" && url.pathname === "/api/v1/entity-relationships") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const relationship = await store.transact(state => createEntityRelationship(state, body));
       return send(res, 201, { relationship });
     }
 
     if (req.method === "POST" && url.pathname === "/api/v1/originality/check") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       const result = await store.transact(state => checkOriginality(state, body));
       return send(res, 200, { result });
     }
 
     if (req.method === "POST" && url.pathname === "/api/v1/sources") {
       const body = await readJson(req);
-      validateScope(body);
+      await validateScope(body);
       if (typeof body.url !== "string" || body.url.length > 2048) return send(res, 400, { error: "A source URL is required" });
       let parsed;
       try { parsed = new URL(body.url); } catch { return send(res, 400, { error: "Invalid source URL" }); }
@@ -790,7 +895,10 @@ const server = createServer(async (req, res) => {
 });
 
 await store.init();
+const recovery = await recoverInterruptedEditorialConversationRuns(store);
+if (recovery.recovered || recovery.recoveredJobs) console.warn(`Recovered ${recovery.recovered} interrupted editorial run(s) and ${recovery.recoveredJobs} uncertain queue job(s); manual retry is required for interrupted work.`);
 server.listen(port, host, () => {
+  scheduleEditorialQueueDrain();
   console.log(`MAAROOF Editorial API listening on http://${host}:${port}`);
   console.log(`Supabase: disabled | Firecrawl: ${firecrawlProvider ? "enabled" : "disabled"} | Persistence: local JSON`);
 });

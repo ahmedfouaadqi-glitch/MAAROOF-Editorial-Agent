@@ -202,3 +202,114 @@ export async function updateEditorialConversationRun(store, {
     return structuredClone(conversation.activeRun);
   });
 }
+
+
+/** Mark in-flight runs as retryable failures after a process restart.
+ * We deliberately do not replay work automatically: a future tool may have caused
+ * an external side effect before the process died, so replay requires explicit review.
+ */
+export async function enqueueEditorialConversationJob(store, {
+  workspaceId, conversationId, runId, userMessageId, mediaDir
+}) {
+  requiredString(workspaceId, "workspaceId", 128);
+  requiredString(conversationId, "conversationId", 128);
+  requiredString(runId, "runId", 128);
+  requiredString(userMessageId, "userMessageId", 128);
+  return store.transact(state => {
+    ownedConversation(state, workspaceId, conversationId);
+    state.editorialJobQueue ||= [];
+    const terminalJobs = state.editorialJobQueue.filter(job => ["completed", "failed", "cancelled"].includes(job.status));
+    if (terminalJobs.length > 250) {
+      const removeIds = new Set(terminalJobs.sort((a, b) => String(a.finishedAt || a.updatedAt || a.createdAt).localeCompare(String(b.finishedAt || b.updatedAt || b.createdAt))).slice(0, terminalJobs.length - 250).map(job => job.id));
+      state.editorialJobQueue = state.editorialJobQueue.filter(job => !removeIds.has(job.id));
+    }
+    const existing = state.editorialJobQueue.find(job => job.id === runId);
+    if (existing) {
+      if (existing.workspaceId !== workspaceId || existing.conversationId !== conversationId || existing.userMessageId !== userMessageId) {
+        fail("runId is already bound to a different queued operation", 409);
+      }
+      return { job: structuredClone(existing), replayed: true };
+    }
+    if (state.editorialJobQueue.filter(job => ["queued", "running"].includes(job.status)).length >= 1000) {
+      fail("Editorial execution queue is full; retry after pending work has cleared.", 503);
+    }
+    const now = new Date().toISOString();
+    const job = {
+      id: runId, type: "editorial-conversation", workspaceId, conversationId, userMessageId,
+      mediaDir: typeof mediaDir === "string" ? mediaDir.slice(0, 1000) : "",
+      status: "queued", attempts: 0, createdAt: now, updatedAt: now
+    };
+    state.editorialJobQueue.push(job);
+    return { job: structuredClone(job), replayed: false };
+  });
+}
+
+export async function claimNextEditorialConversationJob(store) {
+  return store.transact(state => {
+    state.editorialJobQueue ||= [];
+    const job = state.editorialJobQueue
+      .filter(item => item.type === "editorial-conversation" && item.status === "queued")
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+    if (!job) return null;
+    const now = new Date().toISOString();
+    job.status = "running";
+    job.attempts = (Number.isSafeInteger(job.attempts) ? job.attempts : 0) + 1;
+    job.claimedAt = now;
+    job.updatedAt = now;
+    return structuredClone(job);
+  });
+}
+
+export async function finishEditorialConversationJob(store, runId, status, errorCode = null) {
+  if (!["completed", "failed", "cancelled"].includes(status)) fail("Unsupported job terminal status");
+  return store.transact(state => {
+    const job = (state.editorialJobQueue || []).find(item => item.id === runId);
+    if (!job) return null;
+    if (job.status !== "running") return structuredClone(job);
+    job.status = status;
+    job.updatedAt = new Date().toISOString();
+    job.finishedAt = job.updatedAt;
+    if (errorCode) job.errorCode = String(errorCode).slice(0, 80);
+    return structuredClone(job);
+  });
+}
+
+export async function recoverInterruptedEditorialConversationRuns(store, { now = () => new Date().toISOString() } = {}) {
+  return store.transact(state => {
+    let recovered = 0;
+    let recoveredJobs = 0;
+    state.editorialJobQueue ||= [];
+    for (const job of state.editorialJobQueue) {
+      if (job.type !== "editorial-conversation" || job.status !== "running") continue;
+      job.status = "failed";
+      job.errorCode = "process-restarted";
+      job.finishedAt = now();
+      job.updatedAt = job.finishedAt;
+      recoveredJobs += 1;
+    }
+    const queuedRunIds = new Set(state.editorialJobQueue.filter(job => job.type === "editorial-conversation" && job.status === "queued").map(job => job.id));
+    for (const conversation of state.editorialConversations || []) {
+      const run = conversation?.activeRun;
+      if (!run || !["queued", "running"].includes(run.status)) continue;
+      if (run.status === "queued" && queuedRunIds.has(run.id)) continue;
+      const interruptedStatus = run.status;
+      const timestamp = now();
+      conversation.activeRun = {
+        ...run,
+        status: "failed",
+        updatedAt: timestamp,
+        metadata: {
+          ...(run.metadata || {}),
+          error: "process-restarted",
+          interruptedStatus,
+          retryable: true,
+          recoveredAt: timestamp,
+          recoveryNote: "The server restarted before this run reached a terminal state. It was not replayed automatically to avoid duplicate side effects."
+        }
+      };
+      conversation.updatedAt = timestamp;
+      recovered += 1;
+    }
+    return { recovered, recoveredJobs };
+  });
+}

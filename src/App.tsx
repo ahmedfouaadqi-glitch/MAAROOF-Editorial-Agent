@@ -4,7 +4,7 @@ import {
   CheckCircle2, ChevronDown, CircleHelp, FileCheck2, FilePlus2,
   Download, FileText, Globe2, Home, Layers3, LayoutDashboard, Library, ListFilter,
   LockKeyhole, Menu, Moon, MoreHorizontal, Plus, Search,
-  ShieldCheck, SlidersHorizontal, Sparkles, Sun, Workflow, X, Zap, MessageSquare
+  ShieldCheck, SlidersHorizontal, Sparkles, Sun, Workflow, X, Zap, MessageSquare, History
 } from "lucide-react";
 import SpotlightCard from "./components/SpotlightCard";
 import EditorialEvidencePanel from "./components/EditorialEvidencePanel";
@@ -21,7 +21,7 @@ import { adapterRegistry } from "./data/adapter-registry";
 import { magazinePublications } from "./data/magazine-publications";
 import editorialTargetCatalog from "../config/editorial-targets.json";
 
-type View = "chat" | "home" | "articles" | "library" | "registry" | "research-settings" | "ai-visibility" | "magazine-submissions";
+type View = "chat" | "history" | "workspaces" | "home" | "articles" | "library" | "registry" | "research-settings" | "ai-visibility" | "magazine-submissions";
 type Article = { id: string; topic: string; language: string; objective: string; stage: string; createdAt: string; clientId?: string; clientName?: string; brandId?: string; brandName?: string };
 type Locale = "ar" | "en";
 const NEXT_STAGE: Record<string, string> = { intake: "planning", planning: "research", research: "entity-analysis", "entity-analysis": "outline", outline: "drafting", drafting: "source-review", "source-review": "originality-review", "originality-review": "media-review", "media-review": "editorial-approval", "editorial-approval": "ready-to-publish" };
@@ -129,6 +129,11 @@ export default function App() {
   const [budget, setBudget] = useState<ResearchBudgetLimits>({ ...DEFAULT_RESEARCH_BUDGET });
   const [budgetNotice, setBudgetNotice] = useState("");
   const [adminToken, setAdminToken] = useState("");
+  const [workspaces, setWorkspaces] = useState<Array<{id:string;name:string;description?:string;status:string;isDefault:boolean}>>([]);
+  const [workspaceId, setWorkspaceId] = useState("main-workspace");
+  const [workspaceNameDraft, setWorkspaceNameDraft] = useState("");
+  const [workspaceNotice, setWorkspaceNotice] = useState("");
+  const [showArchivedWorkspaces, setShowArchivedWorkspaces] = useState(false);
   const [busy, setBusy] = useState(false);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [locale, setLocale] = useState<Locale>("ar");
@@ -174,6 +179,16 @@ export default function App() {
 
   useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
   useEffect(() => {
+    if (!adminToken.trim()) { setWorkspaces([]); setWorkspaceId("main-workspace"); return; }
+    let cancelled = false;
+    fetch(`${apiBase}/api/v1/workspaces?includeArchived=true`, { headers: { authorization: `Bearer ${adminToken}` } })
+      .then(async response => { const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "تعذر تحميل مساحات العمل"); return payload.workspaces || []; })
+      .then(items => { if (!cancelled) { setWorkspaces(items); setWorkspaceId(current => items.some((item:any) => item.id === current && item.status !== "archived") ? current : (items.find((item:any) => item.isDefault)?.id || items.find((item:any) => item.status === "active")?.id || "main-workspace")); } })
+      .catch(error => { if (!cancelled) setWorkspaceNotice(error instanceof Error ? error.message : "تعذر تحميل مساحات العمل"); });
+    return () => { cancelled = true; };
+  }, [adminToken, apiBase]);
+  useEffect(() => { setArticles([]); setClientOptions([]); setBrandOptions([]); setEvidenceArticleId(null); setDraftArticleId(null); setReviewArticleId(null); setPendingConversationId(null); setBrowserChatDraft(null); setBrowserDrawerOpen(false); }, [workspaceId]);
+  useEffect(() => {
     if (!browserDrawerOpen) return;
     browserCloseButtonRef.current?.focus();
     const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setBrowserDrawerOpen(false); };
@@ -183,7 +198,7 @@ export default function App() {
   useEffect(() => {
     if ((view !== "articles" && view !== "magazine-submissions" && !browserDrawerOpen) || !adminToken.trim()) return;
     let cancelled = false;
-    fetch(`${apiBase}/api/v1/workspaces/main-workspace/articles`, { headers: { authorization: `Bearer ${adminToken}` } })
+    fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/articles`, { headers: { authorization: `Bearer ${adminToken}` } })
       .then(async response => {
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.error || "تعذر تحميل المقالات");
@@ -191,17 +206,60 @@ export default function App() {
       })
       .catch(error => { if (!cancelled) setArticleNotice(error instanceof Error ? error.message : "تعذر الاتصال بالخدمة الخلفية."); });
     return () => { cancelled = true; };
-  }, [view, adminToken, apiBase, browserDrawerOpen]);
+  }, [view, adminToken, apiBase, browserDrawerOpen, workspaceId]);
   useEffect(() => {
     if (view !== "articles" || !adminToken.trim()) { setClientOptions([]); setBrandOptions([]); return; }
     let cancelled = false;
     const headers = { authorization: `Bearer ${adminToken}` };
     Promise.all([
-      fetch(`${apiBase}/api/v1/workspaces/main-workspace/clients`, { headers }).then(async response => { const payload=await response.json(); if(!response.ok) throw new Error(payload.error||"Unable to load clients"); return payload.clients||[]; }),
-      fetch(`${apiBase}/api/v1/workspaces/main-workspace/brands`, { headers }).then(async response => { const payload=await response.json(); if(!response.ok) throw new Error(payload.error||"Unable to load brands"); return payload.brands||[]; })
+      fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/clients`, { headers }).then(async response => { const payload=await response.json(); if(!response.ok) throw new Error(payload.error||"Unable to load clients"); return payload.clients||[]; }),
+      fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/brands`, { headers }).then(async response => { const payload=await response.json(); if(!response.ok) throw new Error(payload.error||"Unable to load brands"); return payload.brands||[]; })
     ]).then(([clients,brands])=>{ if(cancelled)return; setClientOptions(clients); setBrandOptions(brands); }).catch(()=>{ if(!cancelled){setClientOptions([]);setBrandOptions([]);} });
     return ()=>{cancelled=true;};
-  }, [view, adminToken, apiBase]);
+  }, [view, adminToken, apiBase, workspaceId]);
+
+  async function refreshWorkspaces() {
+    const response = await fetch(`${apiBase}/api/v1/workspaces?includeArchived=true`, { headers: { authorization: `Bearer ${adminToken}` } });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "تعذر تحميل مساحات العمل");
+    setWorkspaces(payload.workspaces || []);
+  }
+  async function createWorkspace() {
+    if (!workspaceNameDraft.trim() || !adminToken.trim()) return;
+    setBusy(true); setWorkspaceNotice("");
+    try {
+      const response = await fetch(`${apiBase}/api/v1/workspaces`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ name: workspaceNameDraft.trim() }) });
+      const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "تعذر إنشاء مساحة العمل");
+      await refreshWorkspaces(); setWorkspaceId(payload.workspace.id); setWorkspaceNameDraft(""); setWorkspaceNotice(locale === "ar" ? "تم إنشاء مساحة العمل والتبديل إليها." : "Workspace created and selected.");
+    } catch(error) { setWorkspaceNotice(error instanceof Error ? error.message : "تعذر إنشاء مساحة العمل"); } finally { setBusy(false); }
+  }
+  async function renameWorkspace() {
+    if (!workspaceNameDraft.trim() || !adminToken.trim()) return;
+    setBusy(true); setWorkspaceNotice("");
+    try {
+      const response = await fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}`, { method: "PATCH", headers: { "content-type": "application/json", authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ name: workspaceNameDraft.trim() }) });
+      const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "تعذر إعادة تسمية المساحة");
+      await refreshWorkspaces(); setWorkspaceNameDraft(""); setWorkspaceNotice(locale === "ar" ? "تم تحديث اسم مساحة العمل." : "Workspace renamed.");
+    } catch(error) { setWorkspaceNotice(error instanceof Error ? error.message : "تعذر إعادة تسمية المساحة"); } finally { setBusy(false); }
+  }
+  async function archiveWorkspace() {
+    const current = workspaces.find(item => item.id === workspaceId); if (!current || current.isDefault || !adminToken.trim()) return;
+    if (!window.confirm(locale === "ar" ? `أرشفة مساحة «${current.name}»؟ لن تُحذف بياناتها.` : `Archive “${current.name}”? Its data will not be deleted.`)) return;
+    setBusy(true); setWorkspaceNotice("");
+    try {
+      const response = await fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}`, { method: "PATCH", headers: { "content-type": "application/json", authorization: `Bearer ${adminToken}` }, body: JSON.stringify({ status: "archived" }) });
+      const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "تعذر أرشفة المساحة");
+      await refreshWorkspaces(); setWorkspaceId("main-workspace"); setWorkspaceNotice(locale === "ar" ? "تمت الأرشفة. نُقلت إلى المساحة الرئيسية." : "Archived. Switched to the default workspace.");
+    } catch(error) { setWorkspaceNotice(error instanceof Error ? error.message : "تعذر أرشفة المساحة"); } finally { setBusy(false); }
+  }
+  async function restoreWorkspace(workspaceToRestore: string) {
+    setBusy(true); setWorkspaceNotice("");
+    try {
+      const response = await fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceToRestore)}/restore`, { method: "POST", headers: { authorization: `Bearer ${adminToken}` } });
+      const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "تعذر استعادة المساحة");
+      await refreshWorkspaces(); setWorkspaceId(workspaceToRestore); setWorkspaceNotice(locale === "ar" ? "تمت استعادة المساحة والتبديل إليها." : "Workspace restored and selected.");
+    } catch(error) { setWorkspaceNotice(error instanceof Error ? error.message : "تعذر استعادة المساحة"); } finally { setBusy(false); }
+  }
 
   async function saveBudget() {
     if (!budgetValidation.valid || !adminToken.trim()) return;
@@ -238,7 +296,7 @@ export default function App() {
     }
     setBusy(true); setArticleNotice("");
     try {
-      const response = await fetch(`${apiBase}/api/v1/workspaces/main-workspace/articles`, {
+      const response = await fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/articles`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${adminToken}` },
         body: JSON.stringify({ topic, language, objective, clientName: clientName.trim(), brandName: brandName.trim() })
@@ -259,7 +317,7 @@ export default function App() {
     if (!nextStage || !adminToken.trim()) return;
     setAdvancingId(article.id); setArticleNotice("");
     try {
-      const response = await fetch(`${apiBase}/api/v1/workspaces/main-workspace/articles/${encodeURIComponent(article.id)}/stage`, {
+      const response = await fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/articles/${encodeURIComponent(article.id)}/stage`, {
         method: "PUT",
         headers: { "content-type": "application/json", authorization: `Bearer ${adminToken}` },
         body: JSON.stringify({ nextStage })
@@ -273,21 +331,13 @@ export default function App() {
   }
 
   const navItems = [
-    { id: "chat" as const, label: copy.chat, icon: MessageSquare },
-    { id: "home" as const, label: copy.overview, icon: LayoutDashboard },
-    { id: "articles" as const, label: copy.articles, icon: FileText },
-    { id: "library" as const, label: copy.library, icon: Library },
-    { id: "magazine-submissions" as const, label: locale === "ar" ? "تقديمات المجلات" : "Magazine submissions", icon: BookOpenText },
-    { id: "registry" as const, label: copy.registry, icon: Globe2 },
-    { id: "research-settings" as const, label: copy.settings, icon: SlidersHorizontal },
-    { id: "ai-visibility" as const, label: copy.visibility, icon: Activity }
+    { id: "chat" as const, label: locale === "ar" ? "المحادثة" : "Conversation", icon: MessageSquare },
+    { id: "history" as const, label: locale === "ar" ? "السجل" : "History", icon: History },
+    { id: "workspaces" as const, label: locale === "ar" ? "مساحات العمل" : "Workspaces", icon: Layers3 }
   ];
-  const navGroups = [
-    { label: locale === "ar" ? "الإنتاج التحريري" : "EDITORIAL", items: navItems.filter(item => ["chat", "home", "articles", "library", "magazine-submissions"].includes(item.id)) },
-    { label: locale === "ar" ? "الاستكشاف والأدلة" : "DISCOVERY & EVIDENCE", items: navItems.filter(item => ["registry", "ai-visibility"].includes(item.id)) },
-    { label: locale === "ar" ? "الإدارة" : "MANAGEMENT", items: navItems.filter(item => ["research-settings"].includes(item.id)) }
-  ];
+  const navGroups = [{ label: locale === "ar" ? "مساحة العمل" : "WORKSPACE", items: navItems }];
   const destinationCount = platforms.filter(p => p.category === "editorial").length;
+  const activeWorkspace = workspaces.find(item => item.id === workspaceId);
 
   return <div className={`app-shell ${theme === "dark" ? "theme-dark" : "theme-light"} ${browserDrawerOpen ? "browser-drawer-open" : ""}`} dir={locale === "ar" ? "rtl" : "ltr"} lang={locale}>
     <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
@@ -296,12 +346,12 @@ export default function App() {
         <span className="brand-copy"><strong>MAAROOF</strong><small>EDITORIAL AGENT</small></span>
         <span className="brand-version">BETA</span>
       </button>
-        <div className="workspace-switch" aria-label={copy.workspace}><span className="workspace-avatar">M</span><span><b>{copy.workspace}</b><small>{locale === "ar" ? "مساحة العمل الرئيسية" : "Main editorial workspace"}</small></span></div>
+        <button type="button" className="workspace-context-button" onClick={() => { setView("workspaces"); setMobileNav(false); }}><span className="workspace-avatar">W</span><span><b>{activeWorkspace?.name || (locale === "ar" ? "مساحة العمل الرئيسية" : "Main workspace")}</b><small>{locale === "ar" ? "إدارة المساحات" : "Manage workspaces"}</small></span><ArrowUpLeft size={14}/></button>
       {navGroups.map(group => <section className="nav-group" key={group.label}>
         <div className="side-label">{group.label}</div>
         <nav className="side-nav">
           {group.items.map(item => <button key={item.id} className={view === item.id ? "nav-item active" : "nav-item"} onClick={() => { setView(item.id); setMobileNav(false); setBrowserDrawerOpen(false); }}>
-            <item.icon size={17} strokeWidth={1.8}/><span>{item.label}</span>{item.id === "articles" && articles.length > 0 && <i>{articles.length}</i>}
+            <item.icon size={17} strokeWidth={1.8}/><span>{item.label}</span>
           </button>)}
         </nav>
       </section>)}
@@ -316,11 +366,11 @@ export default function App() {
       <header className="topbar">
         <div className="topbar-start">
           <button className="mobile-menu" onClick={() => setMobileNav(!mobileNav)} aria-label={locale === "ar" ? "فتح التنقل" : "Open navigation"}><Menu size={19}/></button>
-          <div className="breadcrumbs"><span>MAAROOF</span><span className="crumb-slash">/</span><b>{navItems.find(item => item.id === view)?.label}</b></div>
+          <div className="breadcrumbs"><span>MAAROOF</span><span className="crumb-slash">/</span><b>{navItems.find(item => item.id === view)?.label || (locale === "ar" ? "إعدادات داخلية" : "Internal settings")}</b><span className="workspace-context-pill">{activeWorkspace?.name || (locale === "ar" ? "المساحة الرئيسية" : "Main workspace")}</span></div>
         </div>
         <div className="topbar-actions">
-          <label className="global-search"><Search size={15}/><input value={globalQuery} onChange={e=>setGlobalQuery(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){setQuery(globalQuery);setCategory("all");setView("registry");}}} placeholder={copy.search} aria-label={copy.search}/></label>
-          {view !== "chat" && <button ref={browserOpenButtonRef} className={`browser-open-button ${browserDrawerOpen ? "active" : ""}`} onClick={() => { setBrowserChatDraft(null); setBrowserDrawerOpen(true); }} aria-expanded={browserDrawerOpen} aria-controls="browser-agent-panel" aria-label={locale === "ar" ? "فتح مساعد النشر في لوحة جانبية" : "Open publishing assistant side panel"} title={locale === "ar" ? "فتح جلسة المتصفح بجانب مساحة العمل" : "Open the browser beside your workspace"}><Globe2 size={16}/><span>{locale === "ar" ? "المتصفح" : "Browser"}</span><i/></button>}
+
+          {view === "chat" && <button ref={browserOpenButtonRef} className={`browser-open-button ${browserDrawerOpen ? "active" : ""}`} onClick={() => { setBrowserChatDraft(null); setBrowserDrawerOpen(true); }} aria-expanded={browserDrawerOpen} aria-controls="browser-agent-panel" aria-label={locale === "ar" ? "فتح مساعد النشر في لوحة جانبية" : "Open publishing assistant side panel"} title={locale === "ar" ? "فتح جلسة المتصفح بجانب مساحة العمل" : "Open the browser beside your workspace"}><Globe2 size={16}/><span>{locale === "ar" ? "المتصفح" : "Browser"}</span><i/></button>}
           <button className="top-icon" onClick={() => setLocale(locale === "ar" ? "en" : "ar")} title={copy.langToggle}><span className="language-code">{locale === "ar" ? "EN" : "ع"}</span></button>
           <button className="top-icon" onClick={() => setTheme(theme === "light" ? "dark" : "light")} title={theme === "light" ? copy.dark : copy.light}>{theme === "light" ? <Moon size={17}/> : <Sun size={17}/>}</button>
           <div className="top-avatar">M</div>
@@ -328,8 +378,30 @@ export default function App() {
       </header>
 
       <div className={`page-content ${view === "chat" ? "chat-page" : ""}`}>
-        {view === "chat" && <EditorialChatWorkspace apiBase={apiBase} token={adminToken} workspaceId="main-workspace" locale={locale} targets={chatTargets} onOpenSettings={() => setView("research-settings")} openConversationId={pendingConversationId} onConversationOpened={()=>setPendingConversationId(null)} onPrepareBrowser={draft=>{setBrowserChatDraft(draft);setBrowserDrawerOpen(true);}}/>}
-        {view === "library" && <LibraryView apiBase={apiBase} token={adminToken} locale={locale} copy={copy} onOpenConversation={id=>{setPendingConversationId(id);setView("chat");}}/>}
+        {view === "history" && <ConversationHistoryView apiBase={apiBase} token={adminToken} workspaceId={workspaceId} locale={locale} onOpenConversation={id => { setPendingConversationId(id || null); setView("chat"); }}/>}
+        {view === "workspaces" && <section className="page-section workspace-page">
+          <PageHeading eyebrow={locale === "ar" ? "إدارة السياقات المستقلة" : "WORKSPACE MANAGEMENT"} title={locale === "ar" ? "مساحات العمل" : "Workspaces"} subtitle={locale === "ar" ? "كل مساحة تحتفظ بمحادثاتها وملفاتها ومخرجاتها بصورة مستقلة." : "Each workspace keeps its conversations, files, and outputs isolated."}/>
+          <div className="workspace-manager surface-card">
+            <label className="workspace-select-label">{locale === "ar" ? "المساحة النشطة" : "Active workspace"}</label>
+            <select aria-label={locale === "ar" ? "اختيار مساحة العمل" : "Select workspace"} value={workspaceId} disabled={!adminToken.trim() || busy} onChange={event => setWorkspaceId(event.target.value)}>
+              {workspaces.filter(item => item.status !== "archived").map(item => <option key={item.id} value={item.id}>{item.name}{item.isDefault ? (locale === "ar" ? " · افتراضية" : " · Default") : ""}</option>)}
+              {!workspaces.length && <option value="main-workspace">{locale === "ar" ? "مساحة العمل الرئيسية" : "Main workspace"}</option>}
+            </select>
+            <input value={workspaceNameDraft} onChange={event => setWorkspaceNameDraft(event.target.value)} disabled={!adminToken.trim() || busy} maxLength={100} placeholder={locale === "ar" ? "اسم مساحة العمل الجديدة أو الاسم البديل" : "New workspace name or replacement name"} aria-label={locale === "ar" ? "اسم مساحة العمل" : "Workspace name"}/>
+            <div className="workspace-manager-actions">
+              <button type="button" disabled={!adminToken.trim() || busy || workspaceNameDraft.trim().length < 2} onClick={createWorkspace}>{locale === "ar" ? "إنشاء مساحة" : "Create"}</button>
+              <button type="button" disabled={!adminToken.trim() || busy || workspaceNameDraft.trim().length < 2 || workspaceId === "main-workspace"} onClick={renameWorkspace}>{locale === "ar" ? "إعادة تسمية" : "Rename"}</button>
+              <button type="button" disabled={!adminToken.trim() || busy || workspaceId === "main-workspace"} onClick={archiveWorkspace}>{locale === "ar" ? "أرشفة" : "Archive"}</button>
+            </div>
+            <button type="button" className="workspace-archived-toggle" disabled={!adminToken.trim()} onClick={() => setShowArchivedWorkspaces(value => !value)}>{showArchivedWorkspaces ? (locale === "ar" ? "إخفاء المساحات المؤرشفة" : "Hide archived") : (locale === "ar" ? "عرض المساحات المؤرشفة" : "Show archived workspaces")}</button>
+            {showArchivedWorkspaces && workspaces.filter(item => item.status === "archived").map(item => <div className="workspace-restore-row" key={item.id}><span>{item.name}</span><button type="button" disabled={busy} onClick={() => restoreWorkspace(item.id)}>{locale === "ar" ? "استعادة" : "Restore"}</button></div>)}
+            {workspaceNotice && <p className="workspace-feedback" role="status">{workspaceNotice}</p>}
+            {!adminToken.trim() && <p className="workspace-feedback">{locale === "ar" ? "أدخل رمز المسؤول من إعدادات الوصول داخل المحادثة لإدارة المساحات." : "Enter the admin key from conversation access settings to manage workspaces."}</p>}
+          </div>
+          <div className="surface-card workspace-info-card"><span className="tiny-overline">{locale === "ar" ? "عزل البيانات" : "DATA ISOLATION"}</span><h2>{activeWorkspace?.name || "Main workspace"}</h2><p>{activeWorkspace?.description || (locale === "ar" ? "المحادثات والمرفقات والمهام ووجهات المتصفح مرتبطة بهذه المساحة." : "Conversations, attachments, tasks, and browser destinations are scoped to this workspace.")}</p><span className="status-chip"><ShieldCheck size={14}/>{locale === "ar" ? "مساحة مستقلة" : "Isolated workspace"}</span></div>
+        </section>}
+        {view === "chat" && <EditorialChatWorkspace apiBase={apiBase} token={adminToken} workspaceId={workspaceId} locale={locale} targets={chatTargets} onOpenSettings={() => setView("research-settings")} openConversationId={pendingConversationId} onConversationOpened={()=>setPendingConversationId(null)} onPrepareBrowser={draft=>{setBrowserChatDraft(draft);setBrowserDrawerOpen(true);}}/>}
+        {view === "library" && <LibraryView apiBase={apiBase} token={adminToken} workspaceId={workspaceId} locale={locale} copy={copy} onOpenConversation={id=>{setPendingConversationId(id);setView("chat");}}/>}
         {view === "home" && <HomeView copy={copy} articles={articles} onCreate={() => setView("articles")} onRegistry={() => setView("registry")} onViewAll={() => setView("articles")} locale={locale} theme={theme}/>}
         {view === "articles" && <section className="page-section">
           <PageHeading eyebrow={locale === "ar" ? "مسار العمل التحريري" : "EDITORIAL WORKFLOW"} title={copy.newTitle} subtitle={copy.newSub} action={<span className="status-chip"><span className="status-dot"/>{locale==="ar"?"قرار النشر بيدك":"You control publishing"}</span>}/>
@@ -360,9 +432,9 @@ export default function App() {
           <section className="surface-card article-list-card"><div className="section-heading"><div><span className="tiny-overline">{locale==="ar"?"قائمة العمل":"WORK QUEUE"}</span><h2>{copy.recent}</h2></div><span className="count-badge">{articles.length}</span></div>
             {articles.length === 0 ? <EmptyArticles copy={copy}/> : <div className="article-table">{articles.map(article=><div className="article-row" key={article.id}><div className="article-file-icon"><FileText size={17}/></div><div className="article-row-main"><b>{article.topic}</b><small>{article.language.toUpperCase()} · {new Date(article.createdAt).toLocaleDateString(locale === "ar" ? "ar-IQ" : "en-US")}{article.clientName?` · ${article.clientName}`:""}{article.brandName?` / ${article.brandName}`:""}</small></div><span className="stage-pill">{(locale==="ar"?stageLabels:enStageLabels)[article.stage] || article.stage}</span><button className="secondary-button evidence-open-button" onClick={()=>setEvidenceArticleId(evidenceArticleId===article.id?null:article.id)}>{evidenceArticleId===article.id?(locale==="ar"?"إغلاق الأدلة":"Close evidence"):(locale==="ar"?"الأدلة":"Evidence")}</button><button className="secondary-button evidence-open-button" onClick={()=>setDraftArticleId(draftArticleId===article.id?null:article.id)}>{draftArticleId===article.id?(locale==="ar"?"إغلاق المسودة":"Close draft"):(locale==="ar"?"المخطط والمسودة":"Outline / Draft")}</button><button className="secondary-button evidence-open-button" onClick={()=>setReviewArticleId(reviewArticleId===article.id?null:article.id)}>{reviewArticleId===article.id?(locale==="ar"?"إغلاق المراجعة":"Close review"):(locale==="ar"?"المراجعة والاعتماد":"Review / Approve")}</button><button className="advance-button" disabled={!NEXT_STAGE[article.stage]||advancingId===article.id||!adminToken.trim()} onClick={()=>advanceArticle(article)}>{advancingId===article.id?copy.loading:(locale==="ar"?"التالي":"Advance")} <ArrowUpLeft size={12}/></button></div>)}</div>}{articleNotice&&<p className="inline-feedback">{articleNotice}</p>}
           </section>
-          {evidenceArticleId && articles.some(article => article.id === evidenceArticleId) && <EditorialEvidencePanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" article={articles.find(article => article.id === evidenceArticleId)!} locale={locale}/>}
-          {draftArticleId && articles.some(article => article.id === draftArticleId) && <EditorialDraftPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" taskId={draftArticleId} stage={articles.find(article => article.id === draftArticleId)!.stage} locale={locale}/>}
-          {reviewArticleId && articles.some(article => article.id === reviewArticleId) && <EditorialReviewPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" taskId={reviewArticleId} stage={articles.find(article => article.id === reviewArticleId)!.stage} locale={locale} onStageChange={(stage)=>setArticles(current=>current.map(item=>item.id===reviewArticleId?{...item,stage}:item))}/>}
+          {evidenceArticleId && articles.some(article => article.id === evidenceArticleId) && <EditorialEvidencePanel apiBase={apiBase} token={adminToken} workspaceId={workspaceId} article={articles.find(article => article.id === evidenceArticleId)!} locale={locale}/>}
+          {draftArticleId && articles.some(article => article.id === draftArticleId) && <EditorialDraftPanel apiBase={apiBase} token={adminToken} workspaceId={workspaceId} taskId={draftArticleId} stage={articles.find(article => article.id === draftArticleId)!.stage} locale={locale}/>}
+          {reviewArticleId && articles.some(article => article.id === reviewArticleId) && <EditorialReviewPanel apiBase={apiBase} token={adminToken} workspaceId={workspaceId} taskId={reviewArticleId} stage={articles.find(article => article.id === reviewArticleId)!.stage} locale={locale} onStageChange={(stage)=>setArticles(current=>current.map(item=>item.id===reviewArticleId?{...item,stage}:item))}/>}
         </section>}
         {view === "registry" && <section className="page-section">
           <PageHeading eyebrow={locale==="ar"?"وجهات النشر":"PUBLISHING DESTINATIONS"} title={copy.registryTitle} subtitle={copy.registrySub} action={<span className="status-chip"><Globe2 size={14}/>{platforms.length} {copy.platforms}</span>}/>
@@ -380,8 +452,8 @@ export default function App() {
             </div>
           </div>
         </section>}
-        {view === "ai-visibility" && <AIVisibilityPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" locale={locale}/>}
-        {view === "magazine-submissions" && <MagazineSubmissionsPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" articles={articles} publications={magazinePublications} locale={locale}/> }
+        {view === "ai-visibility" && <AIVisibilityPanel apiBase={apiBase} token={adminToken} workspaceId={workspaceId} locale={locale}/>}
+        {view === "magazine-submissions" && <MagazineSubmissionsPanel apiBase={apiBase} token={adminToken} workspaceId={workspaceId} articles={articles} publications={magazinePublications} locale={locale}/> }
         {view === "research-settings" && <section className="page-section">
           <PageHeading eyebrow={locale==="ar"?"إعدادات النظام":"SYSTEM CONFIGURATION"} title={copy.settingsTitle} subtitle={copy.settingsSub}/>
           <SpotlightCard theme={theme} className="surface-card budget-panel" spotlightColor="#F2C21A" intensity={0.09} spotlightSize={340}>
@@ -408,7 +480,7 @@ export default function App() {
           <div className="agent-drawer-brand"><span className="agent-drawer-mark"><BrandMark/></span><div><span className="tiny-overline">{locale==="ar"?"جلسة تفاعلية":"INTERACTIVE SESSION"}</span><h2 id="browser-drawer-title">{locale==="ar"?"مساعد المتصفح":"Browser assistant"}</h2><p>{locale==="ar"?"افتح الوجهة، سجّل الدخول بنفسك، وراجع قبل المتابعة.":"Open a destination, sign in yourself, and review before continuing."}</p></div></div>
           <button ref={browserCloseButtonRef} className="top-icon agent-drawer-close" onClick={()=>setBrowserDrawerOpen(false)} aria-label={locale==="ar"?"إغلاق اللوحة":"Close panel"}><X size={17}/></button>
         </header>
-        <div className="agent-drawer-content"><BrowserPublishingPanel apiBase={apiBase} token={adminToken} workspaceId="main-workspace" articles={articles} locale={locale} chatDraft={browserChatDraft} onOpenSettings={()=>{setBrowserDrawerOpen(false);setView("research-settings");}}/></div>
+        <div className="agent-drawer-content"><BrowserPublishingPanel apiBase={apiBase} token={adminToken} workspaceId={workspaceId} articles={articles} locale={locale} chatDraft={browserChatDraft} onOpenSettings={()=>{setBrowserDrawerOpen(false);setView("research-settings");}}/></div>
     </aside>}
   </div>;
 }
@@ -448,6 +520,28 @@ function HomeView({copy,articles,onCreate,onRegistry,onViewAll,locale,theme}:{co
 }
 
 
+
+function ConversationHistoryView({apiBase,token,workspaceId,locale,onOpenConversation}:{apiBase:string;token:string;workspaceId:string;locale:Locale;onOpenConversation:(id:string)=>void}) {
+  const [items,setItems]=useState<Array<{id:string;title:string|null;targetName:string;language:string;status:string;activeRun:any;updatedAt:string;lastMessagePreview:string}>>([]);
+  const [loading,setLoading]=useState(false);
+  const [notice,setNotice]=useState("");
+  useEffect(()=>{
+    if(!token.trim()){setItems([]);return;}
+    let cancelled=false;setLoading(true);setNotice("");
+    fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/conversations`,{headers:{authorization:`Bearer ${token}`}})
+      .then(async response=>{const payload=await response.json();if(!response.ok)throw new Error(payload.error||"تعذر تحميل سجل المحادثات");return payload.conversations||[];})
+      .then(data=>{if(!cancelled)setItems(data);})
+      .catch(error=>{if(!cancelled)setNotice(error instanceof Error?error.message:"تعذر تحميل سجل المحادثات");})
+      .finally(()=>{if(!cancelled)setLoading(false);});
+    return ()=>{cancelled=true;};
+  },[apiBase,token,workspaceId]);
+  return <section className="page-section history-view">
+    <PageHeading eyebrow={locale==="ar"?"ذاكرة العمل":"WORK HISTORY"} title={locale==="ar"?"سجل المحادثات":"Conversation history"} subtitle={locale==="ar"?"استعد محادثة سابقة وتابع العمل من سياقها داخل مساحة العمل الحالية.":"Reopen a previous conversation and continue from its context in the active workspace."} action={<span className="status-chip"><MessageSquare size={14}/>{items.length}</span>}/>
+    {!token.trim()?<div className="surface-card history-empty"><ShieldCheck size={22}/><b>{locale==="ar"?"يلزم رمز المسؤول":"Admin key required"}</b><p>{locale==="ar"?"أدخل رمز الوصول من إعدادات المحادثة لعرض السجل.":"Enter the access key in conversation settings to load history."}</p></div>:loading?<div className="surface-card history-empty">{locale==="ar"?"جارٍ تحميل المحادثات...":"Loading conversations..."}</div>:items.length===0?<div className="surface-card history-empty"><MessageSquare size={22}/><b>{locale==="ar"?"لا توجد محادثات محفوظة":"No saved conversations"}</b><p>{locale==="ar"?"ابدأ محادثة جديدة وستظهر هنا تلقائياً.":"Start a conversation and it will appear here."}</p><button className="primary-button" onClick={()=>onOpenConversation("")}>{locale==="ar"?"بدء محادثة":"Start conversation"}</button></div>:<div className="surface-card history-list">{items.map(item=><button type="button" className="history-item" key={item.id} onClick={()=>onOpenConversation(item.id)}><span className="history-item-icon"><MessageSquare size={17}/></span><span className="history-item-copy"><b>{item.title|| (locale==="ar"?"محادثة جديدة":"New conversation")}</b><small>{item.targetName} · {item.language.toUpperCase()} · {new Date(item.updatedAt).toLocaleString(locale==="ar"?"ar-IQ":"en-US")}</small>{item.lastMessagePreview&&<span>{item.lastMessagePreview}</span>}</span><span className="history-item-state">{item.activeRun?.status==="running"?(locale==="ar"?"قيد التنفيذ":"Running"):(locale==="ar"?"فتح":"Open")}<ArrowUpLeft size={14}/></span></button>)}</div>}
+    {notice&&<p className="inline-feedback" role="status">{notice}</p>}
+  </section>;
+}
+
 type LibraryDraft = {
   id: string; conversationId: string; messageId: string; title: string; targetId: string; targetName: string;
   clientName?: string | null; brandName?: string | null; language: "ar" | "en"; request: string; format?: string;
@@ -455,7 +549,7 @@ type LibraryDraft = {
   geo?: { intent?: string; primaryPhrase?: string; supportingTerms?: string[]; questions?: string[]; entities?: string[] };
   mediaNotes?: string; factCheckNotes?: string[]; createdAt: string;
 };
-function LibraryView({apiBase,token,locale,copy,onOpenConversation}:{apiBase:string;token:string;locale:Locale;copy:typeof t.ar;onOpenConversation:(id:string)=>void}) {
+function LibraryView({apiBase,token,workspaceId,locale,copy,onOpenConversation}:{apiBase:string;token:string;workspaceId:string;locale:Locale;copy:typeof t.ar;onOpenConversation:(id:string)=>void}) {
   const [items,setItems]=useState<LibraryDraft[]>([]);
   const [selectedId,setSelectedId]=useState("");
   const [loading,setLoading]=useState(false);
@@ -465,13 +559,13 @@ function LibraryView({apiBase,token,locale,copy,onOpenConversation}:{apiBase:str
     if(!token.trim()){setItems([]);return;}
     let cancelled=false;
     setLoading(true);setNotice("");
-    fetch(`${apiBase}/api/v1/workspaces/main-workspace/library`,{headers:{authorization:`Bearer ${token}`}})
+    fetch(`${apiBase}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/library`,{headers:{authorization:`Bearer ${token}`}})
       .then(async response=>{const payload=await response.json();if(!response.ok)throw new Error(payload.error||copy.libraryLoadError);return payload.items||[];})
       .then(data=>{if(!cancelled){setItems(data);setSelectedId(current=>data.some((item:LibraryDraft)=>item.id===current)?current:(data[0]?.id||""));}})
       .catch(error=>{if(!cancelled)setNotice(error instanceof Error?error.message:copy.libraryLoadError);})
       .finally(()=>{if(!cancelled)setLoading(false);});
     return ()=>{cancelled=true;};
-  },[apiBase,token,copy.libraryLoadError]);
+  },[apiBase,token,workspaceId,copy.libraryLoadError]);
   function download(item:LibraryDraft){
     const lines=[`# ${item.title}`,`\n**${item.targetName}** · ${item.format||"Draft"} · ${new Date(item.createdAt).toLocaleString(locale==="ar"?"ar-IQ":"en-US")}`,item.clientName?`\nClient: ${item.clientName}`:"",item.brandName?`\nBrand: ${item.brandName}`:"",`\n## ${copy.libraryRequest}`,item.request||"",item.hook?`\n## Hook\n${item.hook}`:"",`\n## ${copy.libraryOutput}`,item.body||"",item.callToAction?`\n## CTA\n${item.callToAction}`:"",item.videoScript?`\n## Video script\n${item.videoScript}`:"",item.onScreenText?`\n## On-screen text\n${item.onScreenText}`:"",item.hashtags?.length?`\n## Hashtags\n${item.hashtags.map(tag=>tag.startsWith("#")?tag:`#${tag}`).join(" ")}`:"",item.geo?.primaryPhrase?`\n## GEO brief\n- Intent: ${item.geo.intent||"—"}\n- Primary phrase: ${item.geo.primaryPhrase}\n- Related terms: ${(item.geo.supportingTerms||[]).join(", ")}\n- Questions: ${(item.geo.questions||[]).join("; ")}\n- Entities: ${(item.geo.entities||[]).join(", ")}`:"",item.factCheckNotes?.length?`\n## Fact-check notes\n${item.factCheckNotes.map(note=>`- ${note}`).join("\n")}`:"",item.mediaNotes?`\n## Media notes\n${item.mediaNotes}`:""].filter(Boolean);
     const blob=new Blob([lines.join("\n\n")],{type:"text/markdown;charset=utf-8"});

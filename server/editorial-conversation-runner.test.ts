@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { appendEditorialConversationMessage, createEditorialConversation, getEditorialConversation, updateEditorialConversationRun } from "./editorial-conversations.mjs";
-import { createEditorialConversationProgress, runEditorialConversation, cancelEditorialConversationRun } from "./editorial-conversation-runner.mjs";
+import { appendEditorialConversationMessage, createEditorialConversation, getEditorialConversation, updateEditorialConversationRun, enqueueEditorialConversationJob } from "./editorial-conversations.mjs";
+import { createEditorialConversationProgress, buildEditorialExecutionPlan, runEditorialConversation, cancelEditorialConversationRun } from "./editorial-conversation-runner.mjs";
 
 function makeStore() {
   const state: any = {
     editorialConversations: [], conversationAttachments: [], conversationDrafts: [], clients: [], brands: [],
-    editorialDrafts: [], platformVariants: [], originalityChecks: [], tasks: {}
+    editorialDrafts: [], platformVariants: [], originalityChecks: [], tasks: {}, editorialJobQueue: []
   };
   return {
     state,
@@ -36,6 +36,25 @@ const validOutput = {
   }, mediaNotes: "Use a simple workflow diagram.", factCheckNotes: []
 };
 
+describe("editorial conversation execution plan", () => {
+  it("declares unavailable external research as skipped and publishing as disabled", async () => {
+    const store = makeStore();
+    const { conversation, userMessage } = await startConversation(store);
+    const plan = buildEditorialExecutionPlan({
+      conversation, userMessage,
+      target: { id: "linkedin", name: "LinkedIn", type: "social" },
+      providerAvailable: false
+    });
+    expect(plan).toMatchObject({
+      taskType: "editorial-draft",
+      workspaceId: "workspace-1",
+      externalActions: { webSearch: false, pageCrawl: false, publish: false }
+    });
+    expect(plan.steps.find((step: any) => step.id === "discovery")).toMatchObject({ status: "skipped", required: false });
+    expect(plan.steps.find((step: any) => step.id === "draft")).toMatchObject({ required: false });
+  });
+});
+
 describe("editorial conversation workflow", () => {
   it("shows unavailable model and external research steps honestly", async () => {
     const store = makeStore();
@@ -62,6 +81,16 @@ describe("editorial conversation workflow", () => {
     const savedFirst = await getEditorialConversation(store, "workspace-1", conversation.id);
     expect(savedFirst.messages.at(-1)?.result).toMatchObject({ kind: "draft", targetId: "linkedin", draft: { geo: { primaryPhrase: "responsible AI adoption for small businesses" } } });
     expect(savedFirst.activeRun?.metadata?.steps.find((step: any) => step.id === "discovery")?.status).toBe("skipped");
+    expect(savedFirst.activeRun?.metadata?.startedAt).toBeTruthy();
+    expect(savedFirst.activeRun?.metadata?.executionPlan).toMatchObject({ taskType: "editorial-draft", externalActions: { webSearch: false, pageCrawl: false, publish: false } });
+    expect(savedFirst.activeRun?.metadata?.executionPlan?.steps.find((step: any) => step.id === "draft")?.status).toBe("completed");
+    expect(savedFirst.activeRun?.metadata?.finishedAt).toBeTruthy();
+    expect(savedFirst.activeRun?.metadata?.lifecycle?.map((event: any) => event.phase)).toEqual(expect.arrayContaining(["plan", "act", "observe", "reflect"]));
+    expect(savedFirst.activeRun?.metadata?.toolOutcomes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ tool: "research-discovery", status: "skipped" }),
+      expect.objectContaining({ tool: "model-draft-generation", status: "completed" }),
+      expect.objectContaining({ tool: "workspace-originality-screen", status: "completed" })
+    ]));
 
     const secondUserMessage = await appendEditorialConversationMessage(store, {
       workspaceId: "workspace-1", conversationId: conversation.id, role: "user", targetId: "linkedin",
@@ -75,6 +104,17 @@ describe("editorial conversation workflow", () => {
     const finalConversation = await getEditorialConversation(store, "workspace-1", conversation.id);
     expect(finalConversation.messages.at(-1)?.result).toMatchObject({ needsReview: true });
     expect(finalConversation.activeRun?.metadata?.steps.find((step: any) => step.id === "originality")?.status).toBe("needs-review");
+  });
+
+  it("cancels a queued durable job before a worker claims it", async () => {
+    const store = makeStore();
+    const { conversation, userMessage } = await startConversation(store);
+    await updateEditorialConversationRun(store, { workspaceId: "workspace-1", conversationId: conversation.id, runId: "run-queued-cancel", status: "queued", metadata: createEditorialConversationProgress("en") });
+    await enqueueEditorialConversationJob(store, { workspaceId: "workspace-1", conversationId: conversation.id, runId: "run-queued-cancel", userMessageId: userMessage.id, mediaDir: "/tmp/editorial-chat-no-media" });
+    const cancellation = await cancelEditorialConversationRun({ store, workspaceId: "workspace-1", conversationId: conversation.id });
+    expect(cancellation.cancelled).toBe(true);
+    expect(store.state.editorialJobQueue[0]).toMatchObject({ id: "run-queued-cancel", status: "cancelled" });
+    expect((await getEditorialConversation(store, "workspace-1", conversation.id)).activeRun?.status).toBe("cancelled");
   });
 
   it("cancels an in-flight model request and does not save a draft", async () => {
