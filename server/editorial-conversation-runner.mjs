@@ -1,6 +1,6 @@
 import { appendEditorialConversationMessage, claimEditorialConversationRun, getEditorialConversation, updateEditorialConversationRun } from "./editorial-conversations.mjs";
 import { extractConversationAttachmentContext } from "./editorial-conversation-attachments.mjs";
-import { compareWorkspaceEditorialContent } from "./editorial-similarity.mjs";
+import { analyzeOriginality } from "./editorial-originality.mjs";
 import { getEditorialTarget } from "./editorial-targets.mjs";
 
 const MAX_TOTAL_DOCUMENT_CHARS = 20_000;
@@ -184,11 +184,18 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
     await setStep("originality", "running");
     const candidateText = [draft.title, draft.hook, draft.body, draft.callToAction, ...draft.hashtags, draft.videoScript, draft.onScreenText].filter(Boolean).join("\n");
     const snapshot = await store.read();
-    const similarity = compareWorkspaceEditorialContent(snapshot, workspaceId, candidateText, {
+    const originality = analyzeOriginality(snapshot, workspaceId, candidateText, {
       clientId: conversation.clientId || null,
       brandId: conversation.brandId || null
     });
-    const needsReview = similarity.exactMatches.length > 0 || similarity.nearMatches.length > 0;
+    const similarity = {
+      comparisonScope: originality.comparisonScope,
+      comparedContentCount: originality.comparedContentCount,
+      comparedByType: originality.comparedByType,
+      exactMatches: originality.findings.filter(item => item.matchType === "exact"),
+      nearMatches: originality.findings.filter(item => item.matchType !== "exact")
+    };
+    const needsReview = originality.reviewRequired;
     await store.transact(state => {
       state.conversationDrafts ||= [];
       state.conversationDrafts.push({
@@ -196,7 +203,7 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
         targetId: target.id, targetName: target.name,
         clientId: conversation.clientId || null, clientName: conversation.clientName || null,
         brandId: conversation.brandId || null, brandName: conversation.brandName || null,
-        ...draft, similarity, createdAt: new Date().toISOString()
+        ...draft, similarity, originality, createdAt: new Date().toISOString()
       });
     });
     await setStep("originality", needsReview ? "needs-review" : "completed", needsReview ? "A similar saved draft was found; review before using this content." : "No close match was found in this workspace identity scope.");
@@ -210,7 +217,7 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
     const assistantMessage = await appendEditorialConversationMessage(store, {
       workspaceId, conversationId, role: "assistant", content: draft.body,
       result: {
-        kind: "draft", targetId: target.id, targetName: target.name, draft, similarity,
+        kind: "draft", targetId: target.id, targetName: target.name, draft, similarity, originality,
         needsReview, limitations,
         usage: modelResult.usage || null,
         provider: modelResult.provider || "openai-compatible"
