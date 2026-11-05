@@ -1,6 +1,7 @@
 import { appendEditorialConversationMessage, claimEditorialConversationRun, getEditorialConversation, updateEditorialConversationRun } from "./editorial-conversations.mjs";
 import { extractConversationAttachmentContext } from "./editorial-conversation-attachments.mjs";
 import { analyzeOriginality } from "./editorial-originality.mjs";
+import { analyzeEditorialDraft } from "./editorial-intelligence.mjs";
 import { getEditorialTarget } from "./editorial-targets.mjs";
 
 const MAX_TOTAL_DOCUMENT_CHARS = 20_000;
@@ -178,6 +179,7 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
     const modelResult = await provider.generateJSON({ system, prompt, images: attachmentContext.images, maxTokens: 3800, temperature: 0.35, signal: controller.signal });
     if (controller.signal.aborted) throw Object.assign(new Error("Editorial run cancelled"), { name: "AbortError" });
     const draft = validateDraft(modelResult.output, target);
+    const intelligence = analyzeEditorialDraft(draft, { targetName: target.name, targetType: target.type });
     await setStep("geo", "completed", "Intent, natural-language phrases, questions and entities are included in the draft.");
     await setStep("draft", "completed");
 
@@ -203,7 +205,7 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
         targetId: target.id, targetName: target.name,
         clientId: conversation.clientId || null, clientName: conversation.clientName || null,
         brandId: conversation.brandId || null, brandName: conversation.brandName || null,
-        ...draft, similarity, originality, createdAt: new Date().toISOString()
+        ...draft, similarity, originality, intelligence, createdAt: new Date().toISOString()
       });
     });
     await setStep("originality", needsReview ? "needs-review" : "completed", needsReview ? "A similar saved draft was found; review before using this content." : "No close match was found in this workspace identity scope.");
@@ -217,7 +219,7 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
     const assistantMessage = await appendEditorialConversationMessage(store, {
       workspaceId, conversationId, role: "assistant", content: draft.body,
       result: {
-        kind: "draft", targetId: target.id, targetName: target.name, draft, similarity, originality,
+        kind: "draft", targetId: target.id, targetName: target.name, draft, similarity, originality, intelligence,
         needsReview, limitations,
         usage: modelResult.usage || null,
         provider: modelResult.provider || "openai-compatible"

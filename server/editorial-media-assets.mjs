@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { mkdir, rename, rm } from "node:fs/promises";
+import { mkdir, readFile, rename, rm } from "node:fs/promises";
+import { analyzeMediaAsset } from "./media-intelligence.mjs";
 import { basename, isAbsolute, relative, resolve } from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -92,6 +93,8 @@ export async function createMediaAsset({ req, store, workspaceId, taskId, mediaD
     if (bytesWritten < 1) fail("Media file is empty", 400);
     if (storedBytes + bytesWritten > MAX_TOTAL_MEDIA_BYTES) fail("Local media storage quota would be exceeded", 413);
     await rename(temporaryPath, finalPath);
+    const fileBytes = await readFile(finalPath);
+    const intelligence = analyzeMediaAsset({ bytes: fileBytes, mimeType, kind: profile.kind, description });
     const asset = {
       id,
       workspaceId,
@@ -101,6 +104,7 @@ export async function createMediaAsset({ req, store, workspaceId, taskId, mediaD
       sizeBytes: bytesWritten,
       originalName,
       description,
+      intelligence,
       altText: profile.kind === "image" ? description : "",
       caption: profile.kind === "video" ? description : "",
       storageKey,
