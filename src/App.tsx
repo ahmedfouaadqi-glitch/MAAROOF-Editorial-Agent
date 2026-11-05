@@ -274,7 +274,8 @@ export default function App() {
   const navItems = [
     { id: "chat" as const, label: copy.chat, icon: MessageSquare },
     { id: "home" as const, label: copy.overview, icon: LayoutDashboard },
-    { id: "articles" as const, label: copy.articles, icon: FileText },\n    { id: "library" as const, label: copy.library, icon: Library },
+    { id: "articles" as const, label: copy.articles, icon: FileText },
+    { id: "library" as const, label: copy.library, icon: Library },
     { id: "magazine-submissions" as const, label: locale === "ar" ? "تقديمات المجلات" : "Magazine submissions", icon: BookOpenText },
     { id: "registry" as const, label: copy.registry, icon: Globe2 },
     { id: "research-settings" as const, label: copy.settings, icon: SlidersHorizontal },
@@ -327,7 +328,8 @@ export default function App() {
 
       <div className={`page-content ${view === "chat" ? "chat-page" : ""}`}>
         {view === "chat" && <EditorialChatWorkspace apiBase={apiBase} token={adminToken} workspaceId="main-workspace" locale={locale} targets={chatTargets} onOpenSettings={() => setView("research-settings")} openConversationId={pendingConversationId} onConversationOpened={()=>setPendingConversationId(null)} onPrepareBrowser={draft=>{setBrowserChatDraft(draft);setBrowserDrawerOpen(true);}}/>}
-        {view === "library" && <LibraryView apiBase={apiBase} token={adminToken} locale={locale} copy={copy} onOpenConversation={id=>{setPendingConversationId(id);setView("chat");}}/>}\n        {view === "home" && <HomeView copy={copy} articles={articles} onCreate={() => setView("articles")} onRegistry={() => setView("registry")} onViewAll={() => setView("articles")} locale={locale} theme={theme}/>}
+        {view === "library" && <LibraryView apiBase={apiBase} token={adminToken} locale={locale} copy={copy} onOpenConversation={id=>{setPendingConversationId(id);setView("chat");}}/>}
+        {view === "home" && <HomeView copy={copy} articles={articles} onCreate={() => setView("articles")} onRegistry={() => setView("registry")} onViewAll={() => setView("articles")} locale={locale} theme={theme}/>}
         {view === "articles" && <section className="page-section">
           <PageHeading eyebrow={locale === "ar" ? "مسار العمل التحريري" : "EDITORIAL WORKFLOW"} title={copy.newTitle} subtitle={copy.newSub} action={<span className="status-chip"><span className="status-dot"/>{locale==="ar"?"قرار النشر بيدك":"You control publishing"}</span>}/>
           <div className="article-layout">
