@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { resolve } from "node:path";
 import { JsonStore } from "./store.mjs";
-import { createWorkspace, getWorkspace, listWorkspaces, updateWorkspace } from "./editorial-workspaces.mjs";
+import { createWorkspace, getWorkspace, listWorkspaces, restoreWorkspace, updateWorkspace } from "./editorial-workspaces.mjs";
 import { DEFAULT_LIMITS, validateLimits, reserveBudget, releaseReservation, commitReservation } from "./research-budget.mjs";
 import { createEditorialTask, listEditorialTasks, advanceEditorialTask } from "./editorial-tasks.mjs";
 import { registerClaim, listClaims, checkOriginality } from "./editorial-evidence.mjs";
@@ -127,13 +127,20 @@ const server = createServer(async (req, res) => {
 
     if (url.pathname === "/api/v1/workspaces" && req.method === "GET") {
       const state = await store.read();
-      return send(res, 200, { workspaces: listWorkspaces(state) });
+      return send(res, 200, { workspaces: listWorkspaces(state, { includeArchived: url.searchParams.get("includeArchived") === "true" }) });
     }
     if (url.pathname === "/api/v1/workspaces" && req.method === "POST") {
       const body = await readJson(req);
       const workspace = await store.transact(state => createWorkspace(state, body));
       return send(res, 201, { workspace });
     }
+    const workspaceRestore = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/restore$/);
+    if (workspaceRestore && req.method === "POST") {
+      const workspaceId = decodeURIComponent(workspaceRestore[1]);
+      const workspace = await store.transact(state => restoreWorkspace(state, workspaceId));
+      return send(res, 200, { workspace });
+    }
+
     const workspaceItem = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)$/);
     if (workspaceItem && req.method === "GET") {
       const workspaceId = decodeURIComponent(workspaceItem[1]);
