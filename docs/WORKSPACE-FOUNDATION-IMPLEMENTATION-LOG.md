@@ -133,3 +133,4 @@ Decision record: `docs/ARCHITECTURE-DECISION-SINGLE-ADMIN.md`.
 - Video audio extraction/transcription is not implemented; current video processing remains limited to supported frame extraction and metadata.
 - URL ingestion/retrieval is not wired into conversation intake.
 - Image semantic understanding depends on a configured vision-capable model; metadata extraction is not visual fact verification.
+- Documentation follow-up commit 70798786d21f877ea72ca1ecb1eb6ba96ee5bcf7 also passed CI run 41963950452: typecheck, 212 tests across 40 files, and production build.
