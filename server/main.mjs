@@ -244,7 +244,7 @@ const server = createServer(async (req, res) => {
       const conversationId = decodeURIComponent(conversationRetry[2]);
       const conversation = await getEditorialConversation(store, workspaceId, conversationId);
       const previousRun = conversation.activeRun;
-      if (previousRun && !["failed", "cancelled"].includes(previousRun.status)) {
+      if (!previousRun || !["failed", "cancelled"].includes(previousRun.status)) {
         return send(res, 409, { error: "Only a failed or cancelled conversation run can be retried." });
       }
       const userMessage = [...conversation.messages].reverse().find(message => message.role === "user");
