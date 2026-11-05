@@ -47,6 +47,22 @@ describe("Browser Agent runtime", () => {
     await expect(validatePublicUrl("https://publisher.example", ["publisher.example"], { resolveHost: privateDns })).rejects.toMatchObject({ status: 403 });
   });
 
+  it("rejects mixed public/private DNS answers and reserved IPv4/IPv6 literals", async () => {
+    const mixedDns = async () => [
+      { address: "93.184.216.34", family: 4 },
+      { address: "192.168.1.20", family: 4 }
+    ];
+    await expect(validatePublicUrl("https://publisher.example", ["publisher.example"], { resolveHost: mixedDns })).rejects.toMatchObject({ status: 403 });
+    for (const target of ["https://127.0.0.1/", "https://10.1.2.3/", "https://[::1]/", "https://[::ffff:127.0.0.1]/"]) {
+      await expect(validatePublicUrl(target, [], { requireApprovedHost: false })).rejects.toMatchObject({ status: 403 });
+    }
+  });
+
+  it("does not allow a lookalike hostname to satisfy an approved host", async () => {
+    await expect(validatePublicUrl("https://notpublisher.example", ["publisher.example"], { resolveHost: publicDns })).rejects.toMatchObject({ status: 403 });
+    await expect(validatePublicUrl("https://sub.publisher.example", ["publisher.example"], { resolveHost: publicDns })).resolves.toBeInstanceOf(URL);
+  });
+
   it("creates a workspace-scoped session and returns no browser internals", async () => {
     const fake = fakeChromium();
     const manager = new BrowserSessionManager({ chromium: fake.chromium, resolveHost: publicDns });
