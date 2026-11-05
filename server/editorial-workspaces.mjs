@@ -55,6 +55,16 @@ export function createWorkspace(state, input = {}) {
   return workspace;
 }
 
+export function restoreWorkspace(state, workspaceId) {
+  const workspace = ensureDefaultWorkspace(state).find(item => item.id === workspaceId);
+  if (!workspace) fail("Workspace not found", 404);
+  if (workspace.isDefault) return workspace;
+  if (workspace.status !== "archived") return workspace;
+  workspace.status = "active";
+  workspace.updatedAt = new Date().toISOString();
+  return workspace;
+}
+
 export function updateWorkspace(state, workspaceId, input = {}) {
   const workspace = getWorkspace(state, workspaceId);
   if (workspace.isDefault && input.status === "archived") fail("The default workspace cannot be archived");
