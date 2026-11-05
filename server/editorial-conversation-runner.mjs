@@ -104,6 +104,36 @@ export function createEditorialConversationProgress(language = "ar") {
   return progress(stepsFor(language));
 }
 
+export function buildEditorialExecutionPlan({ conversation, userMessage, target, providerAvailable }) {
+  const hasAttachments = Array.isArray(userMessage.attachmentIds) && userMessage.attachmentIds.length > 0;
+  const researchReason = "External search and page retrieval are not connected to this conversation runner; no search or crawl is executed.";
+  const modelReason = providerAvailable ? "" : "The server-side model provider is unavailable; model-dependent work will be skipped.";
+  const steps = [
+    { id: "request", required: true, mode: "local", status: "pending", reason: "Validate the user message and requested language." },
+    { id: "identity", required: false, mode: "local", status: "pending", reason: conversation.clientName || conversation.brandName ? "Use the selected workspace client and brand context." : "No client or brand identity was supplied." },
+    { id: "destination", required: true, mode: "local", status: "pending", reason: `Adapt the output to ${target.name}.` },
+    { id: "attachments", required: hasAttachments && Boolean(providerAvailable), mode: "local+model", status: "pending", reason: hasAttachments ? (providerAvailable ? "Extract bounded local text and supported visual context." : modelReason) : "No attachments were supplied." },
+    { id: "discovery", required: false, mode: "external", status: "skipped", reason: researchReason },
+    { id: "retrieval", required: false, mode: "external", status: "skipped", reason: researchReason },
+    { id: "evidence", required: false, mode: "external", status: "skipped", reason: "No external sources are retrieved or independently verified in this conversation path." },
+    { id: "geo", required: Boolean(providerAvailable), mode: "model", status: "pending", reason: modelReason || "Generate intent, phrase, question, and entity guidance in the draft." },
+    { id: "draft", required: Boolean(providerAvailable), mode: "model", status: "pending", reason: modelReason || "Generate a destination-specific draft." },
+    { id: "originality", required: Boolean(providerAvailable), mode: "local", status: "pending", reason: modelReason || "Compare against saved content in the same workspace." }
+  ];
+  return {
+    version: 1,
+    createdAt: new Date().toISOString(),
+    taskType: "editorial-draft",
+    workspaceId: conversation.workspaceId,
+    language: conversation.language,
+    target: { id: target.id, name: target.name, type: target.type },
+    input: { messageId: userMessage.id, attachmentIds: userMessage.attachmentIds || [] },
+    externalActions: { webSearch: false, pageCrawl: false, publish: false },
+    steps
+  };
+}
+
+
 export async function cancelEditorialConversationRun({ store, workspaceId, conversationId }) {
   const conversation = await getEditorialConversation(store, workspaceId, conversationId);
   const run = conversation.activeRun;
@@ -141,6 +171,8 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
     if (controller.signal.aborted) throw Object.assign(new Error("Editorial run cancelled"), { name: "AbortError" });
     const step = steps.find(item => item.id === id);
     if (step) { step.status = status; if (note) step.note = note; }
+    const plannedStep = runContext.executionPlan?.steps?.find(item => item.id === id);
+    if (plannedStep) { plannedStep.status = status; if (note) plannedStep.note = note; }
     await setRun("running");
   };
   try {
@@ -148,6 +180,8 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
     const userMessage = conversation.messages.find(message => message.id === userMessageId && message.role === "user");
     if (!userMessage) throw new Error("The conversation request was not found.");
     const target = getEditorialTarget(userMessage.targetId || conversation.targetId);
+    const executionPlan = buildEditorialExecutionPlan({ conversation, userMessage, target, providerAvailable: Boolean(provider) });
+    runContext.executionPlan = executionPlan;
     await setRun("running", { startedAt: new Date().toISOString() });
     await setStep("request", "completed");
     await setStep("identity", "completed", conversation.clientName || conversation.brandName ? "Brand identity is included in this workspace." : "No client or brand identity was selected.");
