@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowUp, Check, ChevronDown, Download, File, Globe2, Image, LoaderCircle, MessageSquare, Plus, Search, Settings, Upload, X, AlertTriangle, Sparkles } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, Download, File, FileText, Globe2, Image, LoaderCircle, Mail, MessageSquare, MessagesSquare, Newspaper, Plus, Search, Settings, Upload, Video, X, AlertTriangle, Sparkles } from "lucide-react";
 import type { EditorialChatBrowserDraft } from "../types/editorial-chat";
 
 export type ChatTarget = {
@@ -31,7 +31,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
   const ar = locale === "ar";
   const t = ar ? {
     history: "سجل المحادثات", newChat: "محادثة جديدة", search: "ابحث في الوجهات...", choose: "اختر منصة أو مجلة",
-    emptyTitle: "ما الذي ترغب في تحريره؟", emptySub: "اختر الوجهة، أضف سياق العميل/العلامة عند الحاجة، ثم اكتب طلبك وأرفق الملفات.",
+    emptyTitle: "ما الذي تريد إنجازه؟", emptySub: "ابدأ بطلبك مباشرة أو اختر مثالاً جاهزاً وعدّله. حدّد الوجهة وأرفق الملفات عند الحاجة.", startersTitle: "ابدأ من مثال", starterArticle: "كتابة مقال", starterArticleHint: "مقال منظم قابل للمراجعة", starterPost: "منشور مهني", starterPostHint: "فكرة واضحة لجمهور LinkedIn", starterVideo: "سيناريو فيديو", starterVideoHint: "خطاف ومشاهد ونص شاشة", starterNewsletter: "نشرة تحريرية", starterNewsletterHint: "مقدمة ومحتوى موجّه للقراء",
     placeholder: "اكتب ما تريد صياغته أو تطويره...", send: "إرسال", attach: "إرفاق ملفات", noHistory: "لا توجد محادثات بعد.",
     settings: "أدخل رمز الوصول من الإعدادات لاستخدام المحادثات.", goSettings: "فتح الإعدادات", loading: "جارٍ التحميل...",
     social: "منصات اجتماعية", magazine: "مجلات ومواقع نشر", target: "الوجهة التحريرية", noTargets: "لا توجد وجهات مطابقة.",
@@ -47,7 +47,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
     note: "المسودة لا تُنشر تلقائياً. البحث والكشط الخارجي غير منفّذين في هذه المرحلة.", start: "ابدأ التحرير", runningNote: "تظهر الخطوات المنفذة والمتخطاة بوضوح؛ لا يتم النشر من هنا.", browserHandoff: "المتابعة في المتصفح", browserHandoffHint: "تسجيل الدخول والإدراج اختياريان؛ لن يُضغط زر النشر."
   } : {
     history: "Conversation history", newChat: "New conversation", search: "Search destinations...", choose: "Choose a platform or magazine",
-    emptyTitle: "What would you like to work on?", emptySub: "Choose a destination, add client/brand context if useful, then write your request and attach files.",
+    emptyTitle: "What do you want to accomplish?", emptySub: "Start with your own request or choose an editable example. Select a destination and attach files when useful.", startersTitle: "Start from an example", starterArticle: "Write an article", starterArticleHint: "A structured, review-ready article", starterPost: "Professional post", starterPostHint: "A focused idea for LinkedIn", starterVideo: "Video script", starterVideoHint: "Hook, scenes and on-screen text", starterNewsletter: "Editorial newsletter", starterNewsletterHint: "A reader-focused opening and body",
     placeholder: "Describe what you want to create or adapt...", send: "Send", attach: "Attach files", noHistory: "No conversations yet.",
     settings: "Add the workspace access key in Settings to use conversations.", goSettings: "Open settings", loading: "Loading...",
     social: "Social platforms", magazine: "Magazines & publishers", target: "Editorial destination", noTargets: "No matching destinations.",
@@ -137,7 +137,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
     setFiles(current => { current.forEach(item => { if (item.preview) URL.revokeObjectURL(item.preview); }); return []; });
   }
 
-  function addFiles(list: FileList | null) {
+  function useStarter(target: string, prompt: string) {\n    setTargetId(target);\n    setContent(prompt);\n    setNotice("");\n    setPickerOpen(false);\n  }\n\n  function addFiles(list: FileList | null) {
     if (!list) return;
     const remaining = Math.max(0, 10 - files.length);
     if (remaining === 0) { setNotice(t.fileLimit); return; }
@@ -248,7 +248,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
       </header>
       <div className="editorial-chat-message-area">
         {loading && <p className="editorial-chat-loading"><LoaderCircle size={16}/>{t.loading}</p>}
-        {!loading && messages.length === 0 && <div className="editorial-chat-empty"><div className="editorial-chat-empty-icon"><MessageSquare size={24}/></div><h1>{t.emptyTitle}</h1><p>{t.emptySub}</p>{!selectedTarget && <button type="button" className="editorial-chat-empty-select" onClick={() => setPickerOpen(true)}>{t.choose}<ChevronDown size={15}/></button>}</div>}
+        {!loading && messages.length === 0 && <div className="editorial-chat-empty"><div className="editorial-chat-empty-icon"><Sparkles size={24}/></div><h1>{t.emptyTitle}</h1><p>{t.emptySub}</p>{!selectedTarget && <button type="button" className="editorial-chat-empty-select" onClick={() => setPickerOpen(true)}>{t.choose}<ChevronDown size={15}/></button>}<section className="editorial-chat-starters" aria-label={t.startersTitle}><div className="editorial-chat-starters-heading">{t.startersTitle}</div><div className="editorial-chat-starter-grid"><button type="button" className="editorial-chat-starter" onClick={() => useStarter("wordpress", ar ? "اكتب مقالاً تحريرياً منظماً حول [الموضوع]. ابدأ بعنوان ومقدمة واضحة، ثم أقسام مترابطة وخاتمة. ميّز الحقائق التي تحتاج إلى مصادر، ولا تخترع أرقاماً أو اقتباسات." : "Write a structured editorial article about [topic]. Include a clear title, introduction, connected sections and conclusion. Flag facts that need sources; do not invent figures or quotes.")}><span><Newspaper size={18}/></span><b>{t.starterArticle}</b><small>{t.starterArticleHint}</small></button><button type="button" className="editorial-chat-starter" onClick={() => useStarter("linkedin", ar ? "أنشئ منشوراً مهنياً على LinkedIn حول [الفكرة] لجمهور [الجمهور]. افتتح برؤية محددة، اشرحها بإيجاز، واختم بسؤال نقاش طبيعي." : "Create a professional LinkedIn post about [idea] for [audience]. Open with a specific insight, explain it concisely, and end with a natural discussion question.")}><span><MessagesSquare size={18}/></span><b>{t.starterPost}</b><small>{t.starterPostHint}</small></button><button type="button" className="editorial-chat-starter" onClick={() => useStarter("tiktok", ar ? "اكتب سيناريو فيديو قصير عن [الموضوع] لجمهور [الجمهور]. قدّم خطافاً لأول 3 ثوانٍ، ثم مشاهد متسلسلة مع نص الشاشة والتعليق الصوتي ودعوة واحدة للتفاعل." : "Write a short-video script about [topic] for [audience]. Provide a hook for the first 3 seconds, then sequenced scenes with on-screen text, voiceover and one call to action.")}><span><Video size={18}/></span><b>{t.starterVideo}</b><small>{t.starterVideoHint}</small></button><button type="button" className="editorial-chat-starter" onClick={() => useStarter("substack", ar ? "اكتب مسودة نشرة تحريرية حول [الموضوع] موجّهة إلى [الجمهور]. اقترح عنواناً واضحاً، ومقدمة مباشرة، ومحتوى مفيداً منظماً، وخاتمة تدعو إلى متابعة النقاش." : "Draft an editorial newsletter about [topic] for [audience]. Suggest a clear subject, direct opening, useful structured body and a closing that invites further discussion.")}><span><Mail size={18}/></span><b>{t.starterNewsletter}</b><small>{t.starterNewsletterHint}</small></button></div></section></div>}
         {messages.map((message, index) => {
           const result = message.result;
           const draft = result?.draft;
