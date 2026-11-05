@@ -238,6 +238,31 @@ const server = createServer(async (req, res) => {
       return send(res, 202, { accepted: true, runId, message, conversation: await getEditorialConversation(store, workspaceId, conversationId) });
     }
 
+    const conversationRetry = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/conversations\/([^/]+)\/retry$/);
+    if (conversationRetry && req.method === "POST") {
+      const workspaceId = decodeURIComponent(conversationRetry[1]);
+      const conversationId = decodeURIComponent(conversationRetry[2]);
+      const conversation = await getEditorialConversation(store, workspaceId, conversationId);
+      const previousRun = conversation.activeRun;
+      if (previousRun && !["failed", "cancelled"].includes(previousRun.status)) {
+        return send(res, 409, { error: "Only a failed or cancelled conversation run can be retried." });
+      }
+      const userMessage = [...conversation.messages].reverse().find(message => message.role === "user");
+      if (!userMessage) return send(res, 409, { error: "There is no user request to retry." });
+      const runId = randomUUID();
+      const retryCount = Number.isSafeInteger(previousRun?.metadata?.retryCount) ? previousRun.metadata.retryCount + 1 : 1;
+      const initialProgress = createEditorialConversationProgress(userMessage.language || conversation.language);
+      await updateEditorialConversationRun(store, {
+        workspaceId, conversationId, runId, status: "queued",
+        metadata: { ...initialProgress, queuedAt: new Date().toISOString(), retryCount, retryOfRunId: previousRun?.id || null }
+      });
+      setImmediate(() => {
+        void runEditorialConversation({ store, provider: modelProvider, workspaceId, conversationId, runId, userMessageId: userMessage.id, mediaDir })
+          .catch(error => console.error("Editorial conversation retry failed:", error?.message || "unknown error"));
+      });
+      return send(res, 202, { accepted: true, runId, retriedMessageId: userMessage.id, conversation: await getEditorialConversation(store, workspaceId, conversationId) });
+    }
+
     const conversationAttachments = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/conversations\/([^/]+)\/attachments(?:\/([^/]+)(?:\/(file))?)?$/);
     if (conversationAttachments) {
       const workspaceId = decodeURIComponent(conversationAttachments[1]);
