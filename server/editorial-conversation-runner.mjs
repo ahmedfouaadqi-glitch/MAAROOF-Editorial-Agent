@@ -2,6 +2,7 @@ import { appendEditorialConversationMessage, claimEditorialConversationRun, getE
 import { extractConversationAttachmentContext } from "./editorial-conversation-attachments.mjs";
 import { compareWorkspaceEditorialContent } from "./editorial-similarity.mjs";
 import { getEditorialTarget } from "./editorial-targets.mjs";
+import { analyzeEditorialDraft } from "./editorial-intelligence.mjs";
 
 const MAX_TOTAL_DOCUMENT_CHARS = 20_000;
 const activeRunControllers = new Map();
@@ -178,6 +179,7 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
     const modelResult = await provider.generateJSON({ system, prompt, images: attachmentContext.images, maxTokens: 3800, temperature: 0.35, signal: controller.signal });
     if (controller.signal.aborted) throw Object.assign(new Error("Editorial run cancelled"), { name: "AbortError" });
     const draft = validateDraft(modelResult.output, target);
+    const intelligence = analyzeEditorialDraft(draft, { targetName: target.name, targetType: target.type });
     await setStep("geo", "completed", "Intent, natural-language phrases, questions and entities are included in the draft.");
     await setStep("draft", "completed");
 
@@ -211,7 +213,7 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
       workspaceId, conversationId, role: "assistant", content: draft.body,
       result: {
         kind: "draft", targetId: target.id, targetName: target.name, draft, similarity,
-        needsReview, limitations,
+        intelligence, needsReview, limitations,
         usage: modelResult.usage || null,
         provider: modelResult.provider || "openai-compatible"
       }
