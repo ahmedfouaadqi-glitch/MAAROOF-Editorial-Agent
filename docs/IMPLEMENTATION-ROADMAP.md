@@ -30,9 +30,11 @@
 - [x] Add explicit entity relationships linked to supporting claim IDs, with unverified evidence states.
 - [ ] Implement model-assisted named-entity recognition, entity resolution, and search-intent extraction after provider contracts and evaluation sets are ready.
 - [x] Add a workspace-scoped, deterministic objective-based outline scaffold and human-editable draft persistence/UI in Arabic and English. This is a deterministic scaffold. Optional model-assisted drafting is implemented behind server configuration and explicit invocation; it remains disabled until a provider is selected and credentials are installed.
-- [x] Add deterministic exact-match and token-overlap near-duplicate checks against previously submitted workspace text.
-- [ ] Add semantic, cross-language, and external-corpus originality checks; these require validated embeddings/models and a wider corpus.
-- [x] Add deterministic tests for evidence linking, workspace isolation, Arabic normalization, and exact-match detection.
+- [x] Add a workspace-scoped Originality Engine for exact and lexical near-match screening across saved article, social, conversation, and prior-check records; retain client/brand identity boundaries and return explainable match records.
+- [x] Add draft-run integration and an Arabic/English review panel with match type, comparison scope, corpus size, and strongest lexical similarity; short candidates require review rather than receiving a clean result.
+- [ ] Add validated semantic/paraphrase and cross-language similarity using evaluated multilingual embeddings; no semantic capability is claimed by the current lexical engine.
+- [ ] Add external-corpus checks against permitted web, academic, and publisher sources; no public-web or paid plagiarism database is queried by the current engine.
+- [x] Add deterministic tests for evidence linking, workspace isolation, Arabic normalization, exact-match detection, near-overlap signals, insufficient text, and no cross-workspace leakage.
 - [ ] Add deterministic tests for the remaining editorial engines.
 - [x] Keep the existing optional model adapter disabled; article-writing model calls are deferred until a later phase.
 - [ ] Add model-assisted named-entity recognition, entity resolution, and search intent extraction after evaluation sets are ready.
