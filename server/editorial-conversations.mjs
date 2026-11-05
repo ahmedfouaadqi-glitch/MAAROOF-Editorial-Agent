@@ -218,12 +218,20 @@ export async function enqueueEditorialConversationJob(store, {
   return store.transact(state => {
     ownedConversation(state, workspaceId, conversationId);
     state.editorialJobQueue ||= [];
+    const terminalJobs = state.editorialJobQueue.filter(job => ["completed", "failed", "cancelled"].includes(job.status));
+    if (terminalJobs.length > 250) {
+      const removeIds = new Set(terminalJobs.sort((a, b) => String(a.finishedAt || a.updatedAt || a.createdAt).localeCompare(String(b.finishedAt || b.updatedAt || b.createdAt))).slice(0, terminalJobs.length - 250).map(job => job.id));
+      state.editorialJobQueue = state.editorialJobQueue.filter(job => !removeIds.has(job.id));
+    }
     const existing = state.editorialJobQueue.find(job => job.id === runId);
     if (existing) {
       if (existing.workspaceId !== workspaceId || existing.conversationId !== conversationId || existing.userMessageId !== userMessageId) {
         fail("runId is already bound to a different queued operation", 409);
       }
       return { job: structuredClone(existing), replayed: true };
+    }
+    if (state.editorialJobQueue.filter(job => ["queued", "running"].includes(job.status)).length >= 1000) {
+      fail("Editorial execution queue is full; retry after pending work has cleared.", 503);
     }
     const now = new Date().toISOString();
     const job = {
