@@ -109,6 +109,31 @@ describe("workspace API integration", () => {
     expect(allowed.status).toBe(200);
   });
 
+  it("keeps article records isolated between two active workspaces", async () => {
+    const firstResponse = await api("/api/v1/workspaces", { method: "POST", body: JSON.stringify({ name: "Isolation Workspace A" }) });
+    const secondResponse = await api("/api/v1/workspaces", { method: "POST", body: JSON.stringify({ name: "Isolation Workspace B" }) });
+    const first = (await firstResponse.json() as any).workspace;
+    const second = (await secondResponse.json() as any).workspace;
+
+    const created = await api(`/api/v1/workspaces/${first.id}/articles`, {
+      method: "POST",
+      body: JSON.stringify({ topic: "Workspace-scoped editorial task", language: "en", objective: "analysis" })
+    });
+    expect(created.status).toBe(201);
+    const article = (await created.json() as any).article;
+
+    const firstList = await api(`/api/v1/workspaces/${first.id}/articles`);
+    const secondList = await api(`/api/v1/workspaces/${second.id}/articles`);
+    expect((await firstList.json() as any).articles.some((item: any) => item.id === article.id)).toBe(true);
+    expect((await secondList.json() as any).articles.some((item: any) => item.id === article.id)).toBe(false);
+
+    const crossWorkspaceUpdate = await api(`/api/v1/workspaces/${second.id}/articles/${article.id}/stage`, {
+      method: "PUT",
+      body: JSON.stringify({ nextStage: "planning" })
+    });
+    expect(crossWorkspaceUpdate.status).toBe(404);
+  });
+
   it("rejects unknown workspace IDs in body-scoped operations", async () => {
     const response = await api("/api/v1/claims", {
       method: "POST",
