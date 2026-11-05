@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } 
 import {
   Activity, AlertTriangle, ArrowDownLeft, ArrowLeft, ArrowUpLeft, BookOpenText, Check,
   CheckCircle2, ChevronDown, CircleHelp, FileCheck2, FilePlus2,
-  FileText, Globe2, Home, Layers3, LayoutDashboard, Library, ListFilter,
+  Download, FileText, Globe2, Home, Layers3, LayoutDashboard, Library, ListFilter,
   LockKeyhole, Menu, Moon, MoreHorizontal, Plus, Search,
   ShieldCheck, SlidersHorizontal, Sparkles, Sun, Workflow, X, Zap, MessageSquare
 } from "lucide-react";
