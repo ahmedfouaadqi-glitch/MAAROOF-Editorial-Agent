@@ -95,7 +95,7 @@ export function analyzeMediaAsset({ bytes, mimeType, kind, description = "" }) {
       orientation,
       recommendedUses: recommendations,
       warnings,
-      altTextStatus: description.trim().length >= 8 ? "human-description-present" : "human-description-needs-review"
+      altTextStatus: description.trim().length >= 20 ? "human-description-present" : "human-description-needs-review"
     };
   }
   return {
@@ -107,6 +107,6 @@ export function analyzeMediaAsset({ bytes, mimeType, kind, description = "" }) {
     orientation: "unknown",
     recommendedUses: [],
     warnings,
-    altTextStatus: description.trim().length >= 8 ? "human-description-present" : "human-description-needs-review"
+    altTextStatus: description.trim().length >= 20 ? "human-description-present" : "human-description-needs-review"
   };
 }
