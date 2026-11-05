@@ -202,3 +202,36 @@ export async function updateEditorialConversationRun(store, {
     return structuredClone(conversation.activeRun);
   });
 }
+
+
+/** Mark in-flight runs as retryable failures after a process restart.
+ * We deliberately do not replay work automatically: a future tool may have caused
+ * an external side effect before the process died, so replay requires explicit review.
+ */
+export async function recoverInterruptedEditorialConversationRuns(store, { now = () => new Date().toISOString() } = {}) {
+  return store.transact(state => {
+    let recovered = 0;
+    for (const conversation of state.editorialConversations || []) {
+      const run = conversation?.activeRun;
+      if (!run || !["queued", "running"].includes(run.status)) continue;
+      const interruptedStatus = run.status;
+      const timestamp = now();
+      conversation.activeRun = {
+        ...run,
+        status: "failed",
+        updatedAt: timestamp,
+        metadata: {
+          ...(run.metadata || {}),
+          error: "process-restarted",
+          interruptedStatus,
+          retryable: true,
+          recoveredAt: timestamp,
+          recoveryNote: "The server restarted before this run reached a terminal state. It was not replayed automatically to avoid duplicate side effects."
+        }
+      };
+      conversation.updatedAt = timestamp;
+      recovered += 1;
+    }
+    return { recovered };
+  });
+}
