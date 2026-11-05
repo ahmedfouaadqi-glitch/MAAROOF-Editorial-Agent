@@ -109,7 +109,9 @@
 - [x] Add workspace-scoped backend records for magazine pitches, approval, submission, editor response, acceptance, rejection, withdrawal, and manual publication status; enforce approval and exclusivity gates. Frontend inbox, actual sending, and external publication verification remain pending.
 - [ ] Build the browser-first Playwright/Chromium publishing worker and destination-specific browser adapters; WordPress/Ghost REST API adapters are not required.
 - [ ] Add Playwright + Chromium isolated runtime only for permitted destinations where no suitable API exists.
-- [ ] Implement media library, image rights/credits, crops, hero images, alt text, video covers, and subtitles.
+- [x] Store workspace/article-scoped image and video assets locally with MIME signature validation, bounded file sizes, authenticated file access, and human-provided descriptions.
+- [x] Add deterministic metadata-only image intelligence for PNG/JPEG/WebP dimensions, aspect ratio, orientation, coarse placement hints, and low-resolution/unknown-metadata warnings; keep human rights and alt-text decisions explicit.
+- [ ] Complete the media library UI, rights/credits workflow linked to uploaded asset IDs, crop variants, hero-image renditions, semantic image understanding, video duration/codec inspection, video covers, and subtitle workflows.
 - [ ] Implement platform-specific editorial variant generation and validation for social networks.
 - [ ] Add end-to-end tests for draft, preview, approval, submission, publish, and external verification.
 - [ ] Add production authentication, multi-tenant authorization, durable jobs, secrets management, monitoring, and non-JSON shared persistence.
