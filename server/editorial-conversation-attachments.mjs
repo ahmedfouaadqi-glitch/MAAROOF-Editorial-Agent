@@ -234,7 +234,7 @@ export async function extractConversationAttachmentContext({ store, workspaceId,
       try {
         if (asset.mimeType === "text/plain" || asset.mimeType === "text/markdown") text = buffer.toString("utf8");
         else if (asset.mimeType === "text/csv") {
-          const parsed = parseCsvRows(buffer.toString("utf8"));
+          const parsed = parseCsvRows(buffer.toString("utf8").replace(/^\\uFEFF/, ""));
           text = `CSV HEADERS: ${JSON.stringify(parsed.headers)}\nCSV ROWS: ${JSON.stringify(parsed.rows)}`;
         } else if (asset.mimeType === "application/pdf") {
           const parsed = await pdfParse(buffer, { max: 60 });
@@ -274,7 +274,7 @@ export async function extractConversationAttachmentContext({ store, workspaceId,
     warnings.push(`Unsupported attachment type for ${asset.originalName}.`);
   }
   return { documents, images, warnings, limitations: [
-    "Text is extracted locally from TXT, PDF and DOCX files, with a bounded excerpt included in the prompt.",
+    "Text is extracted locally from TXT, CSV, PDF and DOCX files; CSV rows are parsed into bounded records before inclusion in the prompt.",
     "Images and selected video frames are sent to the configured OpenAI-compatible model provider only when one is configured.",
     "Video audio is not transcribed; frame extraction is visual-only.",
     "Attachments remain stored in local project storage and are never sent to MAAROOF AI."
