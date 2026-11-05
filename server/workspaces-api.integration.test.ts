@@ -134,6 +134,56 @@ describe("workspace API integration", () => {
     expect(crossWorkspaceUpdate.status).toBe(404);
   });
 
+  it("denies cross-workspace conversation and attachment reads", async () => {
+    const workspaceAResponse = await api("/api/v1/workspaces", { method: "POST", body: JSON.stringify({ name: "Conversation Boundary A" }) });
+    const workspaceBResponse = await api("/api/v1/workspaces", { method: "POST", body: JSON.stringify({ name: "Conversation Boundary B" }) });
+    const workspaceA = (await workspaceAResponse.json() as any).workspace;
+    const workspaceB = (await workspaceBResponse.json() as any).workspace;
+
+    const created = await api(`/api/v1/workspaces/${workspaceA.id}/conversations`, {
+      method: "POST",
+      body: JSON.stringify({ targetId: "medium", language: "en", title: "Private workspace conversation" })
+    });
+    expect(created.status).toBe(201);
+    const conversation = (await created.json() as any).conversation;
+
+    const foreignConversation = await api(`/api/v1/workspaces/${workspaceB.id}/conversations/${conversation.id}`);
+    expect(foreignConversation.status).toBe(404);
+    const foreignAttachments = await api(`/api/v1/workspaces/${workspaceB.id}/conversations/${conversation.id}/attachments`);
+    expect(foreignAttachments.status).toBe(404);
+    const foreignCancel = await api(`/api/v1/workspaces/${workspaceB.id}/conversations/${conversation.id}/cancel`, { method: "POST" });
+    expect(foreignCancel.status).toBe(404);
+  });
+
+  it("enforces active workspace scope for AI visibility reads and writes", async () => {
+    const createdResponse = await api("/api/v1/workspaces", { method: "POST", body: JSON.stringify({ name: "Visibility Boundary Workspace" }) });
+    const workspace = (await createdResponse.json() as any).workspace;
+    const eventResponse = await api("/api/v1/admin/ai-visibility/events", {
+      method: "POST",
+      body: JSON.stringify({ workspaceId: workspace.id, url: "https://publisher.example/article", eventType: "referral_visit", source: "manual" })
+    });
+    expect(eventResponse.status).toBe(201);
+    const list = await api(`/api/v1/admin/ai-visibility?workspaceId=${encodeURIComponent(workspace.id)}`);
+    expect(list.status).toBe(200);
+    expect((await list.json() as any).events).toHaveLength(1);
+
+    const invalidWrite = await api("/api/v1/admin/ai-visibility/events", {
+      method: "POST",
+      body: JSON.stringify({ workspaceId: "missing-workspace", url: "https://publisher.example/article", eventType: "referral_visit" })
+    });
+    expect(invalidWrite.status).toBe(404);
+
+    const archived = await api(`/api/v1/workspaces/${workspace.id}`, { method: "PATCH", body: JSON.stringify({ status: "archived" }) });
+    expect(archived.status).toBe(200);
+    const archivedRead = await api(`/api/v1/admin/ai-visibility?workspaceId=${encodeURIComponent(workspace.id)}`);
+    expect(archivedRead.status).toBe(404);
+    const archivedWrite = await api("/api/v1/admin/ai-visibility/events", {
+      method: "POST",
+      body: JSON.stringify({ workspaceId: workspace.id, url: "https://publisher.example/another", eventType: "referral_visit" })
+    });
+    expect(archivedWrite.status).toBe(404);
+  });
+
   it("rejects unknown workspace IDs in body-scoped operations", async () => {
     const response = await api("/api/v1/claims", {
       method: "POST",
