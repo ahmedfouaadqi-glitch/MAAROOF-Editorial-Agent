@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowUp, Check, ChevronDown, Download, File, FileText, Globe2, Image, LoaderCircle, Mail, MessageSquare, MessagesSquare, Newspaper, Plus, Search, Settings, Upload, Video, X, AlertTriangle, Sparkles } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, Download, File, Globe2, Image, LoaderCircle, Mail, MessageSquare, MessagesSquare, Newspaper, Plus, Search, Settings, Upload, Video, X, AlertTriangle, Sparkles } from "lucide-react";
 import type { EditorialChatBrowserDraft } from "../types/editorial-chat";
 
 export type ChatTarget = {
@@ -137,7 +137,14 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
     setFiles(current => { current.forEach(item => { if (item.preview) URL.revokeObjectURL(item.preview); }); return []; });
   }
 
-  function useStarter(target: string, prompt: string) {\n    setTargetId(target);\n    setContent(prompt);\n    setNotice("");\n    setPickerOpen(false);\n  }\n\n  function addFiles(list: FileList | null) {
+  function useStarter(target: string, prompt: string) {
+    setTargetId(target);
+    setContent(prompt);
+    setNotice("");
+    setPickerOpen(false);
+  }
+
+  function addFiles(list: FileList | null) {
     if (!list) return;
     const remaining = Math.max(0, 10 - files.length);
     if (remaining === 0) { setNotice(t.fileLimit); return; }
@@ -262,7 +269,9 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
               {draft.factCheckNotes?.length ? <div className="editorial-chat-review-notes"><AlertTriangle size={15}/><div><b>{t.factChecks}</b><ul>{draft.factCheckNotes.map((item, i) => <li key={i}>{item}</li>)}</ul></div></div> : null}
               {result?.needsReview && <p className="editorial-chat-similarity"><AlertTriangle size={14}/>{t.similarity}</p>}
               {result?.limitations?.length ? <details className="editorial-chat-result-details"><summary>{t.limitations}</summary><ul>{result.limitations.map((item, i) => <li key={i}>{item}</li>)}</ul></details> : null}
-              {onPrepareBrowser && conversation?.id && message.id && <div className="editorial-chat-browser-handoff"><button type="button" onClick={() => onPrepareBrowser({conversationId:conversation.id,messageId:message.id,targetId:result?.targetId||message.targetId||targetId,targetName:result?.targetName||selectedTarget?.name||"",title:draft.title||"",body:[draft.hook,draft.body||draft.videoScript||draft.onScreenText,draft.callToAction,draft.hashtags?.length?draft.hashtags.map(tag=>tag.startsWith("#")?tag:`#${tag}`).join(" "):""].filter(Boolean).join("\n\n")})}><Globe2 size={15}/>{t.browserHandoff}</button><small>{t.browserHandoffHint}</small></div>}
+              {onPrepareBrowser && conversation?.id && message.id && <div className="editorial-chat-browser-handoff"><button type="button" onClick={() => onPrepareBrowser({conversationId:conversation.id,messageId:message.id,targetId:result?.targetId||message.targetId||targetId,targetName:result?.targetName||selectedTarget?.name||"",title:draft.title||"",body:[draft.hook,draft.body||draft.videoScript||draft.onScreenText,draft.callToAction,draft.hashtags?.length?draft.hashtags.map(tag=>tag.startsWith("#")?tag:`#${tag}`).join(" "):""].filter(Boolean).join("
+
+")})}><Globe2 size={15}/>{t.browserHandoff}</button><small>{t.browserHandoffHint}</small></div>}
               {result?.usage && <small className="editorial-chat-usage">{result.usage.totalTokens ? `${result.usage.totalTokens.toLocaleString()} tokens` : ""}</small>}
             </div> : <div className="editorial-chat-message-content">{message.content || ""}</div>}
             {message.attachments?.length ? <div className="editorial-chat-message-attachments">{message.attachments.map(attachment => <button type="button" key={attachment.id} title={t.download} onClick={() => void downloadAttachment(attachment)}><File size={14}/>{attachment.originalName || attachment.name || attachment.id}<Download size={13}/></button>)}</div> : null}
