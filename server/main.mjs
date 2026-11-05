@@ -26,9 +26,10 @@ import { getGeoBrief, getGeoReadiness, updateGeoBrief } from "./editorial-geo.mj
 import { listEditorialBrands, listEditorialClients } from "./editorial-identities.mjs";
 import { createBrowserAgentClient } from "./browser-agent-client.mjs";
 import { createEditorialConversation, listEditorialConversations, getEditorialConversation, appendEditorialConversationMessage, updateEditorialConversationRun } from "./editorial-conversations.mjs";
+import { listEditorialLibraryItems } from "./editorial-library.mjs";
 import { createConversationAttachment, listConversationAttachments, resolveConversationAttachmentFile, deleteConversationAttachment } from "./editorial-conversation-attachments.mjs";
 import { listEditorialTargets } from "./editorial-targets.mjs";
-import { createEditorialConversationProgress, runEditorialConversation } from "./editorial-conversation-runner.mjs";
+import { createEditorialConversationProgress, runEditorialConversation, cancelEditorialConversationRun } from "./editorial-conversation-runner.mjs";
 import {
   buildApprovedArticleForBrowser, getBrowserDestination, getBrowserSession,
   listBrowserDestinations, listBrowserSessions, registerBrowserDestination,
@@ -127,6 +128,13 @@ const server = createServer(async (req, res) => {
       return send(res, 200, { targets: listEditorialTargets() });
     }
 
+    const libraryCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/library$/);
+    if (libraryCollection && req.method === "GET") {
+      const workspaceId = decodeURIComponent(libraryCollection[1]);
+      const state = await store.read();
+      return send(res, 200, { items: listEditorialLibraryItems(state, workspaceId) });
+    }
+
     const conversationsCollection = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/conversations$/);
     if (conversationsCollection && req.method === "GET") {
       const workspaceId = decodeURIComponent(conversationsCollection[1]);
@@ -215,6 +223,14 @@ const server = createServer(async (req, res) => {
         return send(res, 200, await deleteConversationAttachment({ store, workspaceId, conversationId, attachmentId, mediaDir }));
       }
       return send(res, 405, { error: "Method not allowed" });
+    }
+
+    const conversationCancel = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/conversations\/([^/]+)\/cancel$/);
+    if (conversationCancel && req.method === "POST") {
+      const workspaceId = decodeURIComponent(conversationCancel[1]);
+      const conversationId = decodeURIComponent(conversationCancel[2]);
+      const result = await cancelEditorialConversationRun({ store, workspaceId, conversationId });
+      return send(res, 200, result);
     }
 
     const conversationItem = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)\/conversations\/([^/]+)$/);

@@ -67,6 +67,9 @@
 - [x] Add article-level evidence workspace UI for manual sources, claim linking, and local originality checks.
 - [ ] Add functional notifications, file/media upload, and approval inbox.
 - [x] Add article-level editorial evidence and entity intelligence workspaces.
+- [x] Add task-first conversation starters and a task brief that exposes request, destination, identity context, and real step states.
+- [x] Add cooperative task cancellation, retry by resubmitting the original request, and explicit follow-up actions.
+- [x] Add a workspace-scoped saved-draft library with request/destination context, Markdown export, and a link back to the source conversation.
 - [ ] Add browser-level responsive and accessibility tests.
 
 ## Acceptance rules

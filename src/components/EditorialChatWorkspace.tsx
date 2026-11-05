@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ArrowUp, Check, ChevronDown, Download, File, Globe2, Image, LoaderCircle, MessageSquare, Plus, Search, Settings, Upload, X, AlertTriangle, Sparkles } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, Download, File, Globe2, Image, LoaderCircle, Mail, MessageSquare, MessagesSquare, Newspaper, PencilLine, Plus, RotateCcw, Search, StopCircle, Settings, Upload, Video, X, AlertTriangle, Sparkles } from "lucide-react";
 import type { EditorialChatBrowserDraft } from "../types/editorial-chat";
 
 export type ChatTarget = {
@@ -16,7 +16,7 @@ type DraftResult = {
 type ChatMessage = { id: string; role?: string; content?: string; createdAt?: string; targetId?: string; result?: DraftResult; attachments?: Attachment[] };
 type RunStep = { id: string; label: string; status: "pending" | "running" | "completed" | "skipped" | "needs-review" | "failed"; note?: string };
 type ActiveRun = { id: string; status: "queued" | "running" | "completed" | "failed" | "cancelled"; metadata?: { steps?: RunStep[]; totalSteps?: number; completedSteps?: number } };
-type Conversation = { id: string; title?: string; updatedAt?: string; createdAt?: string; messages?: ChatMessage[]; targetId?: string; clientName?: string; brandName?: string; activeRun?: ActiveRun | null };
+type Conversation = { id: string; title?: string; updatedAt?: string; createdAt?: string; messages?: ChatMessage[]; targetId?: string; targetName?: string; clientName?: string; brandName?: string; activeRun?: ActiveRun | null };
 type PendingFile = { file: File; preview: string };
 
 const ACCEPTED_TYPES = new Set([
@@ -25,13 +25,14 @@ const ACCEPTED_TYPES = new Set([
 ]);
 const ACCEPTED_EXTENSIONS = /\.(jpe?g|png|webp|mp4|webm|pdf|docx|txt|md)$/i;
 
-export default function EditorialChatWorkspace({ apiBase, token, workspaceId, locale, targets, onOpenSettings, onPrepareBrowser }: {
+export default function EditorialChatWorkspace({ apiBase, token, workspaceId, locale, targets, onOpenSettings, onPrepareBrowser, openConversationId, onConversationOpened }: {
   apiBase: string; token: string; workspaceId: string; locale: "ar" | "en"; targets: ChatTarget[]; onOpenSettings: () => void; onPrepareBrowser?: (draft: EditorialChatBrowserDraft) => void;
+  openConversationId?: string | null; onConversationOpened?: () => void;
 }) {
   const ar = locale === "ar";
   const t = ar ? {
     history: "سجل المحادثات", newChat: "محادثة جديدة", search: "ابحث في الوجهات...", choose: "اختر منصة أو مجلة",
-    emptyTitle: "ما الذي ترغب في تحريره؟", emptySub: "اختر الوجهة، أضف سياق العميل/العلامة عند الحاجة، ثم اكتب طلبك وأرفق الملفات.",
+    emptyTitle: "ما الذي تريد إنجازه؟", emptySub: "ابدأ بطلبك مباشرة أو اختر مثالاً جاهزاً وعدّله. حدّد الوجهة وأرفق الملفات عند الحاجة.", startersTitle: "ابدأ من مثال", starterArticle: "كتابة مقال", starterArticleHint: "مقال منظم قابل للمراجعة", starterPost: "منشور مهني", starterPostHint: "فكرة واضحة لجمهور LinkedIn", starterVideo: "سيناريو فيديو", starterVideoHint: "خطاف ومشاهد ونص شاشة", starterNewsletter: "نشرة تحريرية", starterNewsletterHint: "مقدمة ومحتوى موجّه للقراء",
     placeholder: "اكتب ما تريد صياغته أو تطويره...", send: "إرسال", attach: "إرفاق ملفات", noHistory: "لا توجد محادثات بعد.",
     settings: "أدخل رمز الوصول من الإعدادات لاستخدام المحادثات.", goSettings: "فتح الإعدادات", loading: "جارٍ التحميل...",
     social: "منصات اجتماعية", magazine: "مجلات ومواقع نشر", target: "الوجهة التحريرية", noTargets: "لا توجد وجهات مطابقة.",
@@ -44,10 +45,10 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
     cta: "دعوة للتفاعل", hashtags: "وسوم", mediaNotes: "ملاحظات الوسائط", factChecks: "نقاط تحتاج إلى تحقق", limitations: "حدود هذه المسودة",
     similarity: "تنبيه التشابه: راجع المسودات المشابهة قبل الاستخدام.", providerFailed: "لم يتم النشر. أعد إعداد مزود النموذج المستقل على الخادم ثم حاول مجدداً.",
     wait: "انتظر اكتمال المسار الحالي قبل إرسال طلب آخر.", noTarget: "اختر منصة أو مجلة أولاً.", noClient: "غير محدد", openSettings: "إعداد النموذج يتم على الخادم، لا في هذه الشاشة.",
-    note: "المسودة لا تُنشر تلقائياً. البحث والكشط الخارجي غير منفّذين في هذه المرحلة.", start: "ابدأ التحرير", runningNote: "تظهر الخطوات المنفذة والمتخطاة بوضوح؛ لا يتم النشر من هنا.", browserHandoff: "المتابعة في المتصفح", browserHandoffHint: "تسجيل الدخول والإدراج اختياريان؛ لن يُضغط زر النشر."
+    note: "المسودة لا تُنشر تلقائياً. البحث والكشط الخارجي غير منفّذين في هذه المرحلة.", start: "ابدأ التحرير", runningNote: "تظهر الخطوات المنفذة والمتخطاة بوضوح؛ لا يتم النشر من هنا.", browserHandoff: "المتابعة في المتصفح", browserHandoffHint: "تسجيل الدخول والإدراج اختياريان؛ لن يُضغط زر النشر.", taskBrief: "ملخص المهمة", editRequest: "تعديل الطلب كمتابعة", retry: "إعادة المحاولة", followUp: "متابعة وتطوير", downloadDraft: "تنزيل المسودة", savedLocally: "حُفظت المسودة في مكتبة مساحة العمل.", stopRun: "إيقاف المهمة"
   } : {
     history: "Conversation history", newChat: "New conversation", search: "Search destinations...", choose: "Choose a platform or magazine",
-    emptyTitle: "What would you like to work on?", emptySub: "Choose a destination, add client/brand context if useful, then write your request and attach files.",
+    emptyTitle: "What do you want to accomplish?", emptySub: "Start with your own request or choose an editable example. Select a destination and attach files when useful.", startersTitle: "Start from an example", starterArticle: "Write an article", starterArticleHint: "A structured, review-ready article", starterPost: "Professional post", starterPostHint: "A focused idea for LinkedIn", starterVideo: "Video script", starterVideoHint: "Hook, scenes and on-screen text", starterNewsletter: "Editorial newsletter", starterNewsletterHint: "A reader-focused opening and body",
     placeholder: "Describe what you want to create or adapt...", send: "Send", attach: "Attach files", noHistory: "No conversations yet.",
     settings: "Add the workspace access key in Settings to use conversations.", goSettings: "Open settings", loading: "Loading...",
     social: "Social platforms", magazine: "Magazines & publishers", target: "Editorial destination", noTargets: "No matching destinations.",
@@ -60,7 +61,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
     cta: "Call to action", hashtags: "Hashtags", mediaNotes: "Media notes", factChecks: "Fact-check notes", limitations: "Draft limitations",
     similarity: "Similarity alert: review matching drafts before use.", providerFailed: "Nothing was published. Configure the independent model provider on the server, then try again.",
     wait: "Wait for the current workflow to finish before sending another request.", noTarget: "Choose a platform or magazine first.", noClient: "Not specified", openSettings: "Model setup is server-side, not on this screen.",
-    note: "Drafts are not published automatically. External search and crawling are not run at this stage.", start: "Start editing", runningNote: "Completed and skipped steps are clearly marked; nothing is published here.", browserHandoff: "Continue in browser", browserHandoffHint: "Sign-in and insertion are optional; Publish will not be clicked."
+    note: "Drafts are not published automatically. External search and crawling are not run at this stage.", start: "Start editing", runningNote: "Completed and skipped steps are clearly marked; nothing is published here.", browserHandoff: "Continue in browser", browserHandoffHint: "Sign-in and insertion are optional; Publish will not be clicked.", taskBrief: "Task brief", editRequest: "Revise as follow-up", retry: "Retry request", followUp: "Continue and refine", downloadDraft: "Download draft", savedLocally: "This draft is saved in the workspace library.", stopRun: "Stop task"
   };
   const errorText = ar ? "تعذّر إكمال الطلب. حاول مجدداً." : "The request failed. Please try again.";
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -78,6 +79,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const filesRef = useRef<PendingFile[]>([]);
   const base = `${apiBase.replace(/\/$/, "")}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/conversations`;
@@ -100,6 +102,25 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
   }, [base, request, token, errorText]);
 
   useEffect(() => { void loadList(); }, [loadList]);
+  useEffect(() => {
+    if (!openConversationId || !token.trim()) return;
+    let cancelled = false;
+    setLoading(true); setNotice("");
+    request(`${base}/${encodeURIComponent(openConversationId)}`)
+      .then(data => {
+        if (cancelled) return;
+        const value = data.conversation || data;
+        setConversation(value);
+        setMessages(Array.isArray(value.messages) ? value.messages : []);
+        setTargetId(value.targetId || "");
+        setClientName(value.clientName || "");
+        setBrandName(value.brandName || "");
+        onConversationOpened?.();
+      })
+      .catch(error => { if (!cancelled) setNotice(error instanceof Error ? error.message : errorText); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [openConversationId, base, request, token, errorText, onConversationOpened]);
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, conversation?.activeRun?.metadata?.steps]);
   useEffect(() => { filesRef.current = files; }, [files]);
   useEffect(() => () => filesRef.current.forEach(item => { if (item.preview) URL.revokeObjectURL(item.preview); }), []);
@@ -137,6 +158,13 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
     setFiles(current => { current.forEach(item => { if (item.preview) URL.revokeObjectURL(item.preview); }); return []; });
   }
 
+  function useStarter(target: string, prompt: string) {
+    setTargetId(target);
+    setContent(prompt);
+    setNotice("");
+    setPickerOpen(false);
+  }
+
   function addFiles(list: FileList | null) {
     if (!list) return;
     const remaining = Math.max(0, 10 - files.length);
@@ -166,6 +194,46 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
       document.body.appendChild(link); link.click(); link.remove();
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
     } catch (error) { setNotice(error instanceof Error ? error.message : errorText); }
+  }
+
+  async function cancelCurrentRun() {
+    if (!conversation?.id || !conversation.activeRun || !["queued", "running"].includes(conversation.activeRun.status)) return;
+    setBusy(true); setNotice("");
+    try {
+      const data = await request(`${base}/${encodeURIComponent(conversation.id)}/cancel`, { method: "POST" });
+      const value = data.conversation || data;
+      setConversation(value);
+      setMessages(Array.isArray(value.messages) ? value.messages : []);
+      await loadList();
+    } catch (error) { setNotice(error instanceof Error ? error.message : errorText); }
+    finally { setBusy(false); }
+  }
+
+  function prepareFollowUp(value: string) {
+    setContent(value);
+    setNotice("");
+    window.requestAnimationFrame(() => composerRef.current?.focus());
+  }
+
+  function downloadDraft(draft: NonNullable<DraftResult["draft"]>) {
+    const sections = [
+      draft.title ? "# " + draft.title : "",
+      draft.hook ? "## " + (ar ? "الافتتاحية" : "Hook") + "\n" + draft.hook : "",
+      draft.body || "",
+      draft.callToAction ? "## " + t.cta + "\n" + draft.callToAction : "",
+      draft.videoScript ? "## " + (ar ? "سيناريو الفيديو" : "Video script") + "\n" + draft.videoScript : "",
+      draft.onScreenText ? "## " + (ar ? "نص الشاشة" : "On-screen text") + "\n" + draft.onScreenText : "",
+      draft.hashtags?.length ? draft.hashtags.map(tag => tag.startsWith("#") ? tag : "#" + tag).join(" ") : "",
+      draft.geo?.primaryPhrase ? "## GEO\n- " + t.intent + ": " + (draft.geo.intent || "—") + "\n- " + t.primary + ": " + draft.geo.primaryPhrase + "\n- " + t.related + ": " + (draft.geo.supportingTerms || []).join(", ") + "\n- " + t.questions + ": " + (draft.geo.questions || []).join("; ") + "\n- " + t.entities + ": " + (draft.geo.entities || []).join(", ") : "",
+      draft.factCheckNotes?.length ? "## " + t.factChecks + "\n" + draft.factCheckNotes.map(note => "- " + note).join("\n") : "",
+      draft.mediaNotes ? "## " + t.mediaNotes + "\n" + draft.mediaNotes : ""
+    ].filter(Boolean);
+    const url = URL.createObjectURL(new Blob([sections.join("\n\n")], { type: "text/markdown;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = (draft.title || "editorial-draft").replace(/[^a-z0-9\u0600-\u06ff-]+/gi, "-").slice(0, 70) + ".md";
+    document.body.appendChild(link); link.click(); link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   async function sendMessage(event: FormEvent) {
@@ -216,6 +284,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
   const completedSteps = currentRun?.metadata?.completedSteps ?? steps.filter(step => ["completed", "skipped", "needs-review"].includes(step.status)).length;
   const totalSteps = currentRun?.metadata?.totalSteps || 10;
   const runLabel = currentRun ? (currentRun.status === "queued" ? t.queued : currentRun.status === "running" ? t.running : currentRun.status === "completed" ? t.completed : currentRun.status === "cancelled" ? t.cancelled : t.failed) : "";
+  const latestUserMessage = [...messages].reverse().find(message => message.role === "user");
 
   if (!token.trim()) return <section className="editorial-chat-workspace" dir={ar ? "rtl" : "ltr"}>
     <div className="editorial-chat-token-prompt"><MessageSquare aria-hidden="true"/><p>{t.settings}</p><button type="button" onClick={onOpenSettings}><Settings size={16}/>{t.goSettings}</button></div>
@@ -248,7 +317,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
       </header>
       <div className="editorial-chat-message-area">
         {loading && <p className="editorial-chat-loading"><LoaderCircle size={16}/>{t.loading}</p>}
-        {!loading && messages.length === 0 && <div className="editorial-chat-empty"><div className="editorial-chat-empty-icon"><MessageSquare size={24}/></div><h1>{t.emptyTitle}</h1><p>{t.emptySub}</p>{!selectedTarget && <button type="button" className="editorial-chat-empty-select" onClick={() => setPickerOpen(true)}>{t.choose}<ChevronDown size={15}/></button>}</div>}
+        {!loading && messages.length === 0 && <div className="editorial-chat-empty"><div className="editorial-chat-empty-icon"><Sparkles size={24}/></div><h1>{t.emptyTitle}</h1><p>{t.emptySub}</p>{!selectedTarget && <button type="button" className="editorial-chat-empty-select" onClick={() => setPickerOpen(true)}>{t.choose}<ChevronDown size={15}/></button>}<section className="editorial-chat-starters" aria-label={t.startersTitle}><div className="editorial-chat-starters-heading">{t.startersTitle}</div><div className="editorial-chat-starter-grid"><button type="button" className="editorial-chat-starter" onClick={() => useStarter("wordpress", ar ? "اكتب مقالاً تحريرياً منظماً حول [الموضوع]. ابدأ بعنوان ومقدمة واضحة، ثم أقسام مترابطة وخاتمة. ميّز الحقائق التي تحتاج إلى مصادر، ولا تخترع أرقاماً أو اقتباسات." : "Write a structured editorial article about [topic]. Include a clear title, introduction, connected sections and conclusion. Flag facts that need sources; do not invent figures or quotes.")}><span><Newspaper size={18}/></span><b>{t.starterArticle}</b><small>{t.starterArticleHint}</small></button><button type="button" className="editorial-chat-starter" onClick={() => useStarter("linkedin", ar ? "أنشئ منشوراً مهنياً على LinkedIn حول [الفكرة] لجمهور [الجمهور]. افتتح برؤية محددة، اشرحها بإيجاز، واختم بسؤال نقاش طبيعي." : "Create a professional LinkedIn post about [idea] for [audience]. Open with a specific insight, explain it concisely, and end with a natural discussion question.")}><span><MessagesSquare size={18}/></span><b>{t.starterPost}</b><small>{t.starterPostHint}</small></button><button type="button" className="editorial-chat-starter" onClick={() => useStarter("tiktok", ar ? "اكتب سيناريو فيديو قصير عن [الموضوع] لجمهور [الجمهور]. قدّم خطافاً لأول 3 ثوانٍ، ثم مشاهد متسلسلة مع نص الشاشة والتعليق الصوتي ودعوة واحدة للتفاعل." : "Write a short-video script about [topic] for [audience]. Provide a hook for the first 3 seconds, then sequenced scenes with on-screen text, voiceover and one call to action.")}><span><Video size={18}/></span><b>{t.starterVideo}</b><small>{t.starterVideoHint}</small></button><button type="button" className="editorial-chat-starter" onClick={() => useStarter("substack", ar ? "اكتب مسودة نشرة تحريرية حول [الموضوع] موجّهة إلى [الجمهور]. اقترح عنواناً واضحاً، ومقدمة مباشرة، ومحتوى مفيداً منظماً، وخاتمة تدعو إلى متابعة النقاش." : "Draft an editorial newsletter about [topic] for [audience]. Suggest a clear subject, direct opening, useful structured body and a closing that invites further discussion.")}><span><Mail size={18}/></span><b>{t.starterNewsletter}</b><small>{t.starterNewsletterHint}</small></button></div></section></div>}
         {messages.map((message, index) => {
           const result = message.result;
           const draft = result?.draft;
@@ -263,19 +332,19 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
               {result?.needsReview && <p className="editorial-chat-similarity"><AlertTriangle size={14}/>{t.similarity}</p>}
               {result?.limitations?.length ? <details className="editorial-chat-result-details"><summary>{t.limitations}</summary><ul>{result.limitations.map((item, i) => <li key={i}>{item}</li>)}</ul></details> : null}
               {onPrepareBrowser && conversation?.id && message.id && <div className="editorial-chat-browser-handoff"><button type="button" onClick={() => onPrepareBrowser({conversationId:conversation.id,messageId:message.id,targetId:result?.targetId||message.targetId||targetId,targetName:result?.targetName||selectedTarget?.name||"",title:draft.title||"",body:[draft.hook,draft.body||draft.videoScript||draft.onScreenText,draft.callToAction,draft.hashtags?.length?draft.hashtags.map(tag=>tag.startsWith("#")?tag:`#${tag}`).join(" "):""].filter(Boolean).join("\n\n")})}><Globe2 size={15}/>{t.browserHandoff}</button><small>{t.browserHandoffHint}</small></div>}
-              {result?.usage && <small className="editorial-chat-usage">{result.usage.totalTokens ? `${result.usage.totalTokens.toLocaleString()} tokens` : ""}</small>}
+              <div className="editorial-chat-result-actions"><button type="button" onClick={() => downloadDraft(draft)}><Download size={14}/>{t.downloadDraft}</button><button type="button" onClick={() => prepareFollowUp(ar ? "طوّر المسودة السابقة مع الحفاظ على فكرتها الأساسية، وعالج نقاط المراجعة المذكورة." : "Refine the previous draft while preserving its core idea and addressing the review notes.")}><Sparkles size={14}/>{t.followUp}</button><small>{t.savedLocally}</small></div>{result?.usage && <small className="editorial-chat-usage">{result.usage.totalTokens ? `${result.usage.totalTokens.toLocaleString()} tokens` : ""}</small>}
             </div> : <div className="editorial-chat-message-content">{message.content || ""}</div>}
             {message.attachments?.length ? <div className="editorial-chat-message-attachments">{message.attachments.map(attachment => <button type="button" key={attachment.id} title={t.download} onClick={() => void downloadAttachment(attachment)}><File size={14}/>{attachment.originalName || attachment.name || attachment.id}<Download size={13}/></button>)}</div> : null}
           </article>;
         })}
-        {currentRun && <section className={`editorial-chat-progress editorial-chat-progress-${currentRun.status}`} aria-live="polite"><div className="editorial-chat-progress-heading"><div><span className="editorial-chat-draft-kicker">{t.run}</span><b>{runLabel}</b></div>{currentRun.status === "running" || currentRun.status === "queued" ? <LoaderCircle size={17} className="editorial-chat-spinner"/> : currentRun.status === "failed" ? <AlertTriangle size={17}/> : <Check size={17}/>}</div><div className="editorial-chat-progress-track"><span style={{ width: `${Math.min(100, Math.round(completedSteps / totalSteps * 100))}%` }}/></div><p>{t.runningNote} · {completedSteps}/{totalSteps}</p>{steps.length > 0 && <ol className="editorial-chat-progress-steps">{steps.map((step, index) => <li key={step.id} className={`step-${step.status}`}><span className="editorial-chat-step-icon">{step.status === "completed" ? <Check size={13}/> : step.status === "running" ? <LoaderCircle size={13} className="editorial-chat-spinner"/> : step.status === "failed" || step.status === "needs-review" ? <AlertTriangle size={13}/> : <span>{String(index + 1).padStart(2, "0")}</span>}</span><span className="editorial-chat-step-text"><b>{step.label}</b>{step.note && <small>{step.note}</small>}</span><small className="editorial-chat-step-status">{step.status === "completed" ? t.completed : step.status === "running" ? t.running : step.status === "failed" ? t.failed : step.status === "needs-review" ? t.needsReview : step.status === "skipped" ? t.skipped : t.pending}</small></li>)}</ol>}{currentRun.status === "failed" && <p className="editorial-chat-progress-note"><AlertTriangle size={14}/>{t.providerFailed}</p>}</section>}
+        {currentRun && latestUserMessage && <section className="editorial-chat-task-brief"><div><span className="editorial-chat-draft-kicker">{t.taskBrief}</span><b>{latestUserMessage.content?.slice(0, 240)}</b><small>{selectedTarget?.name || conversation?.targetName || ""}{conversation?.clientName ? ` · ${conversation.clientName}` : ""}{conversation?.brandName ? ` / ${conversation.brandName}` : ""}</small></div><button type="button" onClick={() => prepareFollowUp(latestUserMessage.content || "")}><PencilLine size={14}/>{t.editRequest}</button></section>}{currentRun && <section className={`editorial-chat-progress editorial-chat-progress-${currentRun.status}`} aria-live="polite"><div className="editorial-chat-progress-heading"><div><span className="editorial-chat-draft-kicker">{t.run}</span><b>{runLabel}</b></div>{currentRun.status === "running" || currentRun.status === "queued" ? <LoaderCircle size={17} className="editorial-chat-spinner"/> : currentRun.status === "failed" ? <AlertTriangle size={17}/> : currentRun.status === "cancelled" ? <StopCircle size={17}/> : <Check size={17}/>}{["running", "queued"].includes(currentRun.status) && <button type="button" className="editorial-chat-stop-button" onClick={() => void cancelCurrentRun()} disabled={busy}><StopCircle size={14}/>{t.stopRun}</button>}</div><div className="editorial-chat-progress-track"><span style={{ width: `${Math.min(100, Math.round(completedSteps / totalSteps * 100))}%` }}/></div><p>{t.runningNote} · {completedSteps}/{totalSteps}</p>{steps.length > 0 && <ol className="editorial-chat-progress-steps">{steps.map((step, index) => <li key={step.id} className={`step-${step.status}`}><span className="editorial-chat-step-icon">{step.status === "completed" ? <Check size={13}/> : step.status === "running" ? <LoaderCircle size={13} className="editorial-chat-spinner"/> : step.status === "failed" || step.status === "needs-review" ? <AlertTriangle size={13}/> : <span>{String(index + 1).padStart(2, "0")}</span>}</span><span className="editorial-chat-step-text"><b>{step.label}</b>{step.note && <small>{step.note}</small>}</span><small className="editorial-chat-step-status">{step.status === "completed" ? t.completed : step.status === "running" ? t.running : step.status === "failed" ? t.failed : step.status === "needs-review" ? t.needsReview : step.status === "skipped" ? t.skipped : t.pending}</small></li>)}</ol>}{currentRun.status === "failed" && <><p className="editorial-chat-progress-note"><AlertTriangle size={14}/>{t.providerFailed}</p><button type="button" className="editorial-chat-retry-button" onClick={() => prepareFollowUp(latestUserMessage?.content || "")}><RotateCcw size={14}/>{t.retry}</button></>}</section>}
         <div ref={messagesEndRef}/>
       </div>
       {notice && <p className="editorial-chat-notice" role="status">{notice}</p>}
       <form className="editorial-chat-composer" onSubmit={sendMessage}>
         {files.length > 0 && <div className="editorial-chat-file-previews">{files.map((item, index) => <div className="editorial-chat-file-preview" key={`${item.file.name}-${index}`}>{item.preview ? <img src={item.preview} alt={item.file.name}/> : <File size={20}/>}<span title={item.file.name}>{item.file.name}</span><button type="button" aria-label={t.removeFile} onClick={() => removeFile(index)}><X size={15}/></button></div>)}</div>}
         <div className="editorial-chat-composer-row"><button className="editorial-chat-attach-button" type="button" aria-label={t.attach} title={t.attach} disabled={busy} onClick={() => fileRef.current?.click()}><Upload size={18}/></button><input ref={fileRef} className="editorial-chat-file-input" type="file" multiple disabled={busy} accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,.txt,.md" onChange={event => addFiles(event.target.files)}/>
-          <textarea value={content} onChange={event => setContent(event.target.value)} placeholder={t.placeholder} rows={1} disabled={busy} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }}/>
+          <textarea ref={composerRef} value={content} onChange={event => setContent(event.target.value)} placeholder={t.placeholder} rows={1} disabled={busy} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }}/>
           <button className="editorial-chat-send-button" type="submit" aria-label={t.send} disabled={busy || (!content.trim() && files.length === 0) || !targetId || (currentRun != null && ["queued", "running"].includes(currentRun.status))}>{busy ? <LoaderCircle size={18} className="editorial-chat-spinner"/> : <ArrowUp size={18}/>}</button>
         </div><p className="editorial-chat-composer-note"><Image size={13}/>{busy ? t.uploading : t.note}</p>
       </form>

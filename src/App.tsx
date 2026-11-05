@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
-  Activity, ArrowDownLeft, ArrowLeft, ArrowUpLeft, BookOpenText, Check,
+  Activity, AlertTriangle, ArrowDownLeft, ArrowLeft, ArrowUpLeft, BookOpenText, Check,
   CheckCircle2, ChevronDown, CircleHelp, FileCheck2, FilePlus2,
-  FileText, Globe2, Home, Layers3, LayoutDashboard, Library, ListFilter,
+  Download, FileText, Globe2, Home, Layers3, LayoutDashboard, Library, ListFilter,
   LockKeyhole, Menu, Moon, MoreHorizontal, Plus, Search,
   ShieldCheck, SlidersHorizontal, Sparkles, Sun, Workflow, X, Zap, MessageSquare
 } from "lucide-react";
@@ -21,7 +21,7 @@ import { adapterRegistry } from "./data/adapter-registry";
 import { magazinePublications } from "./data/magazine-publications";
 import editorialTargetCatalog from "../config/editorial-targets.json";
 
-type View = "chat" | "home" | "articles" | "registry" | "research-settings" | "ai-visibility" | "magazine-submissions";
+type View = "chat" | "home" | "articles" | "library" | "registry" | "research-settings" | "ai-visibility" | "magazine-submissions";
 type Article = { id: string; topic: string; language: string; objective: string; stage: string; createdAt: string; clientId?: string; clientName?: string; brandId?: string; brandName?: string };
 type Locale = "ar" | "en";
 const NEXT_STAGE: Record<string, string> = { intake: "planning", planning: "research", research: "entity-analysis", "entity-analysis": "outline", outline: "drafting", drafting: "source-review", "source-review": "originality-review", "originality-review": "media-review", "media-review": "editorial-approval", "editorial-approval": "ready-to-publish" };
@@ -51,7 +51,7 @@ const enStageLabels: Record<string, string> = {
 };
 const t = {
   ar: {
-    workspace: "مساحة العمل الرئيسية", chat: "المحادثة", overview: "نظرة عامة", articles: "المقالات", registry: "المنصات والمجلات",
+    workspace: "مساحة العمل الرئيسية", chat: "المحادثة", overview: "نظرة عامة", articles: "المقالات", library: "المكتبة", registry: "المنصات والمجلات",
     research: "البحث والمصادر", visibility: "رصد ظهور الذكاء الاصطناعي", settings: "الإعدادات", help: "المساعدة", search: "ابحث عن منصة أو مجلة...",
     eyebrow: "منظومة العمليات التحريرية", title: "مساحة العمل التحريرية", subtitle: "من الفكرة إلى مقال قابل للمراجعة، ضمن مسار تحريري واضح.",
     create: "إنشاء مقالة", explore: "استعراض المنصات", active: "حالة النموذج", ready: "نموذج أولي",
@@ -82,10 +82,10 @@ const t = {
     loading: "جارٍ التحميل...", viewAll: "عرض الكل", light: "الوضع النهاري", dark: "الوضع الليلي",
     langToggle: "English", emptyRegistry: "لم يتم العثور على نتائج مطابقة.",
     policy: "مراجعة السياسات مطلوبة", unverified: "غير متحقق", notBuilt: "لم يُبنَ بعد",
-    targetCount: "وجهات نشر محتملة", noClaims: "لا توجد عمليات نشر موثقة"
+    targetCount: "وجهات نشر محتملة", noClaims: "لا توجد عمليات نشر موثقة", libraryTitle: "مكتبة المسودات", librarySub: "المخرجات المحفوظة من محادثات مساحة العمل، مع سياق الطلب والوجهة.", libraryEmpty: "لا توجد مسودات محفوظة بعد", libraryEmptySub: "عند إنتاج مسودة من المحادثة ستظهر هنا تلقائياً.", libraryOpen: "فتح المحادثة", libraryDownload: "تنزيل Markdown", libraryNoPublish: "هذه مسودات محفوظة وليست منشورات منشورة.", libraryRequest: "الطلب الأصلي", libraryOutput: "المخرج", libraryCreated: "تاريخ الحفظ", libraryLoadError: "تعذر تحميل المكتبة."
   },
   en: {
-    workspace: "Main workspace", chat: "Conversation", overview: "Overview", articles: "Articles", registry: "Platforms & magazines",
+    workspace: "Main workspace", chat: "Conversation", overview: "Overview", articles: "Articles", library: "Library", registry: "Platforms & magazines",
     research: "Research & sources", visibility: "AI visibility", settings: "Settings", help: "Help", search: "Search platforms or magazines...",
     eyebrow: "EDITORIAL OPERATIONS", title: "Editorial workspace", subtitle: "Move from an idea to a review-ready article through a clear editorial workflow.",
     create: "Create article", explore: "Explore platforms", active: "PROTOTYPE STATUS", ready: "Prototype",
@@ -116,7 +116,7 @@ const t = {
     loading: "Loading...", viewAll: "View all", light: "Light mode", dark: "Dark mode",
     langToggle: "العربية", emptyRegistry: "No matching platforms found.",
     policy: "Policy review required", unverified: "Unverified", notBuilt: "Not built",
-    targetCount: "Potential destinations", noClaims: "No verified publications"
+    targetCount: "Potential destinations", noClaims: "No verified publications", libraryTitle: "Draft library", librarySub: "Saved outputs from workspace conversations, with their request and destination context.", libraryEmpty: "No saved drafts yet", libraryEmptySub: "Drafts generated in conversations will appear here automatically.", libraryOpen: "Open conversation", libraryDownload: "Download Markdown", libraryNoPublish: "These are saved drafts, not published posts.", libraryRequest: "Original request", libraryOutput: "Output", libraryCreated: "Saved", libraryLoadError: "Could not load the library."
   }
 };
 
@@ -145,6 +145,7 @@ export default function App() {
   const [language, setLanguage] = useState<"ar" | "en">("ar");
   const [objective, setObjective] = useState("analysis");
   const [articles, setArticles] = useState<Article[]>([]);
+  const [pendingConversationId, setPendingConversationId] = useState<string | null>(null);
   const [articleNotice, setArticleNotice] = useState("");
   const [advancingId, setAdvancingId] = useState<string | null>(null);
   const [evidenceArticleId, setEvidenceArticleId] = useState<string | null>(null);
@@ -275,13 +276,14 @@ export default function App() {
     { id: "chat" as const, label: copy.chat, icon: MessageSquare },
     { id: "home" as const, label: copy.overview, icon: LayoutDashboard },
     { id: "articles" as const, label: copy.articles, icon: FileText },
+    { id: "library" as const, label: copy.library, icon: Library },
     { id: "magazine-submissions" as const, label: locale === "ar" ? "تقديمات المجلات" : "Magazine submissions", icon: BookOpenText },
     { id: "registry" as const, label: copy.registry, icon: Globe2 },
     { id: "research-settings" as const, label: copy.settings, icon: SlidersHorizontal },
     { id: "ai-visibility" as const, label: copy.visibility, icon: Activity }
   ];
   const navGroups = [
-    { label: locale === "ar" ? "الإنتاج التحريري" : "EDITORIAL", items: navItems.filter(item => ["chat", "home", "articles", "magazine-submissions"].includes(item.id)) },
+    { label: locale === "ar" ? "الإنتاج التحريري" : "EDITORIAL", items: navItems.filter(item => ["chat", "home", "articles", "library", "magazine-submissions"].includes(item.id)) },
     { label: locale === "ar" ? "الاستكشاف والأدلة" : "DISCOVERY & EVIDENCE", items: navItems.filter(item => ["registry", "ai-visibility"].includes(item.id)) },
     { label: locale === "ar" ? "الإدارة" : "MANAGEMENT", items: navItems.filter(item => ["research-settings"].includes(item.id)) }
   ];
@@ -326,7 +328,8 @@ export default function App() {
       </header>
 
       <div className={`page-content ${view === "chat" ? "chat-page" : ""}`}>
-        {view === "chat" && <EditorialChatWorkspace apiBase={apiBase} token={adminToken} workspaceId="main-workspace" locale={locale} targets={chatTargets} onOpenSettings={() => setView("research-settings")} onPrepareBrowser={draft=>{setBrowserChatDraft(draft);setBrowserDrawerOpen(true);}}/>}
+        {view === "chat" && <EditorialChatWorkspace apiBase={apiBase} token={adminToken} workspaceId="main-workspace" locale={locale} targets={chatTargets} onOpenSettings={() => setView("research-settings")} openConversationId={pendingConversationId} onConversationOpened={()=>setPendingConversationId(null)} onPrepareBrowser={draft=>{setBrowserChatDraft(draft);setBrowserDrawerOpen(true);}}/>}
+        {view === "library" && <LibraryView apiBase={apiBase} token={adminToken} locale={locale} copy={copy} onOpenConversation={id=>{setPendingConversationId(id);setView("chat");}}/>}
         {view === "home" && <HomeView copy={copy} articles={articles} onCreate={() => setView("articles")} onRegistry={() => setView("registry")} onViewAll={() => setView("articles")} locale={locale} theme={theme}/>}
         {view === "articles" && <section className="page-section">
           <PageHeading eyebrow={locale === "ar" ? "مسار العمل التحريري" : "EDITORIAL WORKFLOW"} title={copy.newTitle} subtitle={copy.newSub} action={<span className="status-chip"><span className="status-dot"/>{locale==="ar"?"قرار النشر بيدك":"You control publishing"}</span>}/>
@@ -441,6 +444,59 @@ function HomeView({copy,articles,onCreate,onRegistry,onViewAll,locale,theme}:{co
       <section className="surface-card recent-card"><div className="section-heading"><div><span className="tiny-overline">{locale==="ar"?"قائمة العمل":"WORK QUEUE"}</span><h2>{copy.recent}</h2></div><button className="text-action" onClick={onViewAll}>{copy.viewAll}<ArrowUpLeft size={14}/></button></div>{articles.length===0?<EmptyArticles copy={copy}/>:<div className="recent-list">{articles.slice(0,4).map(article=><div className="recent-item" key={article.id}><span className="recent-file"><FileText size={16}/></span><span><b>{article.topic}</b><small>{(locale==="ar"?stageLabels:enStageLabels)[article.stage]||article.stage}</small></span><ArrowUpLeft size={14}/></div>)}</div>}</section>
     </div>
     <div className="home-footnote"><span><LockKeyhole size={14}/>{copy.sourceNotice}</span><span>{locale==="ar"?"مراجعة بشرية · النشر بقرارك":"HUMAN REVIEW · YOUR CALL"}</span></div>
+  </section>;
+}
+
+
+type LibraryDraft = {
+  id: string; conversationId: string; messageId: string; title: string; targetId: string; targetName: string;
+  clientName?: string | null; brandName?: string | null; language: "ar" | "en"; request: string; format?: string;
+  hook?: string; body?: string; callToAction?: string; hashtags?: string[]; videoScript?: string; onScreenText?: string;
+  geo?: { intent?: string; primaryPhrase?: string; supportingTerms?: string[]; questions?: string[]; entities?: string[] };
+  mediaNotes?: string; factCheckNotes?: string[]; createdAt: string;
+};
+function LibraryView({apiBase,token,locale,copy,onOpenConversation}:{apiBase:string;token:string;locale:Locale;copy:typeof t.ar;onOpenConversation:(id:string)=>void}) {
+  const [items,setItems]=useState<LibraryDraft[]>([]);
+  const [selectedId,setSelectedId]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [notice,setNotice]=useState("");
+  const selected=items.find(item=>item.id===selectedId)||items[0];
+  useEffect(()=>{
+    if(!token.trim()){setItems([]);return;}
+    let cancelled=false;
+    setLoading(true);setNotice("");
+    fetch(`${apiBase}/api/v1/workspaces/main-workspace/library`,{headers:{authorization:`Bearer ${token}`}})
+      .then(async response=>{const payload=await response.json();if(!response.ok)throw new Error(payload.error||copy.libraryLoadError);return payload.items||[];})
+      .then(data=>{if(!cancelled){setItems(data);setSelectedId(current=>data.some((item:LibraryDraft)=>item.id===current)?current:(data[0]?.id||""));}})
+      .catch(error=>{if(!cancelled)setNotice(error instanceof Error?error.message:copy.libraryLoadError);})
+      .finally(()=>{if(!cancelled)setLoading(false);});
+    return ()=>{cancelled=true;};
+  },[apiBase,token,copy.libraryLoadError]);
+  function download(item:LibraryDraft){
+    const lines=[`# ${item.title}`,`\n**${item.targetName}** · ${item.format||"Draft"} · ${new Date(item.createdAt).toLocaleString(locale==="ar"?"ar-IQ":"en-US")}`,item.clientName?`\nClient: ${item.clientName}`:"",item.brandName?`\nBrand: ${item.brandName}`:"",`\n## ${copy.libraryRequest}`,item.request||"",item.hook?`\n## Hook\n${item.hook}`:"",`\n## ${copy.libraryOutput}`,item.body||"",item.callToAction?`\n## CTA\n${item.callToAction}`:"",item.videoScript?`\n## Video script\n${item.videoScript}`:"",item.onScreenText?`\n## On-screen text\n${item.onScreenText}`:"",item.hashtags?.length?`\n## Hashtags\n${item.hashtags.map(tag=>tag.startsWith("#")?tag:`#${tag}`).join(" ")}`:"",item.geo?.primaryPhrase?`\n## GEO brief\n- Intent: ${item.geo.intent||"—"}\n- Primary phrase: ${item.geo.primaryPhrase}\n- Related terms: ${(item.geo.supportingTerms||[]).join(", ")}\n- Questions: ${(item.geo.questions||[]).join("; ")}\n- Entities: ${(item.geo.entities||[]).join(", ")}`:"",item.factCheckNotes?.length?`\n## Fact-check notes\n${item.factCheckNotes.map(note=>`- ${note}`).join("\n")}`:"",item.mediaNotes?`\n## Media notes\n${item.mediaNotes}`:""].filter(Boolean);
+    const blob=new Blob([lines.join("\n\n")],{type:"text/markdown;charset=utf-8"});
+    const url=URL.createObjectURL(blob);const anchor=document.createElement("a");anchor.href=url;anchor.download=`${(item.title||"editorial-draft").replace(/[^a-z0-9\u0600-\u06ff-]+/gi,"-").slice(0,70)||"editorial-draft"}.md`;document.body.appendChild(anchor);anchor.click();anchor.remove();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  return <section className="page-section library-view">
+    <PageHeading eyebrow="EDITORIAL LIBRARY" title={copy.libraryTitle} subtitle={copy.librarySub} action={<span className="status-chip"><Library size={14}/>{items.length} {locale==="ar"?"مسودة":"drafts"}</span>}/>
+    {!token.trim()?<div className="surface-card library-empty"><LockKeyhole size={22}/><b>{copy.apiKey}</b><p>{copy.apiKeyHint}</p></div>:loading?<div className="surface-card library-empty"><span className="loading-dot"/>{copy.loading}</div>:items.length===0?<div className="surface-card library-empty"><div className="empty-art"><div className="empty-sheet"><span/><span/><span/></div></div><b>{copy.libraryEmpty}</b><p>{copy.libraryEmptySub}</p></div>:<div className="library-layout">
+      <div className="surface-card library-list"><div className="section-heading"><div><span className="tiny-overline">{locale==="ar"?"المخرجات المحفوظة":"SAVED OUTPUTS"}</span><h2>{copy.libraryTitle}</h2></div><span className="count-badge">{items.length}</span></div>
+        {items.map(item=><button type="button" key={item.id} className={`library-item${selected?.id===item.id?" is-active":""}`} onClick={()=>setSelectedId(item.id)}><span className="library-item-icon"><FileText size={17}/></span><span className="library-item-main"><b>{item.title}</b><small>{item.targetName} · {item.format||"Draft"}</small><small>{item.clientName||(locale==="ar"?"غير محدد":"Not specified")}{item.brandName?` / ${item.brandName}`:""}</small></span><small className="library-item-date">{new Date(item.createdAt).toLocaleDateString(locale==="ar"?"ar-IQ":"en-US")}</small></button>)}
+      </div>
+      {selected&&<article className="surface-card library-detail"><div className="library-detail-top"><div><span className="tiny-overline">{copy.libraryOutput}</span><h2>{selected.title}</h2><p>{selected.targetName} · {selected.format||"Draft"} · {new Date(selected.createdAt).toLocaleString(locale==="ar"?"ar-IQ":"en-US")}</p></div><span className="status-chip">{selected.language.toUpperCase()}</span></div>
+        <div className="library-context"><span>{selected.clientName||(locale==="ar"?"غير محدد":"Not specified")}</span>{selected.brandName&&<span>{selected.brandName}</span>}</div>
+        <section className="library-section"><h3>{copy.libraryRequest}</h3><p>{selected.request||"—"}</p></section>
+        {selected.hook&&<section className="library-section"><h3>{locale==="ar"?"الافتتاحية":"Hook"}</h3><p>{selected.hook}</p></section>}
+        <section className="library-section"><h3>{copy.libraryOutput}</h3><div className="library-body">{selected.body||"—"}</div></section>
+        {selected.callToAction&&<section className="library-section"><h3>{locale==="ar"?"دعوة للتفاعل":"Call to action"}</h3><p>{selected.callToAction}</p></section>}
+        {selected.videoScript&&<section className="library-section"><h3>{locale==="ar"?"سيناريو الفيديو":"Video script"}</h3><p>{selected.videoScript}</p></section>}
+        {selected.geo?.primaryPhrase&&<section className="library-section"><h3>GEO</h3><p>{selected.geo.primaryPhrase}</p><small>{(selected.geo.supportingTerms||[]).join(" · ")}</small></section>}
+        {!!selected.factCheckNotes?.length&&<section className="library-warning"><AlertTriangle size={15}/><div><b>{locale==="ar"?"نقاط تحتاج إلى تحقق":"Needs verification"}</b><ul>{selected.factCheckNotes.map((note,index)=><li key={index}>{note}</li>)}</ul></div></section>}
+        <p className="library-truth-note"><ShieldCheck size={14}/>{copy.libraryNoPublish}</p>
+        <div className="library-actions"><button type="button" className="primary-button" onClick={()=>download(selected)}><Download size={15}/>{copy.libraryDownload}</button><button type="button" className="secondary-button" onClick={()=>onOpenConversation(selected.conversationId)}><MessageSquare size={15}/>{copy.libraryOpen}</button></div>
+      </article>}
+    </div>}
+    {notice&&<p className="inline-feedback" role="status">{notice}</p>}
   </section>;
 }
 

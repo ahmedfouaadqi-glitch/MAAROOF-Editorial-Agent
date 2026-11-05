@@ -4,6 +4,7 @@ import { compareWorkspaceEditorialContent } from "./editorial-similarity.mjs";
 import { getEditorialTarget } from "./editorial-targets.mjs";
 
 const MAX_TOTAL_DOCUMENT_CHARS = 20_000;
+const activeRunControllers = new Map();
 const STEP_IDS = ["request", "identity", "destination", "attachments", "discovery", "retrieval", "evidence", "geo", "draft", "originality"];
 
 function stepsFor(language) {
@@ -102,16 +103,39 @@ export function createEditorialConversationProgress(language = "ar") {
   return progress(stepsFor(language));
 }
 
+export async function cancelEditorialConversationRun({ store, workspaceId, conversationId }) {
+  const conversation = await getEditorialConversation(store, workspaceId, conversationId);
+  const run = conversation.activeRun;
+  if (!run || !["queued", "running"].includes(run.status)) return { cancelled: false, conversation };
+  activeRunControllers.get(run.id)?.abort();
+  const activeRun = await updateEditorialConversationRun(store, {
+    workspaceId, conversationId, runId: run.id, status: "cancelled",
+    metadata: { ...(run.metadata || {}), cancelledAt: new Date().toISOString() }
+  });
+  return { cancelled: true, activeRun, conversation: await getEditorialConversation(store, workspaceId, conversationId) };
+}
+
 export async function runEditorialConversation({ store, provider, workspaceId, conversationId, runId, userMessageId, mediaDir }) {
   const claimed = await claimEditorialConversationRun(store, { workspaceId, conversationId, runId });
   if (!claimed) return { status: "ignored", reason: "run-already-claimed" };
-  const language = (await getEditorialConversation(store, workspaceId, conversationId)).language;
+  const controller = new AbortController();
+  activeRunControllers.set(runId, controller);
+  const initialConversation = await getEditorialConversation(store, workspaceId, conversationId);
+  if (initialConversation.activeRun?.id !== runId || initialConversation.activeRun.status !== "running") {
+    activeRunControllers.delete(runId);
+    return { status: initialConversation.activeRun?.status || "ignored" };
+  }
+  const language = initialConversation.language;
   const steps = stepsFor(language);
-  const setRun = async (status = "running", extra = {}) => updateEditorialConversationRun(store, {
-    workspaceId, conversationId, runId, status,
-    metadata: { ...progress(steps), ...extra }
-  });
+  const setRun = async (status = "running", extra = {}) => {
+    if (controller.signal.aborted) throw Object.assign(new Error("Editorial run cancelled"), { name: "AbortError" });
+    return updateEditorialConversationRun(store, {
+      workspaceId, conversationId, runId, status,
+      metadata: { ...progress(steps), ...extra }
+    });
+  };
   const setStep = async (id, status, note = "") => {
+    if (controller.signal.aborted) throw Object.assign(new Error("Editorial run cancelled"), { name: "AbortError" });
     const step = steps.find(item => item.id === id);
     if (step) { step.status = status; if (note) step.note = note; }
     await setRun("running");
@@ -151,7 +175,8 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
     await setStep("geo", "running");
     await setStep("draft", "running");
     const { system, prompt } = makePrompt({ conversation, currentMessage: userMessage, target, attachmentContext });
-    const modelResult = await provider.generateJSON({ system, prompt, images: attachmentContext.images, maxTokens: 3800, temperature: 0.35 });
+    const modelResult = await provider.generateJSON({ system, prompt, images: attachmentContext.images, maxTokens: 3800, temperature: 0.35, signal: controller.signal });
+    if (controller.signal.aborted) throw Object.assign(new Error("Editorial run cancelled"), { name: "AbortError" });
     const draft = validateDraft(modelResult.output, target);
     await setStep("geo", "completed", "Intent, natural-language phrases, questions and entities are included in the draft.");
     await setStep("draft", "completed");
@@ -199,6 +224,16 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
     });
     return { status: "completed", assistantMessageId: assistantMessage.id, needsReview };
   } catch (error) {
+    if (controller.signal.aborted || error?.name === "AbortError") {
+      const latest = await getEditorialConversation(store, workspaceId, conversationId).catch(() => null);
+      if (latest?.activeRun?.id === runId && ["queued", "running"].includes(latest.activeRun.status)) {
+        await updateEditorialConversationRun(store, {
+          workspaceId, conversationId, runId, status: "cancelled",
+          metadata: { ...(latest.activeRun.metadata || {}), cancelledAt: new Date().toISOString() }
+        }).catch(() => {});
+      }
+      return { status: "cancelled" };
+    }
     const failedStep = steps.find(item => item.status === "running") || steps.find(item => item.status === "pending");
     if (failedStep) failedStep.status = "failed";
     for (const step of steps) if (step.status === "pending") { step.status = "skipped"; step.note = "An earlier step failed."; }
@@ -213,5 +248,7 @@ export async function runEditorialConversation({ store, provider, workspaceId, c
       await setRun("failed", { error: "editorial-run-failed", assistantMessageId, finishedAt: new Date().toISOString() });
     } catch {}
     return { status: "failed", assistantMessageId, errorCode: error?.status ? `http-${error.status}` : "editorial-run-failed" };
+  } finally {
+    activeRunControllers.delete(runId);
   }
 }

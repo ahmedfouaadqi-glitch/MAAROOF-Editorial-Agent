@@ -13,7 +13,7 @@ export function createOpenAICompatibleProvider({baseUrl=process.env.MODEL_API_BA
  return {
   id:"openai-compatible",
   model,
-  async generateJSON({system,prompt,maxTokens=1800,temperature=0.2,images=[]}){
+  async generateJSON({system,prompt,maxTokens=1800,temperature=0.2,images=[],signal}){
    if(typeof system!=="string"||system.length<10||system.length>12000)fail("Model system prompt must contain 10-12000 characters",400);
    if(typeof prompt!=="string"||prompt.trim().length<10||prompt.length>60000)fail("Model prompt must contain 10-60000 characters",400);
    if(!Number.isSafeInteger(maxTokens)||maxTokens<64||maxTokens>8192)fail("maxTokens must be from 64 to 8192",400);
@@ -34,7 +34,7 @@ export function createOpenAICompatibleProvider({baseUrl=process.env.MODEL_API_BA
     headers:{"Authorization":"Bearer "+apiKey,"Content-Type":"application/json","Accept":"application/json"},
     redirect:"error",
     body:JSON.stringify({model,messages:[{role:"system",content:system},{role:"user",content:images.length?messageContent:prompt}],temperature,max_tokens:maxTokens,response_format:{type:"json_object"}}),
-    signal:AbortSignal.timeout(timeoutMs)
+    signal:signal ? AbortSignal.any([AbortSignal.timeout(timeoutMs), signal]) : AbortSignal.timeout(timeoutMs)
    }).catch(error=>{
     if(error?.name==="TimeoutError"||error?.name==="AbortError")throw fail("Model provider timed out",504);
     throw fail("Model provider could not be reached",502);
