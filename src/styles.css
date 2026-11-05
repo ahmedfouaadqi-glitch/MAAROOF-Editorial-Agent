@@ -424,3 +424,15 @@ body:has(.app-shell.theme-dark){background:#10100F}
 @media(max-width:600px){.editorial-chat-task-brief{flex-direction:column}.editorial-chat-task-brief>button{align-self:flex-start}.editorial-chat-result-actions{align-items:flex-start}.library-list,.library-detail{padding:13px}.library-detail-top h2{font-size:16px}}
 
 .editorial-chat-stop-button{display:inline-flex;align-items:center;gap:6px;border:1px solid #b85b4b66;border-radius:8px;background:transparent;color:#b85b4b;padding:6px 9px;font-size:9px;font-weight:700;cursor:pointer}.editorial-chat-stop-button:disabled{opacity:.55;cursor:wait}
+
+/* Admin single-account workspace lifecycle */
+.workspace-manager{display:grid;gap:7px;margin:0 0 22px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.workspace-select-label{font-size:9px;font-weight:700;color:var(--muted-strong)}
+.workspace-manager select,.workspace-manager input{width:100%;min-width:0;height:33px;border:1px solid var(--line);border-radius:7px;background:var(--surface-soft);color:var(--text-strong);padding:0 8px;font:10px inherit;outline:none}
+.workspace-manager select:focus,.workspace-manager input:focus{border-color:var(--accent)}
+.workspace-manager-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.workspace-manager-actions button,.workspace-archived-toggle,.workspace-restore-row button{min-width:0;border:1px solid var(--line);border-radius:6px;background:var(--surface-soft);color:var(--muted-strong);padding:6px 4px;font-size:8px;cursor:pointer}
+.workspace-manager button:disabled{opacity:.4;cursor:not-allowed}
+.workspace-archived-toggle{width:100%;text-align:center}
+.workspace-restore-row{display:flex;align-items:center;justify-content:space-between;gap:7px;padding:5px 0;border-top:1px solid var(--line);font-size:9px;color:var(--muted-strong)}
+.workspace-feedback{display:block;color:var(--muted);font-size:8px;line-height:1.6;overflow-wrap:anywhere}
