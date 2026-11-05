@@ -134,7 +134,7 @@ const server = createServer(async (req, res) => {
       const workspace = await store.transact(state => createWorkspace(state, body));
       return send(res, 201, { workspace });
     }
-    const workspaceItem = url.pathname.match(/^\\/api\\/v1\\/workspaces\\/([^/]+)$/);
+    const workspaceItem = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)$/);
     if (workspaceItem && req.method === "GET") {
       const workspaceId = decodeURIComponent(workspaceItem[1]);
       const state = await store.read();
