@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { appendEditorialConversationMessage, createEditorialConversation, getEditorialConversation, updateEditorialConversationRun } from "./editorial-conversations.mjs";
+import { appendEditorialConversationMessage, createEditorialConversation, getEditorialConversation, updateEditorialConversationRun, enqueueEditorialConversationJob } from "./editorial-conversations.mjs";
 import { createEditorialConversationProgress, buildEditorialExecutionPlan, runEditorialConversation, cancelEditorialConversationRun } from "./editorial-conversation-runner.mjs";
 
 function makeStore() {
   const state: any = {
     editorialConversations: [], conversationAttachments: [], conversationDrafts: [], clients: [], brands: [],
-    editorialDrafts: [], platformVariants: [], originalityChecks: [], tasks: {}
+    editorialDrafts: [], platformVariants: [], originalityChecks: [], tasks: {}, editorialJobQueue: []
   };
   return {
     state,
@@ -104,6 +104,17 @@ describe("editorial conversation workflow", () => {
     const finalConversation = await getEditorialConversation(store, "workspace-1", conversation.id);
     expect(finalConversation.messages.at(-1)?.result).toMatchObject({ needsReview: true });
     expect(finalConversation.activeRun?.metadata?.steps.find((step: any) => step.id === "originality")?.status).toBe("needs-review");
+  });
+
+  it("cancels a queued durable job before a worker claims it", async () => {
+    const store = makeStore();
+    const { conversation, userMessage } = await startConversation(store);
+    await updateEditorialConversationRun(store, { workspaceId: "workspace-1", conversationId: conversation.id, runId: "run-queued-cancel", status: "queued", metadata: createEditorialConversationProgress("en") });
+    await enqueueEditorialConversationJob(store, { workspaceId: "workspace-1", conversationId: conversation.id, runId: "run-queued-cancel", userMessageId: userMessage.id, mediaDir: "/tmp/editorial-chat-no-media" });
+    const cancellation = await cancelEditorialConversationRun({ store, workspaceId: "workspace-1", conversationId: conversation.id });
+    expect(cancellation.cancelled).toBe(true);
+    expect(store.state.editorialJobQueue[0]).toMatchObject({ id: "run-queued-cancel", status: "cancelled" });
+    expect((await getEditorialConversation(store, "workspace-1", conversation.id)).activeRun?.status).toBe("cancelled");
   });
 
   it("cancels an in-flight model request and does not save a draft", async () => {
