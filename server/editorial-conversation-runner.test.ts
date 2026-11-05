@@ -62,6 +62,8 @@ describe("editorial conversation workflow", () => {
     const savedFirst = await getEditorialConversation(store, "workspace-1", conversation.id);
     expect(savedFirst.messages.at(-1)?.result).toMatchObject({ kind: "draft", targetId: "linkedin", draft: { geo: { primaryPhrase: "responsible AI adoption for small businesses" } } });
     expect(savedFirst.activeRun?.metadata?.steps.find((step: any) => step.id === "discovery")?.status).toBe("skipped");
+    expect(savedFirst.activeRun?.metadata?.startedAt).toBeTruthy();
+    expect(savedFirst.activeRun?.metadata?.finishedAt).toBeTruthy();
 
     const secondUserMessage = await appendEditorialConversationMessage(store, {
       workspaceId: "workspace-1", conversationId: conversation.id, role: "user", targetId: "linkedin",
