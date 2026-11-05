@@ -43,7 +43,7 @@ export function analyzeOriginality(state, workspaceId, candidateText, {
     if (b.matchType === "exact" && a.matchType !== "exact") return 1;
     return b.similarity - a.similarity;
   });
-  const reviewRequired = findings.length > 0;
+  const reviewRequired = findings.length > 0 || candidateWordCount < minCandidateWords;
   const strongestSimilarity = findings.reduce((max, item) => Math.max(max, item.similarity), 0);
   const status = candidateWordCount < minCandidateWords
     ? "insufficient-text"
