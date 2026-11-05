@@ -144,7 +144,8 @@ export default function App() {
   const [brandOptions, setBrandOptions] = useState<Array<{id:string;name:string;clientId:string|null}>>([]);
   const [language, setLanguage] = useState<"ar" | "en">("ar");
   const [objective, setObjective] = useState("analysis");
-  const [articles, setArticles] = useState<Article[]>([]);\n  const [pendingConversationId, setPendingConversationId] = useState<string | null>(null);
+  const [articles, setArticles] = useState<Article[]>([]);
+  const [pendingConversationId, setPendingConversationId] = useState<string | null>(null);
   const [articleNotice, setArticleNotice] = useState("");
   const [advancingId, setAdvancingId] = useState<string | null>(null);
   const [evidenceArticleId, setEvidenceArticleId] = useState<string | null>(null);
