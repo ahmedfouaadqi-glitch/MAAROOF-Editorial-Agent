@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
-  Activity, ArrowDownLeft, ArrowLeft, ArrowUpLeft, BookOpenText, Check,
+  Activity, AlertTriangle, ArrowDownLeft, ArrowLeft, ArrowUpLeft, BookOpenText, Check,
   CheckCircle2, ChevronDown, CircleHelp, FileCheck2, FilePlus2,
   FileText, Globe2, Home, Layers3, LayoutDashboard, Library, ListFilter,
   LockKeyhole, Menu, Moon, MoreHorizontal, Plus, Search,
@@ -480,7 +480,7 @@ function LibraryView({apiBase,token,locale,copy,onOpenConversation}:{apiBase:str
     <PageHeading eyebrow="EDITORIAL LIBRARY" title={copy.libraryTitle} subtitle={copy.librarySub} action={<span className="status-chip"><Library size={14}/>{items.length} {locale==="ar"?"مسودة":"drafts"}</span>}/>
     {!token.trim()?<div className="surface-card library-empty"><LockKeyhole size={22}/><b>{copy.apiKey}</b><p>{copy.apiKeyHint}</p></div>:loading?<div className="surface-card library-empty"><span className="loading-dot"/>{copy.loading}</div>:items.length===0?<div className="surface-card library-empty"><div className="empty-art"><div className="empty-sheet"><span/><span/><span/></div></div><b>{copy.libraryEmpty}</b><p>{copy.libraryEmptySub}</p></div>:<div className="library-layout">
       <div className="surface-card library-list"><div className="section-heading"><div><span className="tiny-overline">{locale==="ar"?"المخرجات المحفوظة":"SAVED OUTPUTS"}</span><h2>{copy.libraryTitle}</h2></div><span className="count-badge">{items.length}</span></div>
-        {items.map(item=><button type="button" key={item.id} className={`library-item${selected?.id===item.id?" is-active":""}`} onClick={()=>setSelectedId(item.id)}><span className="library-item-icon"><FileText size={17}/></span><span className="library-item-main"><b>{item.title}</b><small>{item.targetName} · {item.format||"Draft"}</small><small>{item.clientName||copy.noClient}{item.brandName?` / ${item.brandName}`:""}</small></span><small className="library-item-date">{new Date(item.createdAt).toLocaleDateString(locale==="ar"?"ar-IQ":"en-US")}</small></button>)}
+        {items.map(item=><button type="button" key={item.id} className={`library-item${selected?.id===item.id?" is-active":""}`} onClick={()=>setSelectedId(item.id)}><span className="library-item-icon"><FileText size={17}/></span><span className="library-item-main"><b>{item.title}</b><small>{item.targetName} · {item.format||"Draft"}</small><small>{item.clientName||(locale==="ar"?"غير محدد":"Not specified")}{item.brandName?` / ${item.brandName}`:""}</small></span><small className="library-item-date">{new Date(item.createdAt).toLocaleDateString(locale==="ar"?"ar-IQ":"en-US")}</small></button>)}
       </div>
       {selected&&<article className="surface-card library-detail"><div className="library-detail-top"><div><span className="tiny-overline">{copy.libraryOutput}</span><h2>{selected.title}</h2><p>{selected.targetName} · {selected.format||"Draft"} · {new Date(selected.createdAt).toLocaleString(locale==="ar"?"ar-IQ":"en-US")}</p></div><span className="status-chip">{selected.language.toUpperCase()}</span></div>
         <div className="library-context"><span>{selected.clientName||copy.noClient}</span>{selected.brandName&&<span>{selected.brandName}</span>}</div>
