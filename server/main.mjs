@@ -26,7 +26,7 @@ import { createMediaAsset, deleteMediaAsset, listMediaAssets, resolveMediaAssetF
 import { getGeoBrief, getGeoReadiness, updateGeoBrief } from "./editorial-geo.mjs";
 import { listEditorialBrands, listEditorialClients } from "./editorial-identities.mjs";
 import { createBrowserAgentClient } from "./browser-agent-client.mjs";
-import { createEditorialConversation, listEditorialConversations, getEditorialConversation, appendEditorialConversationMessage, updateEditorialConversationRun } from "./editorial-conversations.mjs";
+import { createEditorialConversation, listEditorialConversations, getEditorialConversation, appendEditorialConversationMessage, updateEditorialConversationRun, recoverInterruptedEditorialConversationRuns } from "./editorial-conversations.mjs";
 import { listEditorialLibraryItems } from "./editorial-library.mjs";
 import { createConversationAttachment, listConversationAttachments, resolveConversationAttachmentFile, deleteConversationAttachment } from "./editorial-conversation-attachments.mjs";
 import { listEditorialTargets } from "./editorial-targets.mjs";
@@ -855,6 +855,8 @@ const server = createServer(async (req, res) => {
 });
 
 await store.init();
+const recovery = await recoverInterruptedEditorialConversationRuns(store);
+if (recovery.recovered) console.warn(`Recovered ${recovery.recovered} interrupted editorial run(s); manual retry is required.`);
 server.listen(port, host, () => {
   console.log(`MAAROOF Editorial API listening on http://${host}:${port}`);
   console.log(`Supabase: disabled | Firecrawl: ${firecrawlProvider ? "enabled" : "disabled"} | Persistence: local JSON`);
