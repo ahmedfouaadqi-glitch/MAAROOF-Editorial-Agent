@@ -545,7 +545,7 @@ function LibraryView({apiBase,token,workspaceId,locale,copy,onOpenConversation}:
       .catch(error=>{if(!cancelled)setNotice(error instanceof Error?error.message:copy.libraryLoadError);})
       .finally(()=>{if(!cancelled)setLoading(false);});
     return ()=>{cancelled=true;};
-  },[apiBase,token,copy.libraryLoadError]);
+  },[apiBase,token,workspaceId,copy.libraryLoadError]);
   function download(item:LibraryDraft){
     const lines=[`# ${item.title}`,`\n**${item.targetName}** · ${item.format||"Draft"} · ${new Date(item.createdAt).toLocaleString(locale==="ar"?"ar-IQ":"en-US")}`,item.clientName?`\nClient: ${item.clientName}`:"",item.brandName?`\nBrand: ${item.brandName}`:"",`\n## ${copy.libraryRequest}`,item.request||"",item.hook?`\n## Hook\n${item.hook}`:"",`\n## ${copy.libraryOutput}`,item.body||"",item.callToAction?`\n## CTA\n${item.callToAction}`:"",item.videoScript?`\n## Video script\n${item.videoScript}`:"",item.onScreenText?`\n## On-screen text\n${item.onScreenText}`:"",item.hashtags?.length?`\n## Hashtags\n${item.hashtags.map(tag=>tag.startsWith("#")?tag:`#${tag}`).join(" ")}`:"",item.geo?.primaryPhrase?`\n## GEO brief\n- Intent: ${item.geo.intent||"—"}\n- Primary phrase: ${item.geo.primaryPhrase}\n- Related terms: ${(item.geo.supportingTerms||[]).join(", ")}\n- Questions: ${(item.geo.questions||[]).join("; ")}\n- Entities: ${(item.geo.entities||[]).join(", ")}`:"",item.factCheckNotes?.length?`\n## Fact-check notes\n${item.factCheckNotes.map(note=>`- ${note}`).join("\n")}`:"",item.mediaNotes?`\n## Media notes\n${item.mediaNotes}`:""].filter(Boolean);
     const blob=new Blob([lines.join("\n\n")],{type:"text/markdown;charset=utf-8"});
