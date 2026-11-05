@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createWorkspace, ensureDefaultWorkspace, getWorkspace, listWorkspaces, updateWorkspace } from "./editorial-workspaces.mjs";
+import { createWorkspace, ensureDefaultWorkspace, getWorkspace, listWorkspaces, restoreWorkspace, updateWorkspace } from "./editorial-workspaces.mjs";
 
 describe("editorial workspaces", () => {
   it("seeds and lists a stable default workspace", () => {
@@ -31,6 +31,16 @@ describe("editorial workspaces", () => {
     updateWorkspace(state, created.id, { status: "archived" });
     expect(listWorkspaces(state)).toHaveLength(1);
     expect(() => getWorkspace(state, created.id)).toThrow(/not found/);
+  });
+
+  it("restores archived workspaces and exposes them when requested", () => {
+    const state = {};
+    const created = createWorkspace(state, { name: "Restore me" });
+    updateWorkspace(state, created.id, { status: "archived" });
+    expect(listWorkspaces(state)).toHaveLength(1);
+    expect(listWorkspaces(state, { includeArchived: true })).toHaveLength(2);
+    expect(restoreWorkspace(state, created.id)).toMatchObject({ id: created.id, status: "active" });
+    expect(listWorkspaces(state)).toHaveLength(2);
   });
 
   it("does not allow archiving the default workspace", () => {
