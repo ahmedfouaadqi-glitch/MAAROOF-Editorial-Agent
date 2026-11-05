@@ -187,7 +187,7 @@ export default function App() {
       .catch(error => { if (!cancelled) setWorkspaceNotice(error instanceof Error ? error.message : "تعذر تحميل مساحات العمل"); });
     return () => { cancelled = true; };
   }, [adminToken, apiBase]);
-  useEffect(() => { setArticles([]); setClientOptions([]); setBrandOptions([]); setEvidenceArticleId(null); setDraftArticleId(null); setReviewArticleId(null); }, [workspaceId]);
+  useEffect(() => { setArticles([]); setClientOptions([]); setBrandOptions([]); setEvidenceArticleId(null); setDraftArticleId(null); setReviewArticleId(null); setPendingConversationId(null); setBrowserChatDraft(null); setBrowserDrawerOpen(false); }, [workspaceId]);
   useEffect(() => {
     if (!browserDrawerOpen) return;
     browserCloseButtonRef.current?.focus();
