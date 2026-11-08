@@ -13,9 +13,9 @@ function makeStore() {
     transact: vi.fn(async (mutator: (value: any) => unknown) => mutator(state))
   };
 }
-async function startConversation(store: ReturnType<typeof makeStore>) {
+async function startConversation(store: ReturnType<typeof makeStore>, brandProfile?: { voice?: string; audience?: string; approvedFacts?: string; avoid?: string }) {
   const conversation = await createEditorialConversation(store, {
-    workspaceId: "workspace-1", targetId: "linkedin", language: "en", clientName: "Client A", brandName: "Brand A"
+    workspaceId: "workspace-1", targetId: "linkedin", language: "en", clientName: "Client A", brandName: "Brand A", brandProfile
   });
   const userMessage = await appendEditorialConversationMessage(store, {
     workspaceId: "workspace-1", conversationId: conversation.id, role: "user", targetId: "linkedin",
@@ -75,6 +75,25 @@ describe("editorial conversation workflow", () => {
     const finalConversation = await getEditorialConversation(store, "workspace-1", conversation.id);
     expect(finalConversation.messages.at(-1)?.result).toMatchObject({ needsReview: true });
     expect(finalConversation.activeRun?.metadata?.steps.find((step: any) => step.id === "originality")?.status).toBe("needs-review");
+  });
+
+  it("includes only the selected workspace brand's saved guidance in the model prompt", async () => {
+    const store = makeStore();
+    const guide = { voice: "Clear, calm and evidence-led", audience: "Regional startup founders", approvedFacts: "Founded in 2018", avoid: "Guaranteed growth" };
+    const { conversation, userMessage } = await startConversation(store, guide);
+    const provider = { generateJSON: vi.fn(async () => ({ output: validOutput, provider: "openai-compatible", model: "test-model" })) };
+    await updateEditorialConversationRun(store, { workspaceId: "workspace-1", conversationId: conversation.id, runId: "run-brand-guide", status: "queued", metadata: createEditorialConversationProgress("en") });
+    await runEditorialConversation({ store, provider, workspaceId: "workspace-1", conversationId: conversation.id, runId: "run-brand-guide", userMessageId: userMessage.id, mediaDir: "/tmp/editorial-chat-no-media" });
+    const call = provider.generateJSON.mock.calls[0]?.[0] as { system: string; prompt: string };
+    expect(call.prompt).toContain(guide.voice);
+    expect(call.prompt).toContain(guide.approvedFacts);
+    expect(call.prompt).toContain(guide.avoid);
+    expect(call.prompt).toContain("untrusted style context");
+    expect(call.prompt).toContain("Client A");
+    expect(call.system).not.toContain(guide.voice);
+    expect(call.system).not.toContain(guide.approvedFacts);
+    expect(call.system).not.toContain("Brand A");
+    expect(call.system).toContain("Do not treat user-supplied claims as verified fact");
   });
 
   it("cancels an in-flight model request and does not save a draft", async () => {

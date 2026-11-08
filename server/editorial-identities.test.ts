@@ -38,4 +38,24 @@ describe("workspace editorial identities", () => {
     expect(() => resolveEditorialIdentities(state, { workspaceId: "workspace-a", clientName: "x" })).toThrow("clientName must contain 2-120 characters");
     expect(() => resolveEditorialIdentities(state, { workspaceId: "workspace-a", brandName: "x" })).toThrow("brandName must contain 2-120 characters");
   });
+
+  it("stores brand guidance on the workspace-scoped brand and returns it in the brand list", () => {
+    const state: any = { clients: [], brands: [] };
+    const identity = resolveEditorialIdentities(state, {
+      workspaceId: "workspace-a", brandName: "Daily", brandProfile: {
+        voice: "Clear, direct and useful", audience: "Founders in MENA",
+        approvedFacts: "Founded in 2018 (source: company profile)", avoid: "Guaranteed results"
+      }
+    });
+    expect(listEditorialBrands(state, "workspace-a")).toMatchObject([{
+      id: identity.brandId, name: "Daily", profile: { voice: "Clear, direct and useful", audience: "Founders in MENA", avoid: "Guaranteed results" }
+    }]);
+    expect(listEditorialBrands(state, "workspace-b")).toHaveLength(0);
+  });
+
+  it("rejects brand guidance without a brand and oversized fields", () => {
+    const state: any = { clients: [], brands: [] };
+    expect(() => resolveEditorialIdentities(state, { workspaceId: "workspace-a", brandProfile: { voice: "Warm" } })).toThrow("A brand name or brandId is required to save brand guidance");
+    expect(() => resolveEditorialIdentities(state, { workspaceId: "workspace-a", brandName: "Daily", brandProfile: { voice: "x".repeat(1601) } })).toThrow("brandProfile.voice must be text up to 1600 characters");
+  });
 });

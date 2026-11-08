@@ -324,3 +324,34 @@ The default quota is 5 inspections per article. An inspection reports word count
 
 - `GET /api/v1/workspaces/:workspaceId/library` — list saved conversation drafts for the requested workspace. Results are derived from persisted conversation drafts and are filtered by workspace ownership.
 - `POST /api/v1/workspaces/:workspaceId/conversations/:conversationId/cancel` — cooperatively cancel the queued/running editorial generation for that conversation. The server aborts the in-flight model request when it is active and records the run as cancelled. It does not undo already completed external actions; the conversation runner performs no publishing.
+
+
+## Workspaces and chat-first workflow
+
+- `GET /api/v1/workspaces?locale=ar|en` — list registered workspaces and localize the built-in default workspace name.
+- `POST /api/v1/workspaces` with `{ "name": "Brand newsroom" }` — create a workspace; the name is normalized and checked for duplicates.
+- `GET /api/v1/editorial-targets` — return the chat target catalog with bilingual descriptions, scope, style summary, format list, and availability.
+- `GET /api/v1/workspaces/:workspaceId/conversations` — list the workspace's history; `POST` to the same route creates a conversation with `targetId`, `language`, and optional client/brand identity.
+- `POST /api/v1/workspaces/:workspaceId/conversations/:conversationId/messages` — enqueue an editorial run after validating message text, target, attachments and idempotency ID. Progress is persisted in the conversation record.
+- `POST /api/v1/workspaces/:workspaceId/conversations/:conversationId/attachments` — accept a bounded image, video, PDF, DOCX, TXT or Markdown attachment for that conversation. Download and deletion endpoints are scoped to both conversation and workspace.
+
+A new conversation may include `brandProfile` alongside `brandName`:
+
+```json
+{
+  "targetId": "linkedin",
+  "language": "en",
+  "clientName": "Example Client",
+  "brandName": "Example Brand",
+  "brandProfile": {
+    "voice": "Clear, calm and evidence-led",
+    "audience": "Regional startup founders",
+    "approvedFacts": "Company facts and provenance for review",
+    "avoid": "Terms or claims to avoid"
+  }
+}
+```
+
+The profile is stored on the brand identity within that workspace; each field has a server-side character limit. `GET /api/v1/workspaces/:workspaceId/brands` returns the associated records and profile so the UI can reuse them. Profile guidance changes writing context only: the server does not treat the text as independently verified evidence. If no brand name or brand ID is supplied, a non-empty profile is rejected.
+
+The chat catalog and the older `/platform-variants` endpoint have different purposes: the former selects conversation-generation targets (25 bilingual profiles in this snapshot), while `/platform-variants` remains the legacy article-repurposing API with its narrower set of eight identifiers. Neither registry proves that a destination is connected or that publishing works. All routes still use the shared temporary admin bearer token; a workspace ID is not user membership authorization.

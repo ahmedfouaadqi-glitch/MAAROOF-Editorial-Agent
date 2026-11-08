@@ -76,7 +76,7 @@ function validateAttachments(state, workspaceId, conversationId, attachmentIds) 
 }
 
 export async function createEditorialConversation(store, {
-  workspaceId, title = "", clientId, brandId, clientName, brandName,
+  workspaceId, title = "", clientId, brandId, clientName, brandName, brandProfile,
   targetId, language = "ar"
 }) {
   requiredString(workspaceId, "workspaceId", 128);
@@ -85,7 +85,7 @@ export async function createEditorialConversation(store, {
   const cleanTitle = title === "" ? "" : requiredString(title, "title", MAX_TITLE_CHARS);
   if (language !== "ar" && language !== "en") fail("language must be ar or en");
   return store.transact(state => {
-    const identities = resolveEditorialIdentities(state, { workspaceId, clientId, brandId, clientName, brandName });
+    const identities = resolveEditorialIdentities(state, { workspaceId, clientId, brandId, clientName, brandName, brandProfile });
     const now = new Date().toISOString();
     const conversation = {
       id: randomUUID(), workspaceId, title: cleanTitle,

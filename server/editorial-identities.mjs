@@ -18,16 +18,31 @@ function optionalName(value, field) {
   return value.trim().replace(/\s+/g, " ");
 }
 
+const BRAND_PROFILE_LIMITS = { voice: 1600, audience: 1200, approvedFacts: 2400, avoid: 1200 };
+function cleanBrandProfile(value) {
+  if (value == null) return null;
+  if (!value || typeof value !== "object" || Array.isArray(value)) fail("brandProfile must be an object");
+  const profile = {};
+  for (const [field, limit] of Object.entries(BRAND_PROFILE_LIMITS)) {
+    const text = value[field];
+    if (text == null || text === "") continue;
+    if (typeof text !== "string" || text.trim().length > limit) fail(`brandProfile.${field} must be text up to ${limit} characters`);
+    profile[field] = text.trim();
+  }
+  return Object.keys(profile).length ? profile : null;
+}
+
 function publicRecord({ normalizedName: _normalizedName, ...record }) {
   return record;
 }
 
-export function resolveEditorialIdentities(state, { workspaceId, clientId, brandId, clientName, brandName }) {
+export function resolveEditorialIdentities(state, { workspaceId, clientId, brandId, clientName, brandName, brandProfile }) {
   state.clients ||= [];
   state.brands ||= [];
   let client = null;
   const cleanClientName = optionalName(clientName, "clientName");
   const cleanBrandName = optionalName(brandName, "brandName");
+  const cleanProfile = cleanBrandProfile(brandProfile);
 
   if (clientId != null && clientId !== "") {
     if (typeof clientId !== "string") fail("clientId must be a string");
@@ -65,10 +80,13 @@ export function resolveEditorialIdentities(state, { workspaceId, clientId, brand
     if (brand && (brand.normalizedName !== normalizedName || brand.clientId !== parentClientId)) fail("brandId and brandName refer to different brands", 409);
     brand = namedBrand || brand;
     if (!brand) {
-      brand = { id: randomUUID(), workspaceId, clientId: parentClientId, name: cleanBrandName, normalizedName, createdAt: new Date().toISOString() };
+      brand = { id: randomUUID(), workspaceId, clientId: parentClientId, name: cleanBrandName, normalizedName, profile: {}, createdAt: new Date().toISOString() };
       state.brands.push(brand);
     }
   }
+
+  if (cleanProfile && !brand) fail("A brand name or brandId is required to save brand guidance");
+  if (cleanProfile && brand) brand.profile = { ...(brand.profile || {}), ...cleanProfile };
 
   return {
     ...(client ? { clientId: client.id, clientName: client.name } : {}),

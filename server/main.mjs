@@ -29,6 +29,7 @@ import { createEditorialConversation, listEditorialConversations, getEditorialCo
 import { listEditorialLibraryItems } from "./editorial-library.mjs";
 import { createConversationAttachment, listConversationAttachments, resolveConversationAttachmentFile, deleteConversationAttachment } from "./editorial-conversation-attachments.mjs";
 import { listEditorialTargets } from "./editorial-targets.mjs";
+import { createEditorialWorkspace, listEditorialWorkspaces } from "./editorial-workspaces.mjs";
 import { createEditorialConversationProgress, runEditorialConversation, cancelEditorialConversationRun } from "./editorial-conversation-runner.mjs";
 import {
   buildApprovedArticleForBrowser, getBrowserDestination, getBrowserSession,
@@ -123,6 +124,25 @@ const server = createServer(async (req, res) => {
     }
 
     requireAdmin(req);
+
+    if (req.method === "GET" && url.pathname === "/api/v1/workspaces") {
+      const state = await store.read();
+      return send(res, 200, { workspaces: listEditorialWorkspaces(state, url.searchParams.get("locale") === "en" ? "en" : "ar") });
+    }
+    if (req.method === "POST" && url.pathname === "/api/v1/workspaces") {
+      const body = await readJson(req);
+      const workspace = await store.transact(state => createEditorialWorkspace(state, body && typeof body === "object" ? body : {}));
+      return send(res, 201, { workspace });
+    }
+
+    const scopedWorkspace = url.pathname.match(/^\/api\/v1\/workspaces\/([^/]+)(?:\/|$)/);
+    if (scopedWorkspace) {
+      const requestedWorkspaceId = decodeURIComponent(scopedWorkspace[1]);
+      const state = await store.read();
+      if (!listEditorialWorkspaces(state).some(item => item.id === requestedWorkspaceId)) {
+        throw Object.assign(new Error("Workspace not found"), { status: 404 });
+      }
+    }
 
     if (req.method === "GET" && url.pathname === "/api/v1/editorial-targets") {
       return send(res, 200, { targets: listEditorialTargets() });

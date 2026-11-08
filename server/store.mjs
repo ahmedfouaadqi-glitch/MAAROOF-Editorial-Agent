@@ -1,9 +1,11 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { DEFAULT_WORKSPACE_ID, DEFAULT_WORKSPACE_NAME, ensureDefaultWorkspaceCollection } from "./editorial-workspaces.mjs";
 
 const EMPTY = {
   version: 1,
   limits: { sourceUrlsPerArticle: 3, scrapesPerArticle: 3, searchesPerArticle: 5, inspectionsPerArticle: 5 },
+  workspaces: [{ id: DEFAULT_WORKSPACE_ID, name: DEFAULT_WORKSPACE_NAME, nameAr: DEFAULT_WORKSPACE_NAME, nameEn: "Main workspace", createdAt: null, updatedAt: null }],
   tasks: {},
   editorialConversations: [],
   conversationAttachments: [],
@@ -22,7 +24,7 @@ export class JsonStore {
     try {
       const raw = await readFile(this.filePath, "utf8");
       const state = JSON.parse(raw);
-      let changed = false;
+      let changed = ensureDefaultWorkspaceCollection(state);
       state.limits = { ...EMPTY.limits, ...(state.limits || {}) };
       state.researchScrapes ||= [];
       state.researchInspections ||= [];
@@ -41,11 +43,13 @@ export class JsonStore {
         }
         task.reservations ||= {};
       }
-      if (changed || !raw.includes('"scrapesPerArticle"') || !raw.includes('"researchScrapes"') || !raw.includes('"researchInspections"') || !raw.includes('"editorialConversations"') || !raw.includes('"conversationAttachments"')) await this.#write(state);
+      if (changed || !raw.includes('"workspaces"') || !raw.includes('"scrapesPerArticle"') || !raw.includes('"researchScrapes"') || !raw.includes('"researchInspections"') || !raw.includes('"editorialConversations"') || !raw.includes('"conversationAttachments"')) await this.#write(state);
     }
     catch (error) {
       if (error.code !== "ENOENT") throw error;
-      await this.#write(EMPTY);
+      const initialState = structuredClone(EMPTY);
+      ensureDefaultWorkspaceCollection(initialState);
+      await this.#write(initialState);
     }
   }
 

@@ -6,7 +6,10 @@ export type ChatTarget = {
   id: string; name: string; type: "social" | "magazine"; description: string; scope: string;
   styleSummary: string; formats: string[]; selectable: boolean;
 };
+export type ChatWorkspace = { id: string; name: string; createdAt?: string };
 type Attachment = { id: string; originalName?: string; name?: string; kind?: string; mimeType?: string; sizeBytes?: number };
+type BrandProfile = { voice?: string; audience?: string; approvedFacts?: string; avoid?: string };
+type BrandRecord = { id: string; name: string; clientId?: string | null; profile?: BrandProfile };
 type OriginalityFinding = {
   recordId?: string; title?: string; contentType?: string; matchType: string; similarity: number; identityRelationship?: string;
 };
@@ -31,7 +34,7 @@ type DraftResult = {
 type ChatMessage = { id: string; role?: string; content?: string; createdAt?: string; targetId?: string; result?: DraftResult; attachments?: Attachment[] };
 type RunStep = { id: string; label: string; status: "pending" | "running" | "completed" | "skipped" | "needs-review" | "failed"; note?: string };
 type ActiveRun = { id: string; status: "queued" | "running" | "completed" | "failed" | "cancelled"; metadata?: { steps?: RunStep[]; totalSteps?: number; completedSteps?: number } };
-type Conversation = { id: string; title?: string; updatedAt?: string; createdAt?: string; messages?: ChatMessage[]; targetId?: string; targetName?: string; clientName?: string; brandName?: string; activeRun?: ActiveRun | null };
+type Conversation = { id: string; title?: string; updatedAt?: string; createdAt?: string; messages?: ChatMessage[]; targetId?: string; targetName?: string; clientId?: string; clientName?: string; brandId?: string; brandName?: string; activeRun?: ActiveRun | null };
 type PendingFile = { file: File; preview: string };
 
 const ACCEPTED_TYPES = new Set([
@@ -40,19 +43,20 @@ const ACCEPTED_TYPES = new Set([
 ]);
 const ACCEPTED_EXTENSIONS = /\.(jpe?g|png|webp|mp4|webm|pdf|docx|txt|md)$/i;
 
-export default function EditorialChatWorkspace({ apiBase, token, workspaceId, locale, targets, onOpenSettings, onPrepareBrowser, openConversationId, onConversationOpened }: {
+export default function EditorialChatWorkspace({ apiBase, token, workspaceId, workspaceName, workspaces, workspaceBusy = false, workspaceNotice = "", onWorkspaceChange, onCreateWorkspace, locale, targets, onOpenSettings, onPrepareBrowser, openConversationId, onConversationOpened }: {
   apiBase: string; token: string; workspaceId: string; locale: "ar" | "en"; targets: ChatTarget[]; onOpenSettings: () => void; onPrepareBrowser?: (draft: EditorialChatBrowserDraft) => void;
+  workspaceName: string; workspaces: ChatWorkspace[]; workspaceBusy?: boolean; workspaceNotice?: string; onWorkspaceChange: (workspaceId: string) => void; onCreateWorkspace: () => void;
   openConversationId?: string | null; onConversationOpened?: () => void;
 }) {
   const ar = locale === "ar";
   const t = ar ? {
-    history: "سجل المحادثات", newChat: "محادثة جديدة", search: "ابحث في الوجهات...", choose: "اختر منصة أو مجلة",
+    workspace: "مساحة العمل", switchWorkspace: "تغيير مساحة العمل", newWorkspace: "إنشاء مساحة عمل", history: "سجل المحادثات", newChat: "محادثة جديدة", search: "ابحث في الوجهات...", choose: "اختر منصة أو مجلة",
     emptyTitle: "ما الذي تريد إنجازه؟", emptySub: "ابدأ بطلبك مباشرة أو اختر مثالاً جاهزاً وعدّله. حدّد الوجهة وأرفق الملفات عند الحاجة.", startersTitle: "ابدأ من مثال", starterArticle: "كتابة مقال", starterArticleHint: "مقال منظم قابل للمراجعة", starterPost: "منشور مهني", starterPostHint: "فكرة واضحة لجمهور LinkedIn", starterVideo: "سيناريو فيديو", starterVideoHint: "خطاف ومشاهد ونص شاشة", starterNewsletter: "نشرة تحريرية", starterNewsletterHint: "مقدمة ومحتوى موجّه للقراء",
     placeholder: "اكتب ما تريد صياغته أو تطويره...", send: "إرسال", attach: "إرفاق ملفات", noHistory: "لا توجد محادثات بعد.",
     settings: "أدخل رمز الوصول من الإعدادات لاستخدام المحادثات.", goSettings: "فتح الإعدادات", loading: "جارٍ التحميل...",
     social: "منصات اجتماعية", magazine: "مجلات ومواقع نشر", target: "الوجهة التحريرية", noTargets: "لا توجد وجهات مطابقة.",
     error: "تعذّر إكمال الطلب. حاول مجدداً.", scope: "النطاق", style: "الأسلوب", formats: "الصيغ", identity: "سياق العميل والعلامة",
-    client: "العميل (اختياري)", brand: "العلامة (اختياري)", identityHint: "يُستخدم هذا السياق لفحص التكرار داخل مساحة العمل.",
+    client: "العميل (اختياري)", brand: "العلامة (اختياري)", identityHint: "يُستخدم هذا السياق لفحص التكرار داخل مساحة العمل.", brandVoice: "صوت العلامة ونبرتها", brandAudience: "الجمهور المقصود", brandFacts: "حقائق ورسائل معتمدة", brandAvoid: "مصطلحات أو ادعاءات يجب تجنبها", brandGuideHint: "يحفظ الدليل داخل هذه المساحة ويُستخدم كتوجيه أسلوبي، لا كتحقق مستقل من الحقائق.", brandNameRequired: "أدخل اسم العلامة قبل حفظ دليلها.",
     removeFile: "حذف الملف", invalidFile: "نوع الملف غير مدعوم. استخدم صورة أو فيديو MP4/WebM أو PDF أو DOCX أو TXT.", fileLimit: "الحد الأعلى 10 مرفقات في الرسالة الواحدة.", download: "تنزيل المرفق",
     uploading: "جارٍ رفع الملفات...", run: "مسار التحرير", queued: "قيد الانتظار", running: "جارٍ العمل", completed: "اكتمل",
     failed: "تعذر الإكمال", cancelled: "أُلغي", pending: "بانتظار التنفيذ", skipped: "لم يُنفّذ", needsReview: "يتطلب مراجعة",
@@ -62,13 +66,13 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
     wait: "انتظر اكتمال المسار الحالي قبل إرسال طلب آخر.", noTarget: "اختر منصة أو مجلة أولاً.", noClient: "غير محدد", openSettings: "إعداد النموذج يتم على الخادم، لا في هذه الشاشة.",
     note: "المسودة لا تُنشر تلقائياً. البحث والكشط الخارجي غير منفّذين في هذه المرحلة.", start: "ابدأ التحرير", runningNote: "تظهر الخطوات المنفذة والمتخطاة بوضوح؛ لا يتم النشر من هنا.", browserHandoff: "المتابعة في المتصفح", browserHandoffHint: "تسجيل الدخول والإدراج اختياريان؛ لن يُضغط زر النشر.", taskBrief: "ملخص المهمة", editRequest: "تعديل الطلب كمتابعة", retry: "إعادة المحاولة", followUp: "متابعة وتطوير", downloadDraft: "تنزيل المسودة", savedLocally: "حُفظت المسودة في مكتبة مساحة العمل.", stopRun: "إيقاف المهمة"
   } : {
-    history: "Conversation history", newChat: "New conversation", search: "Search destinations...", choose: "Choose a platform or magazine",
+    workspace: "Workspace", switchWorkspace: "Switch workspace", newWorkspace: "Create workspace", history: "Conversation history", newChat: "New conversation", search: "Search destinations...", choose: "Choose a platform or magazine",
     emptyTitle: "What do you want to accomplish?", emptySub: "Start with your own request or choose an editable example. Select a destination and attach files when useful.", startersTitle: "Start from an example", starterArticle: "Write an article", starterArticleHint: "A structured, review-ready article", starterPost: "Professional post", starterPostHint: "A focused idea for LinkedIn", starterVideo: "Video script", starterVideoHint: "Hook, scenes and on-screen text", starterNewsletter: "Editorial newsletter", starterNewsletterHint: "A reader-focused opening and body",
     placeholder: "Describe what you want to create or adapt...", send: "Send", attach: "Attach files", noHistory: "No conversations yet.",
     settings: "Add the workspace access key in Settings to use conversations.", goSettings: "Open settings", loading: "Loading...",
     social: "Social platforms", magazine: "Magazines & publishers", target: "Editorial destination", noTargets: "No matching destinations.",
     error: "The request failed. Please try again.", scope: "Scope", style: "Style", formats: "Formats", identity: "Client and brand context",
-    client: "Client (optional)", brand: "Brand (optional)", identityHint: "This context scopes duplicate checks within the workspace.",
+    client: "Client (optional)", brand: "Brand (optional)", identityHint: "This context scopes duplicate checks within the workspace.", brandVoice: "Brand voice and tone", brandAudience: "Intended audience", brandFacts: "Approved facts and messages", brandAvoid: "Terms or claims to avoid", brandGuideHint: "Saved within this workspace and used as style guidance, not independent fact verification.", brandNameRequired: "Enter a brand name before saving its guidance.",
     removeFile: "Remove file", invalidFile: "Unsupported file type. Use an image, MP4/WebM video, PDF, DOCX, or TXT.", fileLimit: "A message can contain at most 10 attachments.", download: "Download attachment",
     uploading: "Uploading files...", run: "Editorial workflow", queued: "Queued", running: "Working", completed: "Completed",
     failed: "Could not complete", cancelled: "Cancelled", pending: "Pending", skipped: "Not run", needsReview: "Needs review",
@@ -85,6 +89,11 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
   const [targetId, setTargetId] = useState("");
   const [clientName, setClientName] = useState("");
   const [brandName, setBrandName] = useState("");
+  const [brandVoice, setBrandVoice] = useState("");
+  const [brandAudience, setBrandAudience] = useState("");
+  const [brandFacts, setBrandFacts] = useState("");
+  const [brandAvoid, setBrandAvoid] = useState("");
+  const [workspaceBrands, setWorkspaceBrands] = useState<BrandRecord[]>([]);
   const [identityOpen, setIdentityOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -107,6 +116,24 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
     if (!response.ok) throw new Error(typeof payload.error === "string" ? payload.error : errorText);
     return payload;
   }, [token, errorText]);
+
+  useEffect(() => {
+    if (!token.trim()) { setWorkspaceBrands([]); return; }
+    let cancelled = false;
+    request(`${apiBase.replace(/\/$/, "")}/api/v1/workspaces/${encodeURIComponent(workspaceId)}/brands`)
+      .then(data => { if (!cancelled) setWorkspaceBrands(Array.isArray(data.brands) ? data.brands : []); })
+      .catch(() => { if (!cancelled) setWorkspaceBrands([]); });
+    return () => { cancelled = true; };
+  }, [apiBase, workspaceId, token, request]);
+
+  useEffect(() => {
+    const normalized = brandName.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase();
+    const saved = normalized ? workspaceBrands.find(item => item.name.normalize("NFKC").trim().replace(/\s+/g, " ").toLocaleLowerCase() === normalized) : null;
+    setBrandVoice(saved?.profile?.voice || "");
+    setBrandAudience(saved?.profile?.audience || "");
+    setBrandFacts(saved?.profile?.approvedFacts || "");
+    setBrandAvoid(saved?.profile?.avoid || "");
+  }, [brandName, workspaceBrands]);
 
   const loadList = useCallback(async () => {
     if (!token.trim()) return;
@@ -255,18 +282,24 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
     event.preventDefault();
     if (busy || (!content.trim() && files.length === 0) || !token.trim()) return;
     if (!targetId) { setNotice(t.noTarget); setPickerOpen(true); return; }
+    if (!conversation && !brandName.trim() && [brandVoice, brandAudience, brandFacts, brandAvoid].some(value => value.trim())) { setNotice(t.brandNameRequired); setIdentityOpen(true); return; }
     if (conversation?.activeRun && ["queued", "running"].includes(conversation.activeRun.status)) { setNotice(t.wait); return; }
     setBusy(true); setNotice("");
     try {
       let active = conversation;
       if (!active) {
+        const profile: BrandProfile = { voice: brandVoice.trim(), audience: brandAudience.trim(), approvedFacts: brandFacts.trim(), avoid: brandAvoid.trim() };
+        const hasProfile = Object.values(profile).some(value => value);
         const created = await request(base, {
           method: "POST", headers: { "content-type": "application/json" },
-          body: JSON.stringify({ targetId, language: locale, clientName: clientName.trim() || undefined, brandName: brandName.trim() || undefined })
+          body: JSON.stringify({ targetId, language: locale, clientName: clientName.trim() || undefined, brandName: brandName.trim() || undefined, ...(hasProfile ? { brandProfile: profile } : {}) })
         });
         active = created.conversation || created;
         if (!active?.id) throw new Error(errorText);
         setConversation(active);
+        if (active.brandId && active.brandName && hasProfile) {
+          setWorkspaceBrands(current => [...current.filter(item => item.id !== active!.brandId), { id: active!.brandId!, name: active!.brandName!, clientId: active!.clientId, profile }]);
+        }
       }
       const attachmentIds: string[] = [];
       for (const item of files) {
@@ -307,6 +340,27 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
 
   return <section className="editorial-chat-workspace" dir={ar ? "rtl" : "ltr"}>
     <aside className="editorial-chat-history">
+      <section className="editorial-chat-workspace-picker" aria-label={t.workspace}>
+        <div className="editorial-chat-workspace-picker-heading"><span className="editorial-chat-workspace-glyph">W</span><div><small>{t.workspace}</small><b>{workspaceName}</b></div><ChevronDown size={15}/></div>
+        <label className="editorial-chat-workspace-select-label"><span className="editorial-chat-sr-only">{t.switchWorkspace}</span><select value={workspaceId} onChange={event => onWorkspaceChange(event.target.value)} disabled={busy || loading || workspaceBusy} aria-label={t.switchWorkspace}>{workspaces.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <button className="editorial-chat-create-workspace" type="button" onClick={onCreateWorkspace} disabled={busy || loading || workspaceBusy}><Plus size={16}/>{t.newWorkspace}</button>
+        {workspaceNotice && <p className="editorial-chat-workspace-notice" role="status">{workspaceNotice}</p>}
+      </section>
+      <section className="editorial-chat-context-panel">
+        <label className="editorial-chat-target-label">{t.target}</label>
+        <div className="editorial-chat-target-picker">
+          <button type="button" aria-expanded={pickerOpen} disabled={busy || loading} onClick={() => { setIdentityOpen(false); setPickerOpen(value => !value); }}><span>{selectedTarget?.name || t.choose}</span><ChevronDown size={16}/></button>
+          {pickerOpen && <div className="editorial-chat-target-menu"><div className="editorial-chat-target-search"><Search size={15}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder={t.search} disabled={busy || loading}/></div>
+            {visibleTargets.length ? (["social", "magazine"] as const).map(type => {
+              const group = visibleTargets.filter(target => target.type === type);
+              if (!group.length) return null;
+              return <div className="editorial-chat-target-group" key={type}><h3>{type === "social" ? t.social : t.magazine}{group.length > 0 && <small> · {group.length}</small>}</h3>{group.map(target => <button type="button" key={target.id} className="editorial-chat-target-option" disabled={busy || loading} onClick={() => { setTargetId(target.id); setPickerOpen(false); }}><span className="editorial-chat-target-option-heading">{target.name}{targetId === target.id && <Check size={14}/>}</span><span>{target.description}</span><small>{t.scope}: {target.scope}</small><small>{t.style}: {target.styleSummary}</small>{target.formats.length > 0 && <small>{t.formats}: {target.formats.join(" · ")}</small>}</button>)}</div>;
+            }) : <p className="editorial-chat-muted">{t.noTargets}</p>}
+          </div>}
+        </div>
+        <button type="button" className={`editorial-chat-identity-toggle${identityOpen ? " is-open" : ""}`} onClick={() => { setPickerOpen(false); setIdentityOpen(value => !value); }} disabled={busy || loading}><Sparkles size={15}/>{t.identity}<ChevronDown size={14}/></button>
+        {identityOpen && <div className="editorial-chat-identity-panel"><label>{t.client}<input value={clientName} disabled={Boolean(conversation)} onChange={event => setClientName(event.target.value)} maxLength={120}/></label><label>{t.brand}<input value={brandName} disabled={Boolean(conversation)} onChange={event => setBrandName(event.target.value)} maxLength={120}/></label><div className="editorial-chat-brand-profile"><label>{t.brandVoice}<textarea value={brandVoice} disabled={Boolean(conversation)} onChange={event => setBrandVoice(event.target.value)} maxLength={1600} rows={2}/></label><label>{t.brandAudience}<textarea value={brandAudience} disabled={Boolean(conversation)} onChange={event => setBrandAudience(event.target.value)} maxLength={1200} rows={2}/></label><label>{t.brandFacts}<textarea value={brandFacts} disabled={Boolean(conversation)} onChange={event => setBrandFacts(event.target.value)} maxLength={2400} rows={3}/></label><label>{t.brandAvoid}<textarea value={brandAvoid} disabled={Boolean(conversation)} onChange={event => setBrandAvoid(event.target.value)} maxLength={1200} rows={2}/></label><small>{t.brandGuideHint}</small></div><small>{t.identityHint}{conversation ? (ar ? " لبدء سياق مختلف، أنشئ محادثة جديدة." : " Start a new conversation to use a different identity.") : ""}</small></div>}
+      </section>
       <div className="editorial-chat-history-heading"><h2>{t.history}</h2><button type="button" onClick={startNew} disabled={busy || loading} aria-label={t.newChat}><Plus size={18}/></button></div>
       <button className="editorial-chat-new-button" type="button" onClick={startNew} disabled={busy || loading}><Plus size={16}/>{t.newChat}</button>
       <nav className="editorial-chat-conversation-list" aria-label={t.history}>
@@ -315,21 +369,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, lo
       <button type="button" className="editorial-chat-settings-button" onClick={onOpenSettings} disabled={busy || loading}><Settings size={16}/>{ar ? "الإعدادات" : "Settings"}</button>
     </aside>
     <main className="editorial-chat-main">
-      <header className="editorial-chat-toolbar">
-        <label className="editorial-chat-target-label">{t.target}</label>
-        <div className="editorial-chat-target-picker">
-          <button type="button" aria-expanded={pickerOpen} disabled={busy || loading} onClick={() => setPickerOpen(value => !value)}><span>{selectedTarget?.name || t.choose}</span><ChevronDown size={16}/></button>
-          {pickerOpen && <div className="editorial-chat-target-menu"><div className="editorial-chat-target-search"><Search size={15}/><input value={query} onChange={event => setQuery(event.target.value)} placeholder={t.search} disabled={busy || loading}/></div>
-            {visibleTargets.length ? (["social", "magazine"] as const).map(type => {
-              const group = visibleTargets.filter(target => target.type === type);
-              if (!group.length) return null;
-              return <div className="editorial-chat-target-group" key={type}><h3>{type === "social" ? t.social : t.magazine}</h3>{group.map(target => <button type="button" key={target.id} className="editorial-chat-target-option" disabled={busy || loading} onClick={() => { setTargetId(target.id); setPickerOpen(false); }}><span className="editorial-chat-target-option-heading">{target.name}{targetId === target.id && <Check size={14}/>}</span><span>{target.description}</span><small>{t.scope}: {target.scope}</small><small>{t.style}: {target.styleSummary}</small>{target.formats.length > 0 && <small>{t.formats}: {target.formats.join(" · ")}</small>}</button>)}</div>;
-            }) : <p className="editorial-chat-muted">{t.noTargets}</p>}
-          </div>}
-        </div>
-        <button type="button" className={`editorial-chat-identity-toggle${identityOpen ? " is-open" : ""}`} onClick={() => setIdentityOpen(value => !value)} disabled={busy || loading}><Sparkles size={15}/>{t.identity}<ChevronDown size={14}/></button>
-        {identityOpen && <div className="editorial-chat-identity-panel"><label>{t.client}<input value={clientName} disabled={Boolean(conversation)} onChange={event => setClientName(event.target.value)} maxLength={120}/></label><label>{t.brand}<input value={brandName} disabled={Boolean(conversation)} onChange={event => setBrandName(event.target.value)} maxLength={120}/></label><small>{t.identityHint}{conversation ? (ar ? " لبدء سياق مختلف، أنشئ محادثة جديدة." : " Start a new conversation to use a different identity.") : ""}</small></div>}
-      </header>
+      <header className="editorial-chat-main-heading"><div><small>EDITORIAL AGENT</small><h1>{ar ? "الدردشة" : "Conversation"}</h1></div><span className="editorial-chat-active-target">{selectedTarget?.name || t.choose}</span></header>
       <div className="editorial-chat-message-area">
         {loading && <p className="editorial-chat-loading"><LoaderCircle size={16}/>{t.loading}</p>}
         {!loading && messages.length === 0 && <div className="editorial-chat-empty"><div className="editorial-chat-empty-icon"><Sparkles size={24}/></div><h1>{t.emptyTitle}</h1><p>{t.emptySub}</p>{!selectedTarget && <button type="button" className="editorial-chat-empty-select" onClick={() => setPickerOpen(true)}>{t.choose}<ChevronDown size={15}/></button>}<section className="editorial-chat-starters" aria-label={t.startersTitle}><div className="editorial-chat-starters-heading">{t.startersTitle}</div><div className="editorial-chat-starter-grid"><button type="button" className="editorial-chat-starter" onClick={() => useStarter("wordpress", ar ? "اكتب مقالاً تحريرياً منظماً حول [الموضوع]. ابدأ بعنوان ومقدمة واضحة، ثم أقسام مترابطة وخاتمة. ميّز الحقائق التي تحتاج إلى مصادر، ولا تخترع أرقاماً أو اقتباسات." : "Write a structured editorial article about [topic]. Include a clear title, introduction, connected sections and conclusion. Flag facts that need sources; do not invent figures or quotes.")}><span><Newspaper size={18}/></span><b>{t.starterArticle}</b><small>{t.starterArticleHint}</small></button><button type="button" className="editorial-chat-starter" onClick={() => useStarter("linkedin", ar ? "أنشئ منشوراً مهنياً على LinkedIn حول [الفكرة] لجمهور [الجمهور]. افتتح برؤية محددة، اشرحها بإيجاز، واختم بسؤال نقاش طبيعي." : "Create a professional LinkedIn post about [idea] for [audience]. Open with a specific insight, explain it concisely, and end with a natural discussion question.")}><span><MessagesSquare size={18}/></span><b>{t.starterPost}</b><small>{t.starterPostHint}</small></button><button type="button" className="editorial-chat-starter" onClick={() => useStarter("tiktok", ar ? "اكتب سيناريو فيديو قصير عن [الموضوع] لجمهور [الجمهور]. قدّم خطافاً لأول 3 ثوانٍ، ثم مشاهد متسلسلة مع نص الشاشة والتعليق الصوتي ودعوة واحدة للتفاعل." : "Write a short-video script about [topic] for [audience]. Provide a hook for the first 3 seconds, then sequenced scenes with on-screen text, voiceover and one call to action.")}><span><Video size={18}/></span><b>{t.starterVideo}</b><small>{t.starterVideoHint}</small></button><button type="button" className="editorial-chat-starter" onClick={() => useStarter("substack", ar ? "اكتب مسودة نشرة تحريرية حول [الموضوع] موجّهة إلى [الجمهور]. اقترح عنواناً واضحاً، ومقدمة مباشرة، ومحتوى مفيداً منظماً، وخاتمة تدعو إلى متابعة النقاش." : "Draft an editorial newsletter about [topic] for [audience]. Suggest a clear subject, direct opening, useful structured body and a closing that invites further discussion.")}><span><Mail size={18}/></span><b>{t.starterNewsletter}</b><small>{t.starterNewsletterHint}</small></button></div></section></div>}
