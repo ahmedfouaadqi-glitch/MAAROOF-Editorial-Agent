@@ -1,0 +1,3 @@
+# Imported skill source is preserved verbatim; its original trailing spaces are intentional.
+skills/source/*.md whitespace=-blank-at-eol
+skills/library/**/SKILL.md whitespace=-blank-at-eol

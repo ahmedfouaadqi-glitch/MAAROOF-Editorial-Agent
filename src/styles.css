@@ -528,3 +528,18 @@ body:has(.app-shell.theme-dark){background:#10100F}
 .editorial-chat-brand-profile textarea{width:100%;min-height:45px;resize:vertical;padding:7px 8px;border:1px solid var(--line);border-radius:7px;background:var(--surface);color:var(--text-strong);font:inherit;font-size:8px;line-height:1.55}
 .editorial-chat-brand-profile textarea:disabled{opacity:.65;cursor:not-allowed}
 .editorial-chat-brand-profile small{color:var(--muted);font-size:7px;line-height:1.6}
+
+
+/* Skill routing: expose the automatic choice and its integration boundary without crowding drafts. */
+.editorial-chat-skill-list{display:grid;gap:7px;margin:0 0 12px;padding:10px 12px;border:1px solid var(--line-strong);border-inline-start:3px solid var(--accent-strong);border-radius:10px;background:var(--surface-soft);color:var(--text-strong)}
+.editorial-chat-skill-list> b{font-size:10px}
+.editorial-chat-skill-item{display:grid;gap:4px;padding-top:6px;border-top:1px solid var(--line)}
+.editorial-chat-skill-item>div{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.editorial-chat-skill-item code{color:var(--text-strong);font:700 9px ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}
+.editorial-chat-skill-status{padding:3px 6px;border:1px solid var(--line-strong);border-radius:999px;background:var(--surface);color:var(--muted-strong);font-size:8px;font-weight:700}
+.editorial-chat-skill-status.skill-blocked_on_integration{border-color:#a76332;color:#81471d}
+.editorial-chat-skill-status.skill-guidance_only{border-color:#b38b1b;color:#7a5a00}
+.editorial-chat-skill-item p,.editorial-chat-skill-item small{margin:0;color:var(--muted-strong);font-size:8px;line-height:1.6}
+.editorial-chat-skill-item p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere}
+.editorial-chat-skill-item small{color:var(--muted);overflow-wrap:anywhere}
+@media(max-width:760px){.editorial-chat-skill-list{padding:8px 9px}.editorial-chat-skill-item>div{align-items:flex-start}.editorial-chat-skill-status{font-size:7px}}
