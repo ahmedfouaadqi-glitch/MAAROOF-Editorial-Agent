@@ -34,7 +34,7 @@ function ipv6Number(value) {
   if (groups.length !== 8 || groups.some(x => !/^[0-9a-f]{1,4}$/.test(x))) return null;
   return BigInt("0x" + groups.map(x => x.padStart(4, "0")).join(""));
 }
-function isPublicIp(address) {
+export function isPublicIp(address) {
   const family = isIP(address);
   if (family === 4) {
     return ![
@@ -74,7 +74,7 @@ function hostAllowed(host, approvedHosts) {
 export async function validatePublicUrl(input, approvedHosts, { resolveHost = lookup, requireApprovedHost = true } = {}) {
   let url;
   try { url = new URL(input); } catch { fail("A valid destination URL is required", 400); }
-  if (url.protocol !== "https:" || url.username || url.password) fail("Browser publishing accepts HTTPS URLs without embedded credentials only", 400);
+  if (url.protocol !== "https:" || url.username || url.password || (url.port && url.port !== "443")) fail("Browser publishing accepts credential-free HTTPS URLs on port 443 only", 400);
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (requireApprovedHost && !hostAllowed(host, approvedHosts)) fail("Navigation is outside the approved destination hosts", 403);
   if (isIP(host)) {
@@ -96,10 +96,20 @@ const SAFE_KEYS = new Set(["Enter", "Tab", "Escape", "Backspace", "Delete", "Arr
 const MAX_TEXT = 200_000;
 
 export class BrowserSessionManager {
-  constructor({ chromium, resolveHost = lookup, now = () => Date.now(), ttlMs = 60 * 60 * 1000, maxSessionsPerWorkspace = 2 }) {
+  constructor({ chromium, resolveHost = lookup, egressProxyUrl = null, now = () => Date.now(), ttlMs = 60 * 60 * 1000, maxSessionsPerWorkspace = 2 }) {
     if (!chromium || typeof chromium.launch !== "function") throw new Error("Playwright Chromium is required");
     this.chromium = chromium;
     this.resolveHost = resolveHost;
+    if (egressProxyUrl !== null) {
+      let proxy;
+      try { proxy = new URL(egressProxyUrl); } catch { throw new Error("Egress proxy URL is invalid."); }
+      if (proxy.protocol !== "http:" || proxy.hostname !== "127.0.0.1" || !proxy.port || proxy.username || proxy.password || proxy.pathname !== "/" || proxy.search || proxy.hash) {
+        throw new Error("Playwright egress proxy must be an HTTP origin on 127.0.0.1.");
+      }
+      this.egressProxyUrl = proxy.origin;
+    } else {
+      this.egressProxyUrl = null;
+    }
     this.now = now;
     this.ttlMs = ttlMs;
     this.maxSessionsPerWorkspace = maxSessionsPerWorkspace;
@@ -117,7 +127,13 @@ export class BrowserSessionManager {
     try {
       const hosts = normalizeAllowedHosts(approvedHosts);
       const target = await validatePublicUrl(startUrl, hosts, { resolveHost: this.resolveHost });
-      const browser = await this.chromium.launch({ headless: true });
+      const browser = await this.chromium.launch({
+        headless: true,
+        ...(this.egressProxyUrl ? {
+          proxy: { server: this.egressProxyUrl, bypass: "" },
+          args: ["--disable-quic", "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"]
+        } : {})
+      });
       try {
         const context = await browser.newContext({
           viewport: { width: 1440, height: 1000 },

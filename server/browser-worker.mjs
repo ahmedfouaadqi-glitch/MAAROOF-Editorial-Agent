@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import { BrowserSessionManager } from "./browser-runtime.mjs";
 import { createRequestLimiter } from "./request-limiter.mjs";
+import { createLocalEgressProxy } from "./egress-proxy.mjs";
 
 const host = process.env.BROWSER_AGENT_HOST || "127.0.0.1";
 const port = Number(process.env.BROWSER_AGENT_PORT || 8788);
@@ -66,7 +67,9 @@ async function main() {
   const expectedTokenDigest = createHash("sha256").update(token).digest();
   const limiter = createRequestLimiter({ limits: { read: 240, write: 60 }, maxEntries: 10_000 });
   const { chromium } = await import("playwright");
-  const manager = new BrowserSessionManager({ chromium });
+  const egressProxy = createLocalEgressProxy();
+  const egressProxyUrl = await egressProxy.listen();
+  const manager = new BrowserSessionManager({ chromium, egressProxyUrl });
   let pendingSessionCreations = 0;
   let stopping = false;
 
@@ -84,7 +87,7 @@ async function main() {
 
       const url = new URL(req.url || "/", `http://${req.headers.host || "127.0.0.1"}`);
       if (req.method === "GET" && url.pathname === "/health") {
-        return send(res, 200, { ok: true, service: "maaroof-browser-agent", engine: "playwright-chromium" });
+        return send(res, 200, { ok: true, service: "maaroof-browser-agent", engine: "playwright-chromium", egress: "loopback-ip-pinned-connect" });
       }
       if (!tokenMatches(req, expectedTokenDigest)) return send(res, 401, { error: "Unauthorized" });
       if (req.method === "OPTIONS") return send(res, 405, { error: "Method not allowed" });
@@ -137,6 +140,7 @@ async function main() {
     stopping = true;
     clearInterval(cleanup);
     await Promise.all([...manager.sessions.values()].map(session => manager.close(session.id, session.workspaceId)));
+    await egressProxy.close();
     server.close(() => process.exit(0));
   };
   process.on("SIGINT", stop);

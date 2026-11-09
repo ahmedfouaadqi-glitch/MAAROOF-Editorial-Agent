@@ -40,6 +40,7 @@ describe("Browser Agent runtime", () => {
   it("requires HTTPS and a destination-approved hostname", async () => {
     await expect(validatePublicUrl("http://publisher.example", ["publisher.example"], { resolveHost: publicDns })).rejects.toMatchObject({ status: 400 });
     await expect(validatePublicUrl("https://other.example", ["publisher.example"], { resolveHost: publicDns })).rejects.toMatchObject({ status: 403 });
+    await expect(validatePublicUrl("https://publisher.example:8443", ["publisher.example"], { resolveHost: publicDns })).rejects.toMatchObject({ status: 400 });
   });
 
   it("blocks hostnames resolving to private addresses", async () => {
@@ -58,6 +59,20 @@ describe("Browser Agent runtime", () => {
     expect(session).toMatchObject({ workspaceId: "workspace-a", destinationId: "destination-a", state: "waiting-for-user" });
     expect(session).not.toHaveProperty("context");
     expect(session).not.toHaveProperty("browser");
+  });
+
+  it("launches Chromium through the validated local egress proxy", async () => {
+    const fake = fakeChromium();
+    const manager = new BrowserSessionManager({ chromium: fake.chromium, resolveHost: publicDns, egressProxyUrl: "http://127.0.0.1:9876" });
+    await manager.create({
+      workspaceId: "workspace-a", destinationId: "destination-a",
+      startUrl: "https://publisher.example/editor", approvedHosts: ["publisher.example"]
+    });
+    expect(fake.chromium.launch).toHaveBeenCalledWith({
+      headless: true,
+      proxy: { server: "http://127.0.0.1:9876", bypass: "" },
+      args: ["--disable-quic", "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"]
+    });
   });
 
   it("limits concurrent sessions per workspace", async () => {
