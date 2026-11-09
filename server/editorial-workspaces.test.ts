@@ -4,9 +4,12 @@ import {
   ensureDefaultWorkspaceCollection, listEditorialWorkspaces
 } from "./editorial-workspaces.mjs";
 
+type WorkspaceFixture = { id: string; name: string; nameAr?: string; nameEn?: string; createdAt: string; updatedAt: string };
+type WorkspaceState = { tasks?: { retained?: { id: string } }; workspaces?: WorkspaceFixture[] };
+
 describe("editorial workspaces", () => {
   it("migrates a legacy store to a default workspace without replacing existing data", () => {
-    const state = { tasks: { retained: { id: "retained" } } } as Record<string, any>;
+    const state = { tasks: { retained: { id: "retained" } } } as WorkspaceState;
     expect(ensureDefaultWorkspaceCollection(state, "2026-01-01T00:00:00.000Z")).toBe(true);
     expect(state.workspaces).toEqual([{
       id: DEFAULT_WORKSPACE_ID, name: DEFAULT_WORKSPACE_NAME,
@@ -17,7 +20,7 @@ describe("editorial workspaces", () => {
   });
 
   it("creates a normalized workspace and lists it alongside the default", () => {
-    const state: Record<string, any> = { workspaces: [] };
+    const state: WorkspaceState = { workspaces: [] };
     const created = createEditorialWorkspace(state, { name: "  Brand   Studio  " });
     expect(created.id).toMatch(/^ws-[0-9a-f-]{36}$/i);
     expect(created.name).toBe("Brand Studio");
@@ -26,7 +29,7 @@ describe("editorial workspaces", () => {
   });
 
   it("rejects duplicate names after Unicode and whitespace normalization", () => {
-    const state: Record<string, any> = { workspaces: [] };
+    const state: WorkspaceState = { workspaces: [] };
     createEditorialWorkspace(state, { name: "Brand Studio" });
     expect(() => createEditorialWorkspace(state, { name: " brand   studio " })).toThrow(/already exists/i);
   });

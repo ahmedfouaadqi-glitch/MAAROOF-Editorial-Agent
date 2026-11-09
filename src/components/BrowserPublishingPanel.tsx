@@ -13,7 +13,42 @@ type BrowserSession = {
   createdAt:string; expiresAt:string; updatedAt?:string; lastError?:string|null
 };
 type Screenshot = {contentType:string;base64:string};
-const keys=["Enter","Tab","Escape","Backspace","Delete","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Home","End","Space"];
+const keys=["Enter","Tab","Escape","Backspace","Delete","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Home","End","Space"] as const;
+type BrowserKey = typeof keys[number];
+const browserKeySet = new Set<string>(keys);
+function isBrowserKey(value:string):value is BrowserKey{return browserKeySet.has(value);}
+type BrowserAction =
+  | {type:"click";x:number;y:number}
+  | {type:"type"|"paste";text:string}
+  | {type:"press";key:BrowserKey}
+  | {type:"scroll";deltaY:number}
+  | {type:"navigate";url:string}
+  | {type:"fill";selector:string;value:string};
+type JsonRecord = Record<string,unknown>;
+function isRecord(value:unknown):value is JsonRecord{return typeof value==="object"&&value!==null&&!Array.isArray(value);}
+function record(value:unknown,label:string):JsonRecord{if(!isRecord(value))throw new Error(`Invalid ${label} response`);return value;}
+function stringField(value:JsonRecord,key:string,label:string):string{const field=value[key];if(typeof field!=="string")throw new Error(`Invalid ${label} response`);return field;}
+function parseDestination(value:unknown):Destination{
+  const item=record(value,"destination"),selectors=record(item.selectors,"destination selectors");
+  if(!Array.isArray(item.approvedHosts)||!item.approvedHosts.every(host=>typeof host==="string")||!Array.isArray(item.limitations)||!item.limitations.every(note=>typeof note==="string"))throw new Error("Invalid destination lists");
+  if(typeof item.automaticPublishEnabled!=="boolean"||typeof item.authorityConfirmed!=="boolean"||typeof item.policyReviewed!=="boolean")throw new Error("Invalid destination flags");
+  return {id:stringField(item,"id","destination"),name:stringField(item,"name","destination"),homepage:stringField(item,"homepage","destination"),editorUrl:stringField(item,"editorUrl","destination"),approvedHosts:item.approvedHosts,status:stringField(item,"status","destination"),automaticPublishEnabled:item.automaticPublishEnabled,authorityConfirmed:item.authorityConfirmed,policyReviewed:item.policyReviewed,limitations:item.limitations,selectors:{title:stringField(selectors,"title","destination selectors"),body:stringField(selectors,"body","destination selectors"),imageUpload:stringField(selectors,"imageUpload","destination selectors")}};
+}
+function parseSession(value:unknown):BrowserSession{
+  const item=record(value,"browser session");
+  const updatedAt=item.updatedAt,lastError=item.lastError;
+  if(updatedAt!==undefined&&typeof updatedAt!=="string")throw new Error("Invalid browser session response");
+  if(lastError!==undefined&&lastError!==null&&typeof lastError!=="string")throw new Error("Invalid browser session response");
+  return {id:stringField(item,"id","browser session"),workspaceId:stringField(item,"workspaceId","browser session"),destinationId:stringField(item,"destinationId","browser session"),state:stringField(item,"state","browser session"),currentUrl:stringField(item,"currentUrl","browser session"),title:stringField(item,"title","browser session"),createdAt:stringField(item,"createdAt","browser session"),expiresAt:stringField(item,"expiresAt","browser session"),...(typeof updatedAt==="string"?{updatedAt}:{}),...(typeof lastError==="string"||lastError===null?{lastError}:{})};
+}
+function parseScreenshot(value:unknown):Screenshot{
+  const item=record(value,"browser screenshot"),contentType=stringField(item,"contentType","browser screenshot"),base64=stringField(item,"base64","browser screenshot");
+  if(!["image/jpeg","image/png"].includes(contentType)||base64.length>16_000_000||!/^[A-Za-z0-9+/]*={0,2}$/.test(base64))throw new Error("Invalid browser screenshot response");
+  return {contentType,base64};
+}
+function parseArray<T>(value:unknown,key:string,parse:(item:unknown)=>T):T[]{const item=record(value,"API");if(!Array.isArray(item[key]))throw new Error(`Invalid ${key} response`);return item[key].map(parse);}
+function parseSessionEnvelope(value:unknown):BrowserSession{return parseSession(record(value,"API").session);}
+function apiError(value:unknown,fallback:string):string{return isRecord(value)&&typeof value.error==="string"?value.error:fallback;}
 function sessionStateLabel(state:string,ar:boolean){
   const labels:Record<string,[string,string]>={
     "waiting-for-user":["بانتظار تسجيل الدخول","Waiting for sign-in"],
@@ -38,17 +73,17 @@ export default function BrowserPublishingPanel({apiBase,token,workspaceId,articl
   const [name,setName]=useState("");const [homepage,setHomepage]=useState("");const [editorUrl,setEditorUrl]=useState("");
   const [approvedHosts,setApprovedHosts]=useState("");
   const [authorityConfirmed,setAuthorityConfirmed]=useState(false);const [policyReviewed,setPolicyReviewed]=useState(false);
-  const [typingText,setTypingText]=useState("");const [key,setKey]=useState("Tab");
+  const [typingText,setTypingText]=useState("");const [key,setKey]=useState<BrowserKey>("Tab");
   const [busy,setBusy]=useState(false);const [notice,setNotice]=useState("");
   const readyArticles=articles.filter(article=>article.stage==="ready-to-publish");
   const selectedDestination=destinations.find(item=>item.id===destinationId);
   const sessionDestination=destinations.find(item=>item.id===session?.destinationId);
   const canInsertArticle=Boolean(selectedDestination?.selectors?.title&&selectedDestination?.selectors?.body);
 
-  async function request(path:string,init:RequestInit={}){
+  async function request(path:string,init:RequestInit={}):Promise<unknown>{
     const response=await fetch(apiBase+path,{...init,headers:{authorization:`Bearer ${token}`,...(init.body?{"content-type":"application/json"}:{}),...init.headers}});
-    let payload:any={};try{payload=await response.json();}catch{payload={};}
-    if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
+    let payload:unknown=null;try{payload=await response.json() as unknown;}catch{payload=null;}
+    if(!response.ok)throw new Error(apiError(payload,`HTTP ${response.status}`));
     return payload;
   }
   const destinationsPath=`/api/v1/workspaces/${encodeURIComponent(workspaceId)}/browser-destinations`;
@@ -57,8 +92,8 @@ export default function BrowserPublishingPanel({apiBase,token,workspaceId,articl
     if(!token.trim())return;
     try{
       const [destinationResult,sessionResult]=await Promise.all([request(destinationsPath),request(sessionsPath)]);
-      const nextDestinations:Destination[]=destinationResult.destinations||[];
-      const nextSessions:BrowserSession[]=sessionResult.sessions||[];
+      const nextDestinations=parseArray(destinationResult,"destinations",parseDestination);
+      const nextSessions=parseArray(sessionResult,"sessions",parseSession);
       setDestinations(nextDestinations);setSessions(nextSessions);
       setDestinationId(current=>{
         const targetName=chatDraft?.targetName.trim().toLocaleLowerCase();
@@ -74,13 +109,14 @@ export default function BrowserPublishingPanel({apiBase,token,workspaceId,articl
   async function refreshFrame(sessionId:string){
     const root=`${sessionsPath}/${encodeURIComponent(sessionId)}`;
     const [statusResult,frameResult]=await Promise.all([request(root),request(`${root}/screenshot`)]);
-    setSession(statusResult.session);setScreenshot(frameResult);
-    setSessions(current=>current.map(item=>item.id===sessionId?statusResult.session:item));
+    const nextSession=parseSessionEnvelope(statusResult),nextScreenshot=parseScreenshot(frameResult);
+    setSession(nextSession);setScreenshot(nextScreenshot);
+    setSessions(current=>current.map(item=>item.id===sessionId?nextSession:item));
   }
   useEffect(()=>{
     if(!session?.id||!token.trim())return;
     let active=true;
-    const update=async()=>{try{const root=`${sessionsPath}/${encodeURIComponent(session.id)}`;const [s,f]=await Promise.all([request(root),request(`${root}/screenshot`)]);if(active){setSession(s.session);setScreenshot(f);setSessions(current=>current.map(item=>item.id===session.id?s.session:item));}}catch(error){if(active)setNotice(error instanceof Error?error.message:(ar?"انتهت جلسة المتصفح أو تعذر الاتصال":"Browser session expired or unavailable"));}};
+    const update=async()=>{try{const root=`${sessionsPath}/${encodeURIComponent(session.id)}`;const [s,f]=await Promise.all([request(root),request(`${root}/screenshot`)]);if(active){const nextSession=parseSessionEnvelope(s),nextScreenshot=parseScreenshot(f);setSession(nextSession);setScreenshot(nextScreenshot);setSessions(current=>current.map(item=>item.id===session.id?nextSession:item));}}catch(error){if(active)setNotice(error instanceof Error?error.message:(ar?"انتهت جلسة المتصفح أو تعذر الاتصال":"Browser session expired or unavailable"));}};
     void update();const timer=window.setInterval(()=>void update(),3500);
     return()=>{active=false;window.clearInterval(timer);};
   },[apiBase,token,workspaceId,session?.id]);
@@ -89,7 +125,7 @@ export default function BrowserPublishingPanel({apiBase,token,workspaceId,articl
     event.preventDefault();setBusy(true);setNotice("");
     try{
       const payload=await request(destinationsPath,{method:"POST",body:JSON.stringify({name,homepage,editorUrl,approvedHosts:approvedHosts.split(/[\\s,]+/).map(value=>value.trim()).filter(Boolean),authorityConfirmed,policyReviewed})});
-      const item:Destination=payload.destination;
+      const item=parseDestination(record(payload,"API").destination);
       setDestinations(current=>[item,...current.filter(existing=>existing.id!==item.id)]);setDestinationId(item.id);
       setStep("session");
       setNotice(ar?"حُفظت الوجهة كإعداد غير متحقق؛ لم تُنشر أي مادة.":"Destination saved as operator-declared and unverified; nothing was published.");
@@ -100,18 +136,20 @@ export default function BrowserPublishingPanel({apiBase,token,workspaceId,articl
     if(!destinationId)return;setBusy(true);setNotice("");setScreenshot(null);
     try{
       const payload=await request(sessionsPath,{method:"POST",body:JSON.stringify({destinationId})});
-      setSession(payload.session);setSessions(current=>[payload.session,...current.filter(item=>item.id!==payload.session.id)]);
+      const nextSession=parseSessionEnvelope(payload);
+      setSession(nextSession);setSessions(current=>[nextSession,...current.filter(item=>item.id!==nextSession.id)]);
       setNotice(ar?"فتحت جلسة المتصفح. سجّل الدخول بنفسك؛ لا تُحفظ كلمة المرور ولا يتجاوز النظام MFA أو CAPTCHA.":"Browser session opened. Sign in yourself; passwords are not saved and MFA/CAPTCHA are not bypassed.");
-      await refreshFrame(payload.session.id);
+      await refreshFrame(nextSession.id);
     }catch(error){setNotice(error instanceof Error?error.message:(ar?"تعذر فتح جلسة المتصفح":"Could not open browser session"));}
     finally{setBusy(false);}
   }
-  async function act(action:Record<string,unknown>){
+  async function act(action:BrowserAction){
     if(!session)return false;setBusy(true);setNotice("");
     try{
       const root=`${sessionsPath}/${encodeURIComponent(session.id)}`;
       const payload=await request(`${root}/actions`,{method:"POST",body:JSON.stringify(action)});
-      setSession(payload.session);setSessions(current=>current.map(item=>item.id===session.id?payload.session:item));
+      const nextSession=parseSessionEnvelope(payload);
+      setSession(nextSession);setSessions(current=>current.map(item=>item.id===session.id?nextSession:item));
       await refreshFrame(session.id);
       return true;
     }catch(error){setNotice(error instanceof Error?error.message:(ar?"تعذر تنفيذ الإجراء":"Browser action failed"));}
@@ -135,8 +173,9 @@ export default function BrowserPublishingPanel({apiBase,token,workspaceId,articl
     if(!session||!taskId)return;setBusy(true);setNotice("");
     try{
       const payload=await request(`${sessionsPath}/${encodeURIComponent(session.id)}/fill-article`,{method:"POST",body:JSON.stringify({taskId})});
-      setSession(payload.session);setSessions(current=>current.map(item=>item.id===session.id?payload.session:item));
-      setNotice(payload.note|| (ar?"أُدرج نص المقال المعتمد؛ راجع الصفحة وأكمل الإرسال بنفسك إن رغبت.":"Approved article text inserted; review the page and submit manually if desired."));
+      const result=record(payload,"fill article"),nextSession=parseSession(result.session);
+      setSession(nextSession);setSessions(current=>current.map(item=>item.id===session.id?nextSession:item));
+      setNotice((typeof result.note==="string"&&result.note)|| (ar?"أُدرج نص المقال المعتمد؛ راجع الصفحة وأكمل الإرسال بنفسك إن رغبت.":"Approved article text inserted; review the page and submit manually if desired."));
       await refreshFrame(session.id);
     }catch(error){setNotice(error instanceof Error?error.message:(ar?"تعذر إدراج المقال":"Could not insert article"));}
     finally{setBusy(false);}
@@ -181,7 +220,7 @@ export default function BrowserPublishingPanel({apiBase,token,workspaceId,articl
         {session&&<div className="browser-session-meta"><b>{session.title||sessionStateLabel(session.state,ar)}</b><small>{session.currentUrl}</small><small>{ar?"تنتهي:":"Expires:"} {new Date(session.expiresAt).toLocaleString(ar?"ar-IQ":"en-US")}</small></div>}
         {session&&screenshot&&<div className="browser-remote-frame"><button className="browser-screenshot" type="button" onClick={clickRemote} aria-label={ar?"انقر داخل لقطة المتصفح":"Click inside browser screenshot"}><img src={`data:${screenshot.contentType};base64,${screenshot.base64}`} alt={ar?"لقطة شاشة تفاعلية للمتصفح البعيد":"Interactive remote browser screenshot"}/><span><MousePointer2 size={13}/>{ar?"انقر داخل الصفحة لإدخال المؤشر":"Click the page to focus an element"}</span></button></div>}
         {session&&chatDraft&&<div className="browser-chat-draft"><span className="tiny-overline">{ar?"مسودة المحادثة":"CHAT DRAFT"} · {chatDraft.targetName}</span><p>{ar?`تحقق أن الجلسة المفتوحة «${sessionDestination?.name||"وجهة غير محددة"}» هي ${chatDraft.targetName}. انقر على حقل العنوان أو النص في المعاينة، ثم أدرج الجزء المناسب. لا يحفظ التطبيق ولا ينشر.`:`Confirm the open session “${sessionDestination?.name||"unspecified destination"}” matches ${chatDraft.targetName}. Click the title or body field in the preview, then insert the matching part. Nothing is saved or published.`}</p><div><button className="secondary-button" type="button" disabled={busy||!chatDraft.title.trim()} onClick={()=>void insertChatText(chatDraft.title,ar?"العنوان":"Title")}><Upload size={14}/>{ar?"إدراج العنوان في الحقل المركّز":"Insert title into focused field"}</button><button className="secondary-button" type="button" disabled={busy||!chatDraft.body.trim()} onClick={()=>void insertChatText(chatDraft.body,ar?"المحتوى":"Body")}><Upload size={14}/>{ar?"إدراج المحتوى في الحقل المركّز":"Insert body into focused field"}</button></div></div>}
-        {session&&<div className="browser-control-group"><div className="browser-interaction-controls"><label>{ar?"اكتب في الحقل المحدد (لا يُحفظ النص)":"Type into the focused field (text is not saved)"}<input type="password" autoComplete="off" value={typingText} onChange={event=>setTypingText(event.target.value)} onKeyDown={event=>{if(event.key==="Enter"){event.preventDefault();void typeText();}}}/></label><button className="secondary-button" disabled={busy||!typingText} onClick={()=>void typeText()}>{ar?"كتابة":"Type"}</button></div><details className="browser-advanced-fields browser-key-controls"><summary>{ar?"عناصر تحكم إضافية":"More browser controls"}</summary><div className="browser-key-actions"><label>{ar?"المفتاح":"Key"}<select value={key} onChange={event=>setKey(event.target.value)}>{keys.map(item=><option key={item}>{item}</option>)}</select></label><button className="secondary-button" disabled={busy} onClick={()=>void act({type:"press",key})}>{ar?"ضغط المفتاح":"Press key"}</button><button className="secondary-button" disabled={busy} onClick={()=>void act({type:"scroll",deltaY:500})}>{ar?"تمرير لأسفل":"Scroll down"}</button><button className="secondary-button" disabled={busy} onClick={()=>void act({type:"scroll",deltaY:-500})}>{ar?"تمرير لأعلى":"Scroll up"}</button></div></details></div>}
+        {session&&<div className="browser-control-group"><div className="browser-interaction-controls"><label>{ar?"اكتب في الحقل المحدد (لا يُحفظ النص)":"Type into the focused field (text is not saved)"}<input type="password" autoComplete="off" value={typingText} onChange={event=>setTypingText(event.target.value)} onKeyDown={event=>{if(event.key==="Enter"){event.preventDefault();void typeText();}}}/></label><button className="secondary-button" disabled={busy||!typingText} onClick={()=>void typeText()}>{ar?"كتابة":"Type"}</button></div><details className="browser-advanced-fields browser-key-controls"><summary>{ar?"عناصر تحكم إضافية":"More browser controls"}</summary><div className="browser-key-actions"><label>{ar?"المفتاح":"Key"}<select value={key} onChange={event=>{if(isBrowserKey(event.target.value))setKey(event.target.value);}}>{keys.map(item=><option key={item}>{item}</option>)}</select></label><button className="secondary-button" disabled={busy} onClick={()=>void act({type:"press",key})}>{ar?"ضغط المفتاح":"Press key"}</button><button className="secondary-button" disabled={busy} onClick={()=>void act({type:"scroll",deltaY:500})}>{ar?"تمرير لأسفل":"Scroll down"}</button><button className="secondary-button" disabled={busy} onClick={()=>void act({type:"scroll",deltaY:-500})}>{ar?"تمرير لأعلى":"Scroll up"}</button></div></details></div>}
         {session&&canInsertArticle&&!chatDraft&&<div className="browser-fill-article"><label>{ar?"مقالة معتمدة لإدراجها":"Approved article to insert"}<select value={taskId} onChange={event=>setTaskId(event.target.value)}><option value="">{ar?"اختر مقالة جاهزة ومعتمدة":"Select a ready, approved article"}</option>{readyArticles.map(article=><option key={article.id} value={article.id}>{article.topic}</option>)}</select></label><button className="secondary-button" disabled={busy||!taskId||!readyArticles.some(article=>article.id===taskId)} onClick={()=>void fillApprovedArticle()}><Upload size={14}/>{ar?"إدراج النص في المحرر":"Insert text into editor"}</button><p className="form-note">{ar?"لا تُرفق ملفات الوسائط في هذه الدفعة. لا يضغط التطبيق زر الحفظ أو النشر؛ راجع الصفحة وأكمل يدوياً.":"Media files are not attached in this phase. The app does not click Save or Publish; review the page and continue manually."}</p></div>}
         {session&&!canInsertArticle&&!chatDraft&&<div className="browser-manual-insert"><p>{ar?"يمكنك تسجيل الدخول والتفاعل مع المتصفح. لإدراج مسودة محادثة، ارجع إلى الرسالة واختر «المتابعة في المتصفح»، ثم انقر الحقل المطلوب من المعاينة. لن يحفظ التطبيق أو ينشر.":"You can sign in and interact with the browser. To insert a chat draft, return to its message and choose “Continue in browser,” then click the desired field in the preview. The app will not save or publish."}</p></div>}
         {!session&&<div className="browser-empty"><MonitorPlay size={23}/><p>{ar?"احفظ وجهة مفوضاً بها ثم افتح جلسة لتسجيل الدخول. سيظهر المتصفح هنا.":"Save an authorized destination and open a session to sign in. The browser will appear here."}</p></div>}

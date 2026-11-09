@@ -7,13 +7,13 @@ import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 const MIME_PROFILES = {
-  "image/jpeg": { kind: "image", extension: ".jpg", maxBytes: 15 * 1024 * 1024, matches: bytes => bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff },
-  "image/png": { kind: "image", extension: ".png", maxBytes: 15 * 1024 * 1024, matches: bytes => bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
-  "image/webp": { kind: "image", extension: ".webp", maxBytes: 15 * 1024 * 1024, matches: bytes => bytes.length >= 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP" },
-  "video/mp4": { kind: "video", extension: ".mp4", maxBytes: 100 * 1024 * 1024, matches: bytes => bytes.length >= 12 && bytes.toString("ascii", 4, 8) === "ftyp" },
-  "video/webm": { kind: "video", extension: ".webm", maxBytes: 100 * 1024 * 1024, matches: bytes => bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3])) }
+  "image/jpeg": { kind: "image", extension: ".jpg", maxBytes: 10 * 1024 * 1024, matches: bytes => bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff },
+  "image/png": { kind: "image", extension: ".png", maxBytes: 10 * 1024 * 1024, matches: bytes => bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
+  "image/webp": { kind: "image", extension: ".webp", maxBytes: 10 * 1024 * 1024, matches: bytes => bytes.length >= 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP" },
+  "video/mp4": { kind: "video", extension: ".mp4", maxBytes: 50 * 1024 * 1024, matches: bytes => bytes.length >= 12 && bytes.toString("ascii", 4, 8) === "ftyp" },
+  "video/webm": { kind: "video", extension: ".webm", maxBytes: 50 * 1024 * 1024, matches: bytes => bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3])) }
 };
-const MAX_TOTAL_MEDIA_BYTES = 1024 * 1024 * 1024;
+const MAX_TOTAL_MEDIA_BYTES = 250 * 1024 * 1024;
 
 function fail(message, status = 400) {
   const error = new Error(message);
@@ -51,7 +51,7 @@ function ownedAsset(state, workspaceId, taskId, assetId) {
 export async function createMediaAsset({ req, store, workspaceId, taskId, mediaDir }) {
   const state = await store.read();
   ownedTask(state, workspaceId, taskId);
-  const storedBytes = (state.mediaAssets || []).reduce((sum, asset) => sum + (Number.isSafeInteger(asset.sizeBytes) ? asset.sizeBytes : 0), 0);
+  const storedBytes = [...(state.mediaAssets || []), ...(state.conversationAttachments || [])].reduce((sum, asset) => sum + (Number.isSafeInteger(asset.sizeBytes) ? asset.sizeBytes : 0), 0);
   if (storedBytes >= MAX_TOTAL_MEDIA_BYTES) fail("Local media storage quota is full", 413);
   const mimeType = header(req, "content-type").split(";")[0].trim().toLowerCase();
   const profile = MIME_PROFILES[mimeType];
@@ -113,7 +113,7 @@ export async function createMediaAsset({ req, store, workspaceId, taskId, mediaD
     try {
       return await store.transact(current => {
         ownedTask(current, workspaceId, taskId);
-        const currentBytes = (current.mediaAssets || []).reduce((sum, item) => sum + (Number.isSafeInteger(item.sizeBytes) ? item.sizeBytes : 0), 0);
+        const currentBytes = [...(current.mediaAssets || []), ...(current.conversationAttachments || [])].reduce((sum, item) => sum + (Number.isSafeInteger(item.sizeBytes) ? item.sizeBytes : 0), 0);
         if (currentBytes + bytesWritten > MAX_TOTAL_MEDIA_BYTES) fail("Local media storage quota would be exceeded", 413);
         current.mediaAssets ||= [];
         current.mediaAssets.push(asset);

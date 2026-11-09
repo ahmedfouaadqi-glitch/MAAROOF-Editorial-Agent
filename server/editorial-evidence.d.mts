@@ -14,9 +14,9 @@ export interface OriginalityCheckInput extends EditorialEvidenceScope {
 }
 
 export function normalizeEditorialText(value: string): string;
-export function registerClaim(state: Record<string, any>, input: EditorialClaimInput): Record<string, any>;
-export function listClaims(state: Record<string, any>, workspaceId: string, taskId: string): {
-  claims: Array<Record<string, any>>;
+export function registerClaim(state: Record<string, unknown>, input: EditorialClaimInput): Record<string, unknown>;
+export function listClaims(state: Record<string, unknown>, workspaceId: string, taskId: string): {
+  claims: Array<Record<string, unknown>>;
   summary: {
     total: number;
     sourceLinked: number;
@@ -25,4 +25,4 @@ export function listClaims(state: Record<string, any>, workspaceId: string, task
     note: string;
   };
 };
-export function checkOriginality(state: Record<string, any>, input: OriginalityCheckInput): Record<string, any>;
+export function checkOriginality(state: Record<string, unknown>, input: OriginalityCheckInput): Record<string, unknown>;

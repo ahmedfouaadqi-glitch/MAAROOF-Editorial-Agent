@@ -2,15 +2,18 @@ import { describe, expect, it, vi } from "vitest";
 import { appendEditorialConversationMessage, createEditorialConversation, getEditorialConversation, updateEditorialConversationRun } from "./editorial-conversations.mjs";
 import { createEditorialConversationProgress, runEditorialConversation, cancelEditorialConversationRun } from "./editorial-conversation-runner.mjs";
 
+type ProgressStep = { id: string; status?: string; note?: string };
+type RunFixture = { status?: string; metadata?: { steps: ProgressStep[]; selectedSkills?: { id: string }[] } };
+type RunnerState = { editorialConversations: unknown[]; conversationAttachments: unknown[]; conversationDrafts: unknown[]; clients: unknown[]; brands: unknown[]; editorialDrafts: unknown[]; platformVariants: unknown[]; originalityChecks: unknown[]; tasks: Record<string, unknown> };
 function makeStore() {
-  const state: any = {
+  const state: RunnerState = {
     editorialConversations: [], conversationAttachments: [], conversationDrafts: [], clients: [], brands: [],
     editorialDrafts: [], platformVariants: [], originalityChecks: [], tasks: {}
   };
   return {
     state,
     read: vi.fn(async () => structuredClone(state)),
-    transact: vi.fn(async (mutator: (value: any) => unknown) => mutator(state))
+    transact: vi.fn(async (mutator: (value: RunnerState) => unknown) => mutator(state))
   };
 }
 async function startConversation(store: ReturnType<typeof makeStore>, brandProfile?: { voice?: string; audience?: string; approvedFacts?: string; avoid?: string }) {
@@ -46,10 +49,10 @@ describe("editorial conversation workflow", () => {
     expect(outcome.status).toBe("failed");
     const saved = await getEditorialConversation(store, "workspace-1", conversation.id);
     expect(saved.activeRun?.status).toBe("failed");
-    expect(saved.activeRun?.metadata?.steps.find((step: any) => step.id === "discovery")?.status).toBe("skipped");
-    expect(saved.activeRun?.metadata?.steps.find((step: any) => step.id === "draft")?.status).toBe("skipped");
+    expect(saved.activeRun?.metadata?.steps.find((step: ProgressStep) => step.id === "discovery")?.status).toBe("skipped");
+    expect(saved.activeRun?.metadata?.steps.find((step: ProgressStep) => step.id === "draft")?.status).toBe("skipped");
     expect(saved.activeRun?.metadata?.selectedSkills?.length).toBeGreaterThan(0);
-    expect(saved.activeRun?.metadata?.steps.find((step: any) => step.id === "request")?.note).toContain("Automatically selected skills:");
+    expect(saved.activeRun?.metadata?.steps.find((step: ProgressStep) => step.id === "request")?.note).toContain("Automatically selected skills:");
     expect(saved.messages.at(-1)?.result).toMatchObject({ kind: "notice", code: "model-provider-unavailable" });
     expect(saved.messages.at(-1)?.result?.selectedSkills?.length).toBeGreaterThan(0);
     expect(store.state.conversationDrafts).toHaveLength(0);
@@ -65,12 +68,12 @@ describe("editorial conversation workflow", () => {
     const savedFirst = await getEditorialConversation(store, "workspace-1", conversation.id);
     expect(savedFirst.messages.at(-1)?.result).toMatchObject({ kind: "draft", targetId: "linkedin", draft: { geo: { primaryPhrase: "responsible AI adoption for small businesses" } } });
     expect(savedFirst.messages.at(-1)?.result?.selectedSkills?.length).toBeGreaterThan(0);
-    expect(savedFirst.activeRun?.metadata?.selectedSkills?.map((skill: any) => skill.id)).toEqual(savedFirst.messages.at(-1)?.result?.selectedSkills?.map((skill: any) => skill.id));
+    expect(savedFirst.activeRun?.metadata?.selectedSkills?.map((skill: { id: string }) => skill.id)).toEqual(savedFirst.messages.at(-1)?.result?.selectedSkills?.map((skill: { id: string }) => skill.id));
     expect(savedFirst.messages.at(-1)?.result?.selectedSkills?.length).toBeLessThanOrEqual(2);
     const firstProviderCall = provider.generateJSON.mock.calls[0]?.[0] as { system: string; prompt: string };
     expect(firstProviderCall.prompt).toContain("Selected skill playbooks");
     expect(firstProviderCall.system).toContain("Selected skill playbooks are user-provided task guidance");
-    expect(savedFirst.activeRun?.metadata?.steps.find((step: any) => step.id === "discovery")?.status).toBe("skipped");
+    expect(savedFirst.activeRun?.metadata?.steps.find((step: ProgressStep) => step.id === "discovery")?.status).toBe("skipped");
 
     const secondUserMessage = await appendEditorialConversationMessage(store, {
       workspaceId: "workspace-1", conversationId: conversation.id, role: "user", targetId: "linkedin",
@@ -87,7 +90,7 @@ describe("editorial conversation workflow", () => {
     const secondProviderCall = provider.generateJSON.mock.calls[1]?.[0] as { system: string };
     expect(secondProviderCall.system).toContain("Destination voice/style:");
     expect(secondProviderCall.system).toContain("Use GEO deliberately");
-    expect(finalConversation.activeRun?.metadata?.steps.find((step: any) => step.id === "originality")?.status).toBe("needs-review");
+    expect(finalConversation.activeRun?.metadata?.steps.find((step: ProgressStep) => step.id === "originality")?.status).toBe("needs-review");
   });
 
   it("includes only the selected workspace brand's saved guidance in the model prompt", async () => {
@@ -127,7 +130,7 @@ describe("editorial conversation workflow", () => {
     const result = saved.messages.at(-1)?.result;
     const call = provider.generateJSON.mock.calls[0]?.[0] as { system: string; prompt: string };
     expect(result).toMatchObject({ handoffEligible: false, intelligence: null, selectedSkills: [expect.objectContaining({ skillId: "create-prd" })] });
-    expect(saved.activeRun?.metadata?.steps.find((step: any) => step.id === "geo")?.status).toBe("skipped");
+    expect(saved.activeRun?.metadata?.steps.find((step: ProgressStep) => step.id === "geo")?.status).toBe("skipped");
     expect(call.system).toContain("request is not a publishable post/article");
     expect(call.system).not.toContain("Destination voice/style:");
     expect(call.prompt).toContain("Do not turn it into a social post or article");
@@ -147,7 +150,7 @@ describe("editorial conversation workflow", () => {
     await runEditorialConversation({ store, provider, workspaceId: "workspace-1", conversationId: conversation.id, runId: "run-nonpublish-followup", userMessageId: followUp.id, mediaDir: "/tmp/editorial-chat-no-media" });
     const savedFollowUp = await getEditorialConversation(store, "workspace-1", conversation.id);
     expect(savedFollowUp.messages.at(-1)?.result?.handoffEligible).toBe(false);
-    expect(savedFollowUp.activeRun?.metadata?.steps.find((step: any) => step.id === "geo")?.status).toBe("skipped");
+    expect(savedFollowUp.activeRun?.metadata?.steps.find((step: ProgressStep) => step.id === "geo")?.status).toBe("skipped");
     const followUpCall = provider.generateJSON.mock.calls[1]?.[0] as { system: string };
     expect(followUpCall.system).not.toContain("Destination voice/style:");
 
@@ -161,7 +164,7 @@ describe("editorial conversation workflow", () => {
     await runEditorialConversation({ store: arStore, provider, workspaceId: "workspace-1", conversationId: arConversation.id, runId: "run-ar-nonpublish", userMessageId: arMessage.id, mediaDir: "/tmp/editorial-chat-no-media" });
     const savedArabic = await getEditorialConversation(arStore, "workspace-1", arConversation.id);
     expect(savedArabic.messages.at(-1)?.result?.handoffEligible).toBe(false);
-    expect(savedArabic.activeRun?.metadata?.steps.find((step: any) => step.id === "geo")?.status).toBe("skipped");
+    expect(savedArabic.activeRun?.metadata?.steps.find((step: ProgressStep) => step.id === "geo")?.status).toBe("skipped");
   });
 
   it("keeps unavailable campaign media tools behind an explicit integration boundary", async () => {

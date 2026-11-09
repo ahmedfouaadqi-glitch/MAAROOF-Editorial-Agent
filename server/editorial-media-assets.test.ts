@@ -13,8 +13,9 @@ async function newRoot() {
 }
 afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))); });
 
+type MediaAssetFixture = { id?: string; workspaceId?: string; taskId?: string; kind?: string; mimeType?: string; storageKey?: string; [key: string]: unknown };
 function initialState() {
-  return { tasks: { taskA: { workspaceId: "workspaceA", article: { topic: "Solar", language: "en" } } }, mediaAssets: [] as any[] };
+  return { tasks: { taskA: { workspaceId: "workspaceA", article: { topic: "Solar", language: "en" } } }, mediaAssets: [] as MediaAssetFixture[], conversationAttachments: [] as Array<{ sizeBytes: number }> };
 }
 function makeStore(state = initialState()) {
   return {
@@ -72,6 +73,15 @@ describe("editorial media assets", () => {
     const store = makeStore();
     const req = request(validPng, "image/png", { "content-length": String(16 * 1024 * 1024) });
     await expect(createMediaAsset({ req, store, workspaceId: "workspaceA", taskId: "taskA", mediaDir })).rejects.toMatchObject({ status: 413 });
+    expect(store.state.mediaAssets).toHaveLength(0);
+  });
+
+  it("counts conversation attachments toward the shared workspace storage quota", async () => {
+    const mediaDir = await newRoot();
+    const state = initialState();
+    state.conversationAttachments.push({ sizeBytes: 250 * 1024 * 1024 });
+    const store = makeStore(state);
+    await expect(createMediaAsset({ req: request(validPng), store, workspaceId: "workspaceA", taskId: "taskA", mediaDir })).rejects.toMatchObject({ status: 413 });
     expect(store.state.mediaAssets).toHaveLength(0);
   });
 

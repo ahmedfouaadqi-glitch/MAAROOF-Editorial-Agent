@@ -12,7 +12,7 @@ function makeState() {
       sections: [{ heading: "The opportunity", body: "Cities are evaluating solar installations using local planning and energy data." }]
     }],
     platformVariants: [],
-    mediaAssets: [] as any[]
+    mediaAssets: [] as { id: string; workspaceId: string; taskId: string; kind: string; mimeType: string; description: string; storageKey: string }[]
   };
 }
 function makeStore(state = makeState()) {

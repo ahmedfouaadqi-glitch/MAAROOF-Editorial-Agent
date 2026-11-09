@@ -10,7 +10,7 @@ import {
 
 function initialState() {
   return {
-    clients: [], brands: [], conversationAttachments: [], editorialConversations: [] as any[]
+    clients: [], brands: [], conversationAttachments: [], editorialConversations: [] as { id: string; workspaceId: string; messages: unknown[]; [key: string]: unknown }[]
   };
 }
 function makeStore(state = initialState()) {

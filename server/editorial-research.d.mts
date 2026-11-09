@@ -23,6 +23,6 @@ export interface RecordEvidenceInput extends ResearchScope {
   stance?: "supports" | "contradicts" | "contextualizes" | "unclear";
   observedAt?: string;
 }
-export function assessSource(state: Record<string, any>, input: SourceAssessmentInput): Record<string, any>;
-export function recordEvidence(state: Record<string, any>, input: RecordEvidenceInput): Record<string, any>;
-export function listResearch(state: Record<string, any>, workspaceId: string, taskId: string): Record<string, any>;
+export function assessSource(state: Record<string, unknown>, input: SourceAssessmentInput): Record<string, unknown>;
+export function recordEvidence(state: Record<string, unknown>, input: RecordEvidenceInput): Record<string, unknown>;
+export function listResearch(state: Record<string, unknown>, workspaceId: string, taskId: string): Record<string, unknown>;

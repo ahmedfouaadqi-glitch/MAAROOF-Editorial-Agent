@@ -12,8 +12,8 @@ export interface EntityRelationshipInput extends EntityScope {
   claimIds?: string[];
 }
 export function normalizeEntityLabel(value: string): string;
-export function createEntity(state: Record<string, any>, input: CreateEntityInput): Record<string, any>;
-export function listEntities(state: Record<string, any>, workspaceId: string, taskId: string): Record<string, any>;
-export function scanKnownEntities(state: Record<string, any>, input: EntityScope): Record<string, any>;
-export function createEntityRelationship(state: Record<string, any>, input: EntityRelationshipInput): Record<string, any>;
-export function listEntityRelationships(state: Record<string, any>, workspaceId: string, taskId: string): Array<Record<string, any>>;
+export function createEntity(state: Record<string, unknown>, input: CreateEntityInput): Record<string, unknown>;
+export function listEntities(state: Record<string, unknown>, workspaceId: string, taskId: string): Record<string, unknown>;
+export function scanKnownEntities(state: Record<string, unknown>, input: EntityScope): Record<string, unknown>;
+export function createEntityRelationship(state: Record<string, unknown>, input: EntityRelationshipInput): Record<string, unknown>;
+export function listEntityRelationships(state: Record<string, unknown>, workspaceId: string, taskId: string): Array<Record<string, unknown>>;

@@ -10,25 +10,79 @@ import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import mammoth from "mammoth";
 
 const execFile = promisify(execFileCallback);
-const MAX_TOTAL_BYTES = 1024 * 1024 * 1024;
+const MAX_TOTAL_BYTES = 250 * 1024 * 1024;
 const MAX_DOCUMENT_TEXT = 24_000;
 const MAX_INLINE_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_DOCX_ENTRIES = 256;
+const MAX_DOCX_ENTRY_BYTES = 25 * 1024 * 1024;
+const MAX_DOCX_EXPANDED_BYTES = 50 * 1024 * 1024;
 const MIME_PROFILES = {
-  "image/jpeg": { kind: "image", extension: ".jpg", maxBytes: 15 * 1024 * 1024, matches: bytes => bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff },
-  "image/png": { kind: "image", extension: ".png", maxBytes: 15 * 1024 * 1024, matches: bytes => bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
-  "image/webp": { kind: "image", extension: ".webp", maxBytes: 15 * 1024 * 1024, matches: bytes => bytes.length >= 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP" },
-  "video/mp4": { kind: "video", extension: ".mp4", maxBytes: 100 * 1024 * 1024, matches: bytes => bytes.length >= 12 && bytes.toString("ascii", 4, 8) === "ftyp" },
-  "video/webm": { kind: "video", extension: ".webm", maxBytes: 100 * 1024 * 1024, matches: bytes => bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3])) },
-  "application/pdf": { kind: "document", extension: ".pdf", maxBytes: 25 * 1024 * 1024, matches: bytes => bytes.length >= 5 && bytes.toString("ascii", 0, 5) === "%PDF-" },
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { kind: "document", extension: ".docx", maxBytes: 25 * 1024 * 1024, matches: bytes => bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04 },
-  "text/plain": { kind: "document", extension: ".txt", maxBytes: 5 * 1024 * 1024, matches: bytes => bytes.length > 0 && !bytes.subarray(0, Math.min(bytes.length, 4096)).includes(0) },
-  "text/markdown": { kind: "document", extension: ".txt", maxBytes: 5 * 1024 * 1024, matches: bytes => bytes.length > 0 && !bytes.subarray(0, Math.min(bytes.length, 4096)).includes(0) }
+  "image/jpeg": { kind: "image", extension: ".jpg", maxBytes: 10 * 1024 * 1024, matches: bytes => bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff },
+  "image/png": { kind: "image", extension: ".png", maxBytes: 10 * 1024 * 1024, matches: bytes => bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
+  "image/webp": { kind: "image", extension: ".webp", maxBytes: 10 * 1024 * 1024, matches: bytes => bytes.length >= 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP" },
+  "video/mp4": { kind: "video", extension: ".mp4", maxBytes: 50 * 1024 * 1024, matches: bytes => bytes.length >= 12 && bytes.toString("ascii", 4, 8) === "ftyp" },
+  "video/webm": { kind: "video", extension: ".webm", maxBytes: 50 * 1024 * 1024, matches: bytes => bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3])) },
+  "application/pdf": { kind: "document", extension: ".pdf", maxBytes: 15 * 1024 * 1024, matches: bytes => bytes.length >= 5 && bytes.toString("ascii", 0, 5) === "%PDF-" },
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": { kind: "document", extension: ".docx", maxBytes: 15 * 1024 * 1024, matches: bytes => bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04 },
+  "text/plain": { kind: "document", extension: ".txt", maxBytes: 2 * 1024 * 1024, matches: bytes => bytes.length > 0 && !bytes.subarray(0, Math.min(bytes.length, 4096)).includes(0) },
+  "text/markdown": { kind: "document", extension: ".txt", maxBytes: 2 * 1024 * 1024, matches: bytes => bytes.length > 0 && !bytes.subarray(0, Math.min(bytes.length, 4096)).includes(0) }
 };
 
 function fail(message, status = 400) {
   const error = new Error(message);
   error.status = status;
   throw error;
+}
+
+export function validateDocxArchiveLimits(buffer) {
+  const searchStart = Math.max(0, buffer.length - 65_557);
+  let eocd = -1;
+  for (let offset = buffer.length - 22; offset >= searchStart; offset -= 1) {
+    if (buffer.readUInt32LE(offset) !== 0x06054b50) continue;
+    const commentLength = buffer.readUInt16LE(offset + 20);
+    if (offset + 22 + commentLength === buffer.length) { eocd = offset; break; }
+  }
+  if (eocd < 0) fail("DOCX archive is malformed or has no end record", 415);
+  const diskNumber = buffer.readUInt16LE(eocd + 4);
+  const directoryDisk = buffer.readUInt16LE(eocd + 6);
+  const entriesOnDisk = buffer.readUInt16LE(eocd + 8);
+  const entryCount = buffer.readUInt16LE(eocd + 10);
+  const directoryBytes = buffer.readUInt32LE(eocd + 12);
+  const directoryOffset = buffer.readUInt32LE(eocd + 16);
+  const directoryEnd = directoryOffset + directoryBytes;
+  if (diskNumber !== 0 || directoryDisk !== 0 || entriesOnDisk !== entryCount
+    || entryCount < 1 || entryCount > MAX_DOCX_ENTRIES || directoryEnd > eocd) {
+    fail("DOCX archive layout exceeds supported limits", 415);
+  }
+
+  let cursor = directoryOffset;
+  let expandedBytes = 0;
+  for (let index = 0; index < entryCount; index += 1) {
+    if (cursor + 46 > directoryEnd || buffer.readUInt32LE(cursor) !== 0x02014b50) fail("DOCX central directory is malformed", 415);
+    const flags = buffer.readUInt16LE(cursor + 8);
+    const method = buffer.readUInt16LE(cursor + 10);
+    const compressedBytes = buffer.readUInt32LE(cursor + 20);
+    const uncompressedBytes = buffer.readUInt32LE(cursor + 24);
+    const nameLength = buffer.readUInt16LE(cursor + 28);
+    const extraLength = buffer.readUInt16LE(cursor + 30);
+    const commentLength = buffer.readUInt16LE(cursor + 32);
+    const startDisk = buffer.readUInt16LE(cursor + 34);
+    const entryEnd = cursor + 46 + nameLength + extraLength + commentLength;
+    if (entryEnd > directoryEnd || startDisk !== 0 || (flags & 1) !== 0 || ![0, 8].includes(method)
+      || compressedBytes === 0xffffffff || uncompressedBytes === 0xffffffff
+      || uncompressedBytes > MAX_DOCX_ENTRY_BYTES || compressedBytes === 0 && uncompressedBytes > 0) {
+      fail("DOCX contains an encrypted, unsupported, or oversized entry", 415);
+    }
+    const entryName = buffer.toString("utf8", cursor + 46, cursor + 46 + nameLength);
+    if (entryName.startsWith("/") || entryName.includes("\\") || entryName.split("/").includes("..")) {
+      fail("DOCX contains an unsafe archive path", 415);
+    }
+    expandedBytes += uncompressedBytes;
+    if (expandedBytes > MAX_DOCX_EXPANDED_BYTES) fail("DOCX expands beyond the extraction safety limit", 413);
+    cursor = entryEnd;
+  }
+  if (cursor !== directoryEnd) fail("DOCX central directory has trailing or inconsistent data", 415);
+  return { entryCount, expandedBytes };
 }
 function header(req, name) {
   const value = req.headers?.[name.toLowerCase()];
@@ -200,6 +254,7 @@ export async function extractConversationAttachmentContext({ store, workspaceId,
           const parsed = await pdfParse(buffer, { max: 60 });
           text = parsed.text || "";
         } else if (asset.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+          validateDocxArchiveLimits(buffer);
           const parsed = await mammoth.extractRawText({ buffer });
           text = parsed.value || "";
         }

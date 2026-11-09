@@ -1,7 +1,8 @@
 import { createServer } from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { resolve } from "node:path";
+import { createRequestLimiter } from "./request-limiter.mjs";
 import { JsonStore } from "./store.mjs";
 import { DEFAULT_LIMITS, validateLimits, reserveBudget, releaseReservation, commitReservation } from "./research-budget.mjs";
 import { createEditorialTask, listEditorialTasks, advanceEditorialTask } from "./editorial-tasks.mjs";
@@ -39,8 +40,20 @@ import {
 
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "127.0.0.1";
-const adminToken = process.env.ADMIN_API_TOKEN || "";
+const adminToken = (process.env.ADMIN_API_TOKEN || "").trim();
 const allowedOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+const allowRemoteApi = process.env.API_ALLOW_REMOTE === "true";
+const loopbackHosts = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) {
+  throw new Error("PORT must be between 1 and 65535");
+}
+if (adminToken && (adminToken.length < 32 || /^(replace|change|your|example)[-_]/i.test(adminToken))) {
+  throw new Error("ADMIN_API_TOKEN must be a non-placeholder secret with at least 32 characters.");
+}
+if (!loopbackHosts.has(host) && (!adminToken || !allowRemoteApi)) {
+  throw new Error("Refusing to bind the API beyond loopback without a strong ADMIN_API_TOKEN and explicit API_ALLOW_REMOTE=true opt-in behind trusted TLS and a firewall.");
+}
+if (!loopbackHosts.has(host)) process.stderr.write("Warning: remote API access is enabled; enforce TLS, network filtering, and a dedicated origin.\n");
 const dataFile = resolve(process.env.DATA_FILE || "./data/editorial-agent.json");
 const mediaDir = resolve(process.env.MEDIA_DIR || "./data/media");
 const store = new JsonStore(dataFile);
@@ -63,7 +76,8 @@ const configuredModelRequests = Number(process.env.MODEL_REQUESTS_PER_ARTICLE ||
 const modelRequestsPerArticle = Number.isSafeInteger(configuredModelRequests) && configuredModelRequests >= 1 && configuredModelRequests <= 10 ? configuredModelRequests : 2;
 
 function send(res, status, payload) {
-  res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+  if (res.destroyed || res.writableEnded) return;
+  res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", "x-frame-options": "DENY", "referrer-policy": "no-referrer" });
   res.end(JSON.stringify(payload));
 }
 function sendAttachmentFile(res, filePath, asset) {
@@ -81,16 +95,23 @@ function sendAttachmentFile(res, filePath, asset) {
 }
 function readJson(req) {
   return new Promise((resolveBody, reject) => {
-    let body = "";
+    const chunks = [];
+    let byteLength = 0;
     req.on("data", chunk => {
-      body += chunk;
-      if (body.length > 64 * 1024) {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      byteLength += bytes.length;
+      if (byteLength > 64 * 1024) {
         reject(Object.assign(new Error("Request body too large"), { status: 413 }));
         req.destroy();
+        return;
       }
+      chunks.push(bytes);
     });
     req.on("end", () => {
-      try { resolveBody(body ? JSON.parse(body) : {}); }
+      try {
+        const body = Buffer.concat(chunks, byteLength).toString("utf8");
+        resolveBody(body ? JSON.parse(body) : {});
+      }
       catch { reject(Object.assign(new Error("Invalid JSON body"), { status: 400 })); }
     });
     req.on("error", reject);
@@ -98,7 +119,12 @@ function readJson(req) {
 }
 function requireAdmin(req) {
   if (!adminToken) throw Object.assign(new Error("ADMIN_API_TOKEN is not configured"), { status: 503 });
-  if (req.headers.authorization !== `Bearer ${adminToken}`) throw Object.assign(new Error("Unauthorized"), { status: 401 });
+  const header = req.headers.authorization;
+  const candidate = typeof header === "string" && header.startsWith("Bearer ") ? header.slice(7) : "";
+  const expectedDigest = createHash("sha256").update(adminToken).digest();
+  const candidateDigest = createHash("sha256").update(candidate).digest();
+  const matches = timingSafeEqual(candidateDigest, expectedDigest) && candidate.length === adminToken.length;
+  if (!matches) throw Object.assign(new Error("Unauthorized"), { status: 401 });
 }
 function validateScope(body) {
   if (typeof body.workspaceId !== "string" || !body.workspaceId.trim() || body.workspaceId.length > 128) {
@@ -109,9 +135,24 @@ function validateScope(body) {
   }
 }
 
+const requestLimiter = createRequestLimiter({ limits: { preflight: 600, read: 240, write: 60 }, maxEntries: 10_000 });
+function enforceRequestLimit(req, res) {
+  const requestClass = req.method === "OPTIONS" ? "preflight" : req.method === "GET" || req.method === "HEAD" ? "read" : "write";
+  const key = `${req.socket.remoteAddress || "unknown"}:${requestClass}`;
+  const result = requestLimiter.consume(key, requestClass);
+  if (!result.allowed) {
+    res.setHeader("retry-after", String(result.retryAfterSeconds));
+    send(res, 429, { error: "Request limit reached. Retry after the current minute." });
+    return false;
+  }
+  return true;
+}
+
 const server = createServer(async (req, res) => {
   const origin = req.headers.origin;
-  if (origin && origin === allowedOrigin) res.setHeader("access-control-allow-origin", origin);
+  if (!enforceRequestLimit(req, res)) return;
+  if (origin && origin !== allowedOrigin) return send(res, 403, { error: "Origin not allowed" });
+  if (origin) res.setHeader("access-control-allow-origin", origin);
   res.setHeader("vary", "Origin");
   res.setHeader("access-control-allow-methods", "GET,POST,PUT,DELETE,OPTIONS");
   res.setHeader("access-control-allow-headers", "content-type,authorization,idempotency-key,x-file-name,x-media-description");
@@ -120,7 +161,7 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     if (req.method === "GET" && url.pathname === "/health") {
-      return send(res, 200, { ok: true, service: "maaroof-editorial-api", persistence: "local-json", integrations: { supabase: false, firecrawl: Boolean(firecrawlProvider), liveSearch: Boolean(searchProvider), searchProvider: searchProvider?.id || null, modelGeneration: Boolean(modelProvider), model: modelProvider?.model || null, browserAgentConfigured: (process.env.BROWSER_AGENT_TOKEN || "").length >= 32 } });
+      return send(res, 200, { ok: true, service: "maaroof-editorial-api", persistence: "local-json", authConfigured: Boolean(adminToken), integrations: { supabase: false, firecrawl: Boolean(firecrawlProvider), liveSearch: Boolean(searchProvider), searchProvider: searchProvider?.id || null, modelGeneration: Boolean(modelProvider), model: modelProvider?.model || null, browserAgentConfigured: (process.env.BROWSER_AGENT_TOKEN || "").length >= 32 } });
     }
 
     requireAdmin(req);
@@ -809,6 +850,9 @@ const server = createServer(async (req, res) => {
   }
 });
 
+server.headersTimeout = 15_000;
+server.requestTimeout = 30_000;
+server.keepAliveTimeout = 5_000;
 await store.init();
 server.listen(port, host, () => {
   console.log(`MAAROOF Editorial API listening on http://${host}:${port}`);

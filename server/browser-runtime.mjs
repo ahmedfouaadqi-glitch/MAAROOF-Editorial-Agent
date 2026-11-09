@@ -104,52 +104,61 @@ export class BrowserSessionManager {
     this.ttlMs = ttlMs;
     this.maxSessionsPerWorkspace = maxSessionsPerWorkspace;
     this.sessions = new Map();
+    this.pendingCreationsByWorkspace = new Map();
   }
 
   async create({ workspaceId, destinationId, startUrl, approvedHosts }) {
     if (typeof workspaceId !== "string" || !workspaceId.trim() || workspaceId.length > 128) fail("workspaceId is required");
     if (typeof destinationId !== "string" || !destinationId.trim() || destinationId.length > 128) fail("destinationId is required");
     const activeCount = [...this.sessions.values()].filter(item => item.workspaceId === workspaceId && item.expiresAt > this.now()).length;
-    if (activeCount >= this.maxSessionsPerWorkspace) fail("The active browser session limit for this workspace has been reached", 429);
-    const hosts = normalizeAllowedHosts(approvedHosts);
-    const target = await validatePublicUrl(startUrl, hosts, { resolveHost: this.resolveHost });
-    const browser = await this.chromium.launch({ headless: true });
+    const pendingCount = this.pendingCreationsByWorkspace.get(workspaceId) || 0;
+    if (activeCount + pendingCount >= this.maxSessionsPerWorkspace) fail("The active browser session limit for this workspace has been reached", 429);
+    this.pendingCreationsByWorkspace.set(workspaceId, pendingCount + 1);
     try {
-      const context = await browser.newContext({
-        viewport: { width: 1440, height: 1000 },
-        acceptDownloads: false,
-        serviceWorkers: "block"
-      });
-      await context.route("**/*", async route => {
-        try {
-          const request = route.request();
-          const raw = request.url();
-          if (/^(about:|data:|blob:)/i.test(raw)) return route.continue();
-          const navigation = request.isNavigationRequest();
-          const url = await validatePublicUrl(raw, hosts, { resolveHost: this.resolveHost, requireApprovedHost: navigation });
-          if (navigation && !hostAllowed(url.hostname, hosts)) return route.abort("blockedbyclient");
-          return route.continue();
-        } catch {
-          return route.abort("blockedbyclient");
-        }
-      });
-      const page = await context.newPage();
-      page.setDefaultTimeout(12_000);
-      await page.goto(target.toString(), { waitUntil: "domcontentloaded", timeout: 30_000 });
-      const id = randomUUID();
-      const createdAt = this.now();
-      const session = {
-        id, workspaceId, destinationId, approvedHosts: hosts,
-        browser, context, page, createdAt, lastActiveAt: createdAt,
-        expiresAt: createdAt + this.ttlMs, state: "waiting-for-user",
-        currentUrl: page.url(), title: await page.title().catch(() => ""),
-        lastError: null
-      };
-      this.sessions.set(id, session);
-      return this.publicSession(session);
-    } catch (error) {
-      await browser.close().catch(() => {});
-      throw error;
+      const hosts = normalizeAllowedHosts(approvedHosts);
+      const target = await validatePublicUrl(startUrl, hosts, { resolveHost: this.resolveHost });
+      const browser = await this.chromium.launch({ headless: true });
+      try {
+        const context = await browser.newContext({
+          viewport: { width: 1440, height: 1000 },
+          acceptDownloads: false,
+          serviceWorkers: "block"
+        });
+        await context.route("**/*", async route => {
+          try {
+            const request = route.request();
+            const raw = request.url();
+            if (/^(about:|data:|blob:)/i.test(raw)) return route.continue();
+            const navigation = request.isNavigationRequest();
+            const url = await validatePublicUrl(raw, hosts, { resolveHost: this.resolveHost, requireApprovedHost: navigation });
+            if (navigation && !hostAllowed(url.hostname, hosts)) return route.abort("blockedbyclient");
+            return route.continue();
+          } catch {
+            return route.abort("blockedbyclient");
+          }
+        });
+        const page = await context.newPage();
+        page.setDefaultTimeout(12_000);
+        await page.goto(target.toString(), { waitUntil: "domcontentloaded", timeout: 30_000 });
+        const id = randomUUID();
+        const createdAt = this.now();
+        const session = {
+          id, workspaceId, destinationId, approvedHosts: hosts,
+          browser, context, page, createdAt, lastActiveAt: createdAt,
+          expiresAt: createdAt + this.ttlMs, state: "waiting-for-user",
+          currentUrl: page.url(), title: await page.title().catch(() => ""),
+          lastError: null
+        };
+        this.sessions.set(id, session);
+        return this.publicSession(session);
+      } catch (error) {
+        await browser.close().catch(() => {});
+        throw error;
+      }
+    } finally {
+      const remaining = (this.pendingCreationsByWorkspace.get(workspaceId) || 1) - 1;
+      if (remaining > 0) this.pendingCreationsByWorkspace.set(workspaceId, remaining);
+      else this.pendingCreationsByWorkspace.delete(workspaceId);
     }
   }
 

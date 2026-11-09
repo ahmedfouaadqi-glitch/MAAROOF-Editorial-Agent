@@ -9,6 +9,6 @@ export interface EditorialTaskInput {
   clientName?: string;
   brandName?: string;
 }
-export function createEditorialTask(state: { tasks: Record<string, unknown> }, input: EditorialTaskInput): any;
-export function listEditorialTasks(state: { tasks: Record<string, any> }, workspaceId: string): any[];
-export function advanceEditorialTask(state: { tasks: Record<string, any> }, input: { workspaceId: string; taskId: string; nextStage: string }): any;
+export function createEditorialTask(state: { tasks: Record<string, unknown> }, input: EditorialTaskInput): unknown;
+export function listEditorialTasks(state: { tasks: Record<string, unknown> }, workspaceId: string): unknown[];
+export function advanceEditorialTask(state: { tasks: Record<string, unknown> }, input: { workspaceId: string; taskId: string; nextStage: string }): unknown;

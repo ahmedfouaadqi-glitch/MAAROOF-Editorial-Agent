@@ -7,24 +7,49 @@ import {
   createConversationAttachment,
   deleteConversationAttachment,
   extractConversationAttachmentContext,
-  resolveConversationAttachmentFile
+  resolveConversationAttachmentFile,
+  validateDocxArchiveLimits
 } from "./editorial-conversation-attachments.mjs";
 
+type AttachmentState = { editorialConversations: { id: string; workspaceId: string; messages: unknown[] }[]; conversationAttachments: unknown[]; mediaAssets: unknown[] };
 function makeStore() {
-  const state: any = {
+  const state: AttachmentState = {
     editorialConversations: [{ id: "conv-1", workspaceId: "workspace-1", messages: [] }],
     conversationAttachments: [], mediaAssets: []
   };
   return {
     state,
     read: async () => structuredClone(state),
-    transact: async (mutator: (value: any) => unknown) => mutator(state)
+    transact: async (mutator: (value: AttachmentState) => unknown) => mutator(state)
   };
 }
 function requestFor(buffer: Buffer, mime: string, name: string) {
-  const req: any = Readable.from([buffer]);
+  const req = Readable.from([buffer]) as Readable & { headers: Record<string, string> };
   req.headers = { "content-type": mime, "content-length": String(buffer.length), "x-file-name": encodeURIComponent(name) };
   return req;
+}
+function centralDirectoryFixture({ entryName = "word/document.xml", uncompressedBytes = 1024 } = {}) {
+  const name = Buffer.from(entryName, "utf8");
+  const local = Buffer.alloc(30 + name.length);
+  local.writeUInt32LE(0x04034b50, 0);
+  local.writeUInt16LE(20, 4);
+  local.writeUInt16LE(name.length, 26);
+  name.copy(local, 30);
+  const central = Buffer.alloc(46 + name.length);
+  central.writeUInt32LE(0x02014b50, 0);
+  central.writeUInt16LE(20, 4);
+  central.writeUInt16LE(20, 6);
+  central.writeUInt32LE(1, 20);
+  central.writeUInt32LE(uncompressedBytes, 24);
+  central.writeUInt16LE(name.length, 28);
+  name.copy(central, 46);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(1, 8);
+  eocd.writeUInt16LE(1, 10);
+  eocd.writeUInt32LE(central.length, 12);
+  eocd.writeUInt32LE(local.length, 16);
+  return Buffer.concat([local, central, eocd]);
 }
 
 describe("conversation attachments", () => {
@@ -53,6 +78,13 @@ describe("conversation attachments", () => {
       await expect(createConversationAttachment({ req: requestFor(Buffer.from([0x50, 0x4b, 0x03, 0x04]), "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "word.doc"), store, workspaceId: "workspace-1", conversationId: "conv-1", mediaDir })).rejects.toMatchObject({ status: 415 });
       expect(store.state.conversationAttachments).toHaveLength(0);
     } finally { await rm(mediaDir, { recursive: true, force: true }); }
+  });
+
+  it("bounds DOCX central-directory expansion and rejects traversal paths", () => {
+    expect(validateDocxArchiveLimits(centralDirectoryFixture())).toMatchObject({ entryCount: 1, expandedBytes: 1024 });
+    expect(() => validateDocxArchiveLimits(centralDirectoryFixture({ uncompressedBytes: 26 * 1024 * 1024 }))).toThrow(/oversized/i);
+    expect(() => validateDocxArchiveLimits(centralDirectoryFixture({ entryName: "../outside.xml" }))).toThrow(/unsafe archive path/i);
+    expect(() => validateDocxArchiveLimits(Buffer.from("PK0304 malformed"))).toThrow(/malformed/i);
   });
 
   it("stores visual attachments and prepares image context without exposing storage keys", async () => {

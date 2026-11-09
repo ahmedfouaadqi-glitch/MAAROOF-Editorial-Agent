@@ -4,6 +4,9 @@ import {
   normalizeEntityLabel, scanKnownEntities
 } from "../../server/editorial-entities.mjs";
 
+type EntityResult = { id: string; type: string; normalizedAliases: string[]; taskId: string };
+type EntityListResult = { entities: Array<EntityResult & { claimIds: string[] }> };
+type ScanResult = { scannedClaims: number; matches: unknown[] };
 function fixture() {
   return {
     tasks: {
@@ -35,7 +38,7 @@ describe("editorial entity intelligence", () => {
       canonicalName: "معروف", type: "organization",
       aliases: ["Maaroof", "شركة معروف"],
       disambiguationNote: "علامة تجارية وشركة تقنية ضمن سياق هذه المقالة."
-    });
+    }) as unknown as EntityResult;
     expect(entity.type).toBe("organization");
     expect(entity.normalizedAliases).toContain("maar oof".replace(" ", ""));
     expect(() => createEntity(state, {
@@ -65,11 +68,11 @@ describe("editorial entity intelligence", () => {
       canonicalName: "معروف", type: "organization", aliases: ["Maaroof"],
       disambiguationNote: "علامة تجارية محددة في سياق المقالة الحالية."
     });
-    const result = scanKnownEntities(state, { workspaceId: "workspace-a", taskId: "task-a" });
+    const result = scanKnownEntities(state, { workspaceId: "workspace-a", taskId: "task-a" }) as unknown as ScanResult;
     expect(result.scannedClaims).toBe(2);
     expect(result.matches).toHaveLength(2);
-    expect(listEntities(state, "workspace-a", "task-a").entities[0].claimIds).toContain("claim-a");
-    expect(listEntities(state, "workspace-a", "task-a").entities[0].id).toBe(entity.id);
+    expect((listEntities(state, "workspace-a", "task-a") as unknown as EntityListResult).entities[0].claimIds).toContain("claim-a");
+    expect((listEntities(state, "workspace-a", "task-a") as unknown as EntityListResult).entities[0].id).toBe(entity.id);
     expect(scanKnownEntities(state, { workspaceId: "workspace-a", taskId: "task-a" }).matches).toHaveLength(2);
     expect(state.entityClaimLinks).toHaveLength(2);
   });
@@ -79,11 +82,11 @@ describe("editorial entity intelligence", () => {
     const a = createEntity(state, {
       workspaceId: "workspace-a", taskId: "task-a", canonicalName: "Maaroof",
       type: "organization", disambiguationNote: "شركة وعلامة ضمن سياق المقالة."
-    });
+    }) as unknown as EntityResult;
     const b = createEntity(state, {
       workspaceId: "workspace-a", taskId: "task-a", canonicalName: "Acme Group",
       type: "organization", disambiguationNote: "شركة أخرى مذكورة في المقالة."
-    });
+    }) as unknown as EntityResult;
     expect(() => createEntityRelationship(state, {
       workspaceId: "workspace-a", taskId: "task-a", fromEntityId: a.id,
       toEntityId: b.id, relation: "partnered with", claimIds: ["claim-x"]

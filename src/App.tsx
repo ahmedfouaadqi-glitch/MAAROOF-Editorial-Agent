@@ -13,7 +13,7 @@ import MagazineSubmissionsPanel from "./components/MagazineSubmissionsPanel";
 import EditorialDraftPanel from "./components/EditorialDraftPanel";
 import EditorialReviewPanel from "./components/EditorialReviewPanel";
 import BrowserPublishingPanel from "./components/BrowserPublishingPanel";
-import EditorialChatWorkspace, { type ChatTarget, type ChatWorkspace } from "./components/EditorialChatWorkspace";
+import EditorialChatWorkspace, { type ChatTarget, type ChatWorkspace, type EditorialAccessStatus } from "./components/EditorialChatWorkspace";
 import type { EditorialChatBrowserDraft } from "./types/editorial-chat";
 import { DEFAULT_RESEARCH_BUDGET, validateResearchBudgetLimits, type ResearchBudgetLimits } from "./domain/research-budget";
 import { categoryLabels, modeLabels, platforms, readinessLabels, type PlatformCategory } from "./data/platforms";
@@ -24,6 +24,9 @@ import editorialTargetCatalog from "../config/editorial-targets.json";
 type View = "chat" | "home" | "articles" | "library" | "registry" | "research-settings" | "ai-visibility" | "magazine-submissions";
 type Article = { id: string; topic: string; language: string; objective: string; stage: string; createdAt: string; clientId?: string; clientName?: string; brandId?: string; brandName?: string };
 type Locale = "ar" | "en";
+function isRecord(value:unknown):value is Record<string,unknown>{return typeof value==="object"&&value!==null&&!Array.isArray(value);}
+function isChatWorkspace(value:unknown):value is ChatWorkspace{return isRecord(value)&&typeof value.id==="string"&&value.id.length>0&&value.id.length<=128&&typeof value.name==="string"&&value.name.trim().length>=2&&value.name.length<=80&&(value.createdAt===undefined||typeof value.createdAt==="string"&&value.createdAt.length<=64);}
+function apiError(value:unknown,fallback:string):string{return isRecord(value)&&typeof value.error==="string"?value.error:fallback;}
 const NEXT_STAGE: Record<string, string> = { intake: "planning", planning: "research", research: "entity-analysis", "entity-analysis": "outline", outline: "drafting", drafting: "source-review", "source-review": "originality-review", "originality-review": "media-review", "media-review": "editorial-approval", "editorial-approval": "ready-to-publish" };
 const categories: Array<"all" | PlatformCategory> = ["all", "editorial", "professional", "community", "knowledge", "research", "developer", "web-data"];
 const editorialFormatNamesEn: Record<string, string> = {
@@ -68,7 +71,7 @@ const t = {
     profile: "ملف المنصة", noPublish: "النشر غير مفعّل. هذا الملف يوضح المتطلبات ولا يثبت جاهزية الموصل.",
     integration: "طريقة التكامل المرشحة", capabilities: "قدرات النشر", constraints: "قيود يجب احترامها",
     checklist: "قائمة التحقق قبل التفعيل", docs: "الوثائق الرسمية", adapter: "حالة الموصل",
-    apiKey: "رمز الوصول", apiKeyHint: "أدخل رمز الوصول الذي زوّدك به مسؤول المساحة. يبقى في ذاكرة الجلسة الحالية فقط.",
+    apiKey: "رمز الوصول", apiKeyHint: "أدخل القيمة المطابقة لـ ADMIN_API_TOKEN المضبوط على الخادم. لا تُحفظ هنا؛ تبقى في ذاكرة جلسة المتصفح الحالية فقط.",
     load: "تحميل المحفوظ", save: "حفظ الإعدادات", reset: "استعادة الافتراضي", sourceLimit: "روابط المصادر اليدوية لكل مقالة", scrapeLimit: "روابط الكشط لكل مقالة",
     searchLimit: "عمليات البحث لكل مقالة", inspectLimit: "عمليات الفحص لكل مقالة",
     sourceHint: "روابط مرجعية يضيفها المستخدم؛ هذه الحصة منفصلة عن عمليات الكشط.",
@@ -102,7 +105,7 @@ const t = {
     profile: "PLATFORM PROFILE", noPublish: "Publishing is disabled. This profile describes requirements; it does not prove connector readiness.",
     integration: "Proposed integration", capabilities: "Publishing capabilities", constraints: "Restrictions",
     checklist: "Activation checklist", docs: "Official documentation", adapter: "Connector status",
-    apiKey: "Workspace access key", apiKeyHint: "Enter the access key provided by your workspace administrator. Kept in memory for this session only.",
+    apiKey: "Workspace access key", apiKeyHint: "Enter the value matching ADMIN_API_TOKEN configured on the server. It is not saved here and remains in browser memory for this session only.",
     load: "Load saved", save: "Save settings", reset: "Reset defaults", sourceLimit: "Manually registered source URLs per article", scrapeLimit: "Scraped page URLs per article",
     searchLimit: "Search operations per article", inspectLimit: "Inspection operations per article",
     sourceHint: "Manually registered references; this quota is separate from scraping.",
@@ -131,6 +134,7 @@ export default function App() {
   const [budget, setBudget] = useState<ResearchBudgetLimits>({ ...DEFAULT_RESEARCH_BUDGET });
   const [budgetNotice, setBudgetNotice] = useState("");
   const [adminToken, setAdminToken] = useState("");
+  const [accessStatus, setAccessStatus] = useState<EditorialAccessStatus>("checking");
   const [workspaceId, setWorkspaceId] = useState(() => typeof window === "undefined" ? "main-workspace" : (window.localStorage.getItem("editorial-agent.active-workspace") || "main-workspace"));
   const [workspaces, setWorkspaces] = useState<ChatWorkspace[]>([{ id: "main-workspace", name: "مساحة العمل الرئيسية" }]);
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
@@ -183,23 +187,63 @@ export default function App() {
     (p.name + " " + p.contentPurpose + " " + p.note).toLowerCase().includes(query.toLowerCase())
   ), [query, category]);
 
-  useEffect(() => { document.documentElement.dataset.theme = theme; }, [theme]);
+  useEffect(() => { document.documentElement.dataset.theme = theme; document.documentElement.lang = locale; document.documentElement.dir = "rtl"; }, [theme, locale]);
   useEffect(() => { window.localStorage.setItem("editorial-agent.active-workspace", workspaceId); }, [workspaceId]);
   useEffect(() => {
-    if (!adminToken.trim()) return;
     let cancelled = false;
     const requestId = ++workspaceListRequestRef.current;
-    setWorkspaceBusy(true);
-    fetch(`${apiBase}/api/v1/workspaces?locale=${locale}`, { headers: { authorization: `Bearer ${adminToken}` } })
-      .then(async response => { const payload = await response.json(); if (!response.ok) throw new Error(payload.error || "Unable to load workspaces"); return payload.workspaces || []; })
-      .then((items: ChatWorkspace[]) => {
-        if (cancelled || requestId !== workspaceListRequestRef.current || !Array.isArray(items) || !items.length) return;
+    async function checkAccess() {
+      setWorkspaceNotice("");
+      if (!adminToken.trim()) {
+        setWorkspaceBusy(false);
+        setAccessStatus("checking");
+        try {
+          const response = await fetch(`${apiBase}/health`);
+          const payload: unknown = await response.json().catch(() => null);
+          if (cancelled) return;
+          if (!response.ok) { setAccessStatus("offline"); return; }
+          setAccessStatus(isRecord(payload) && payload.authConfigured === true ? "needs-token" : "server-unconfigured");
+        } catch {
+          if (!cancelled) setAccessStatus("offline");
+        }
+        return;
+      }
+      setAccessStatus("checking");
+      setWorkspaceBusy(true);
+      try {
+        const response = await fetch(`${apiBase}/api/v1/workspaces?locale=${locale}`, { headers: { authorization: `Bearer ${adminToken}` } });
+        const payload: unknown = await response.json().catch(() => null);
+        if (cancelled || requestId !== workspaceListRequestRef.current) return;
+        if (!response.ok) {
+          setWorkspaceNotice(apiError(payload, "Unable to load workspaces"));
+          setAccessStatus(response.status === 401 ? "invalid-token" : response.status === 503 ? "server-unconfigured" : "offline");
+          return;
+        }
+        if (!isRecord(payload) || !Array.isArray(payload.workspaces)) {
+          setWorkspaceNotice(locale === "ar" ? "استجابة الخادم غير صالحة." : "The server returned an invalid response.");
+          setAccessStatus("offline");
+          return;
+        }
+        const items = payload.workspaces.filter(isChatWorkspace);
+        if (!items.length) {
+          setWorkspaceNotice(locale === "ar" ? "لم يُرجع الخادم أي مساحة عمل." : "The server returned no workspaces.");
+          setAccessStatus("offline");
+          return;
+        }
         setWorkspaces(items);
         setWorkspaceId(current => items.some(item => item.id === current) ? current : items[0].id);
         setWorkspaceNotice("");
-      })
-      .catch(error => { if (!cancelled) setWorkspaceNotice(error instanceof Error ? error.message : (locale === "ar" ? "تعذر تحميل مساحات العمل." : "Could not load workspaces.")); })
-      .finally(() => { if (!cancelled && requestId === workspaceListRequestRef.current) setWorkspaceBusy(false); });
+        setAccessStatus("ready");
+      } catch (error) {
+        if (!cancelled) {
+          setWorkspaceNotice(error instanceof Error ? error.message : (locale === "ar" ? "تعذر تحميل مساحات العمل." : "Could not load workspaces."));
+          setAccessStatus("offline");
+        }
+      } finally {
+        if (!cancelled && requestId === workspaceListRequestRef.current) setWorkspaceBusy(false);
+      }
+    }
+    void checkAccess();
     return () => { cancelled = true; };
   }, [adminToken, apiBase, locale]);
   useEffect(() => {
@@ -276,9 +320,11 @@ export default function App() {
         method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${adminToken}` },
         body: JSON.stringify({ name: newWorkspaceName })
       });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "Could not create workspace");
-      const created = payload.workspace as ChatWorkspace;
+      const payload: unknown = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(apiError(payload, locale === "ar" ? "تعذر إنشاء مساحة العمل" : "Could not create workspace"));
+      const workspaceValue = isRecord(payload) ? payload.workspace : undefined;
+      if (!isChatWorkspace(workspaceValue)) throw new Error(locale === "ar" ? "استجابة مساحة العمل غير صالحة" : "Invalid workspace response");
+      const created = workspaceValue;
       setWorkspaces(current => [...current.filter(item => item.id !== created.id), created]);
       setWorkspaceId(created.id);
       setPendingConversationId(null);
@@ -357,7 +403,7 @@ export default function App() {
   ];
   const destinationCount = platforms.filter(p => p.category === "editorial").length;
 
-  return <div className={`app-shell ${theme === "dark" ? "theme-dark" : "theme-light"} ${browserDrawerOpen ? "browser-drawer-open" : ""} ${view === "chat" ? "chat-mode" : ""} ${mobileNav ? "navigation-open" : ""}`} dir={locale === "ar" ? "rtl" : "ltr"} lang={locale}>
+  return <div className={`app-shell ${theme === "dark" ? "theme-dark" : "theme-light"} ${browserDrawerOpen ? "browser-drawer-open" : ""} ${view === "chat" ? "chat-mode" : ""} ${mobileNav ? "navigation-open" : ""}`} dir="rtl" lang={locale} data-locale={locale}>
     <aside className={`sidebar ${mobileNav ? "sidebar-open" : ""}`}>
       <button className="brand" onClick={() => { setView("chat"); setMobileNav(false); }} aria-label={locale==="ar"?"المحادثة التحريرية":"Editorial conversation"}>
         <span className="brand-mark"><BrandMark /></span>
@@ -396,7 +442,7 @@ export default function App() {
       </header>
 
       <div className={`page-content ${view === "chat" ? "chat-page" : ""}`}>
-        {view === "chat" && <EditorialChatWorkspace key={workspaceId} apiBase={apiBase} token={adminToken} workspaceId={workspaceId} workspaceName={workspaceName} workspaces={workspaces} workspaceBusy={workspaceBusy} workspaceNotice={workspaceNotice} onWorkspaceChange={switchWorkspace} onCreateWorkspace={openWorkspaceCreation} locale={locale} targets={chatTargets} onOpenSettings={() => setView("research-settings")} openConversationId={pendingConversationId} onConversationOpened={()=>setPendingConversationId(null)} onPrepareBrowser={draft=>{setBrowserChatDraft(draft);setBrowserDrawerOpen(true);}}/>}
+        {view === "chat" && <EditorialChatWorkspace key={workspaceId} apiBase={apiBase} token={adminToken} accessStatus={accessStatus} workspaceId={workspaceId} workspaceName={workspaceName} workspaces={workspaces} workspaceBusy={workspaceBusy} workspaceNotice={workspaceNotice} onWorkspaceChange={switchWorkspace} onCreateWorkspace={openWorkspaceCreation} locale={locale} targets={chatTargets} onOpenSettings={() => setView("research-settings")} openConversationId={pendingConversationId} onConversationOpened={()=>setPendingConversationId(null)} onPrepareBrowser={draft=>{setBrowserChatDraft(draft);setBrowserDrawerOpen(true);}}/>}
         {view === "library" && <LibraryView apiBase={apiBase} token={adminToken} workspaceId={workspaceId} locale={locale} copy={copy} onOpenConversation={id=>{setPendingConversationId(id);setView("chat");}}/>}
         {view === "home" && <HomeView copy={copy} articles={articles} onCreate={() => setView("articles")} onRegistry={() => setView("registry")} onViewAll={() => setView("articles")} locale={locale} theme={theme}/>}
         {view === "articles" && <section className="page-section">
@@ -456,6 +502,7 @@ export default function App() {
             <div className="card-topline"><span className="section-icon"><SlidersHorizontal size={17}/></span><span className="tiny-overline">{locale==="ar"?"إدارة البحث والمصادر":"RESEARCH GOVERNANCE"}</span></div>
             <div className="budget-intro"><div><h2>{copy.settingsTitle}</h2><p className="muted">{copy.sourceNotice}</p></div><span className="status-chip"><LockKeyhole size={13}/> {locale==="ar"?"للمسؤول":"Admin only"}</span></div>
             <label className="budget-field token-field"><span>{copy.apiKey}</span><small>{copy.apiKeyHint}</small><input type="password" autoComplete="off" value={adminToken} onChange={e=>setAdminToken(e.target.value)} placeholder={locale==="ar"?"أدخل رمز الوصول":"Enter access key"}/></label>
+            {accessStatus!=="ready"&&accessStatus!=="checking"&&<p className="api-access-status" role="status">{accessStatus==="server-unconfigured"?(locale==="ar"?"لم يُضبط سر الإدارة على الخادم؛ أدخل ADMIN_API_TOKEN في .env ثم أعد تشغيل API.":"The server admin secret is not configured. Set ADMIN_API_TOKEN in .env and restart the API."):accessStatus==="invalid-token"?(locale==="ar"?"الرمز الحالي غير مطابق لرمز الخادم.":"The current key does not match the server."):accessStatus==="offline"?(locale==="ar"?"الخادم غير متاح أو أعاد استجابة غير صالحة.":"The API is unavailable or returned an invalid response."):(locale==="ar"?"أدخل الرمز المطابق لرمز الخادم لبدء المحادثات.":"Enter the key matching the server token to start chatting.")}</p>}
             <div className="budget-grid">
               <BudgetField label={copy.sourceLimit} hint={copy.sourceHint} value={budget.sourceUrlsPerArticle} onChange={v=>setBudget(old=>({...old,sourceUrlsPerArticle:v}))}/>
               <BudgetField label={copy.scrapeLimit} hint={copy.scrapeHint} value={budget.scrapesPerArticle} onChange={v=>setBudget(old=>({...old,scrapesPerArticle:v}))}/>

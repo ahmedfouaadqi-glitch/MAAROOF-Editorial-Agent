@@ -543,3 +543,16 @@ body:has(.app-shell.theme-dark){background:#10100F}
 .editorial-chat-skill-item p{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;overflow-wrap:anywhere}
 .editorial-chat-skill-item small{color:var(--muted);overflow-wrap:anywhere}
 @media(max-width:760px){.editorial-chat-skill-list{padding:8px 9px}.editorial-chat-skill-item>div{align-items:flex-start}.editorial-chat-skill-status{font-size:7px}}
+
+
+/* Keep navigation/workspace geometry RTL in both locales; let prose follow its language. */
+.app-shell{direction:rtl}
+.editorial-chat-workspace{direction:rtl}
+.editorial-chat-message-content,.editorial-chat-draft-card h3,.editorial-chat-draft-hook,.editorial-chat-draft-body,.editorial-chat-draft-extra,.editorial-chat-draft-tags{unicode-bidi:plaintext;text-align:start}
+.app-shell[lang="en"] .editorial-chat-message-content,.app-shell[lang="en"] .editorial-chat-draft-card h3,.app-shell[lang="en"] .editorial-chat-draft-hook,.app-shell[lang="en"] .editorial-chat-draft-body,.app-shell[lang="en"] .editorial-chat-draft-extra,.app-shell[lang="en"] .editorial-chat-draft-tags{direction:ltr;text-align:left}
+.app-shell[lang="ar"] .editorial-chat-message-content,.app-shell[lang="ar"] .editorial-chat-draft-card h3,.app-shell[lang="ar"] .editorial-chat-draft-hook,.app-shell[lang="ar"] .editorial-chat-draft-body,.app-shell[lang="ar"] .editorial-chat-draft-extra,.app-shell[lang="ar"] .editorial-chat-draft-tags{direction:rtl;text-align:right}
+.editorial-chat-token-prompt p{max-width:620px;margin:0;line-height:1.9;text-align:center;unicode-bidi:plaintext}
+.editorial-chat-token-prompt button{max-width:100%}
+.editorial-chat-token-prompt[role="status"]{border-color:var(--line-strong)}
+
+.api-access-status{margin:10px 0;padding:10px 12px;border:1px solid var(--line-strong);border-inline-start:3px solid var(--accent);border-radius:9px;background:var(--accent-soft);color:var(--text-strong);font-size:10px;line-height:1.8;unicode-bidi:plaintext}

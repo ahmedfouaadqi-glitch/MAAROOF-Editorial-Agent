@@ -7,6 +7,7 @@ export type ChatTarget = {
   styleSummary: string; formats: string[]; selectable: boolean;
 };
 export type ChatWorkspace = { id: string; name: string; createdAt?: string };
+export type EditorialAccessStatus = "checking" | "needs-token" | "server-unconfigured" | "invalid-token" | "offline" | "ready";
 type Attachment = { id: string; originalName?: string; name?: string; kind?: string; mimeType?: string; sizeBytes?: number };
 type BrandProfile = { voice?: string; audience?: string; approvedFacts?: string; avoid?: string };
 type BrandRecord = { id: string; name: string; clientId?: string | null; profile?: BrandProfile };
@@ -43,9 +44,17 @@ const ACCEPTED_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"
 ]);
 const ACCEPTED_EXTENSIONS = /\.(jpe?g|png|webp|mp4|webm|pdf|docx|txt|md)$/i;
+function maxAttachmentBytes(file: File) {
+  const name = file.name.toLowerCase();
+  if (file.type.startsWith("image/") || /\.(jpe?g|png|webp)$/.test(name)) return 10 * 1024 * 1024;
+  if (file.type.startsWith("video/") || /\.(mp4|webm)$/.test(name)) return 50 * 1024 * 1024;
+  if (file.type === "application/pdf" || name.endsWith(".pdf") || file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || name.endsWith(".docx")) return 15 * 1024 * 1024;
+  if (file.type === "text/plain" || name.endsWith(".txt") || file.type === "text/markdown" || name.endsWith(".md")) return 2 * 1024 * 1024;
+  return 0;
+}
 
-export default function EditorialChatWorkspace({ apiBase, token, workspaceId, workspaceName, workspaces, workspaceBusy = false, workspaceNotice = "", onWorkspaceChange, onCreateWorkspace, locale, targets, onOpenSettings, onPrepareBrowser, openConversationId, onConversationOpened }: {
-  apiBase: string; token: string; workspaceId: string; locale: "ar" | "en"; targets: ChatTarget[]; onOpenSettings: () => void; onPrepareBrowser?: (draft: EditorialChatBrowserDraft) => void;
+export default function EditorialChatWorkspace({ apiBase, token, accessStatus, workspaceId, workspaceName, workspaces, workspaceBusy = false, workspaceNotice = "", onWorkspaceChange, onCreateWorkspace, locale, targets, onOpenSettings, onPrepareBrowser, openConversationId, onConversationOpened }: {
+  apiBase: string; token: string; accessStatus: EditorialAccessStatus; workspaceId: string; locale: "ar" | "en"; targets: ChatTarget[]; onOpenSettings: () => void; onPrepareBrowser?: (draft: EditorialChatBrowserDraft) => void;
   workspaceName: string; workspaces: ChatWorkspace[]; workspaceBusy?: boolean; workspaceNotice?: string; onWorkspaceChange: (workspaceId: string) => void; onCreateWorkspace: () => void;
   openConversationId?: string | null; onConversationOpened?: () => void;
 }) {
@@ -54,11 +63,12 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, wo
     workspace: "مساحة العمل", switchWorkspace: "تغيير مساحة العمل", newWorkspace: "إنشاء مساحة عمل", history: "سجل المحادثات", newChat: "محادثة جديدة", search: "ابحث في الوجهات...", choose: "اختر منصة أو مجلة",
     emptyTitle: "ما الذي تريد إنجازه؟", emptySub: "ابدأ بطلبك مباشرة أو اختر مثالاً جاهزاً وعدّله. حدّد الوجهة وأرفق الملفات عند الحاجة.", startersTitle: "ابدأ من مثال", starterArticle: "كتابة مقال", starterArticleHint: "مقال منظم قابل للمراجعة", starterPost: "منشور مهني", starterPostHint: "فكرة واضحة لجمهور LinkedIn", starterVideo: "سيناريو فيديو", starterVideoHint: "خطاف ومشاهد ونص شاشة", starterNewsletter: "نشرة تحريرية", starterNewsletterHint: "مقدمة ومحتوى موجّه للقراء",
     placeholder: "اكتب ما تريد صياغته أو تطويره...", send: "إرسال", attach: "إرفاق ملفات", noHistory: "لا توجد محادثات بعد.",
-    settings: "أدخل رمز الوصول من الإعدادات لاستخدام المحادثات.", goSettings: "فتح الإعدادات", loading: "جارٍ التحميل...",
+    settings: "أدخل رمز الوصول المطابق الذي أعده مسؤول الخادم.", goSettings: "فتح الإعدادات", loading: "جارٍ التحميل...",
+    accessChecking: "جارٍ التحقق من خدمة المحادثات...", accessUnconfigured: "الخادم يعمل دون ADMIN_API_TOKEN. أضف سراً عشوائياً من 32 محرفاً أو أكثر إلى ملف .env ثم أعد تشغيل API.", accessInvalid: "الرمز المدخل لا يطابق ADMIN_API_TOKEN على الخادم. أعد إدخال الرمز الصحيح من الإعدادات.", accessOffline: "تعذر الاتصال بخدمة API. تحقق من تشغيل الخادم وقيمة VITE_API_BASE_URL.",
     social: "منصات اجتماعية", magazine: "مجلات ومواقع نشر", target: "الوجهة التحريرية", noTargets: "لا توجد وجهات مطابقة.",
     error: "تعذّر إكمال الطلب. حاول مجدداً.", scope: "النطاق", style: "الأسلوب", formats: "الصيغ", identity: "سياق العميل والعلامة",
     client: "العميل (اختياري)", brand: "العلامة (اختياري)", identityHint: "يُستخدم هذا السياق لفحص التكرار داخل مساحة العمل.", brandVoice: "صوت العلامة ونبرتها", brandAudience: "الجمهور المقصود", brandFacts: "حقائق ورسائل معتمدة", brandAvoid: "مصطلحات أو ادعاءات يجب تجنبها", brandGuideHint: "يحفظ الدليل داخل هذه المساحة ويُستخدم كتوجيه أسلوبي، لا كتحقق مستقل من الحقائق.", brandNameRequired: "أدخل اسم العلامة قبل حفظ دليلها.",
-    removeFile: "حذف الملف", invalidFile: "نوع الملف غير مدعوم. استخدم صورة أو فيديو MP4/WebM أو PDF أو DOCX أو TXT.", fileLimit: "الحد الأعلى 10 مرفقات في الرسالة الواحدة.", download: "تنزيل المرفق",
+    removeFile: "حذف الملف", invalidFile: "نوع الملف غير مدعوم. استخدم صورة أو فيديو MP4/WebM أو PDF أو DOCX أو TXT.", fileTooLarge: "حجم الملف يتجاوز الحد المسموح لهذا النوع.", fileLimit: "الحد الأعلى 10 مرفقات في الرسالة الواحدة.", download: "تنزيل المرفق",
     uploading: "جارٍ رفع الملفات...", run: "مسار التحرير", queued: "قيد الانتظار", running: "جارٍ العمل", completed: "اكتمل",
     failed: "تعذر الإكمال", cancelled: "أُلغي", pending: "بانتظار التنفيذ", skipped: "لم يُنفّذ", needsReview: "يتطلب مراجعة",
     draft: "المسودة", geo: "موجز GEO", intent: "نية البحث", primary: "العبارة الأساسية", related: "عبارات داعمة", questions: "أسئلة متوقعة", entities: "كيانات ذات صلة",
@@ -70,11 +80,12 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, wo
     workspace: "Workspace", switchWorkspace: "Switch workspace", newWorkspace: "Create workspace", history: "Conversation history", newChat: "New conversation", search: "Search destinations...", choose: "Choose a platform or magazine",
     emptyTitle: "What do you want to accomplish?", emptySub: "Start with your own request or choose an editable example. Select a destination and attach files when useful.", startersTitle: "Start from an example", starterArticle: "Write an article", starterArticleHint: "A structured, review-ready article", starterPost: "Professional post", starterPostHint: "A focused idea for LinkedIn", starterVideo: "Video script", starterVideoHint: "Hook, scenes and on-screen text", starterNewsletter: "Editorial newsletter", starterNewsletterHint: "A reader-focused opening and body",
     placeholder: "Describe what you want to create or adapt...", send: "Send", attach: "Attach files", noHistory: "No conversations yet.",
-    settings: "Add the workspace access key in Settings to use conversations.", goSettings: "Open settings", loading: "Loading...",
+    settings: "Enter the access key configured by the server administrator.", goSettings: "Open settings", loading: "Loading...",
+    accessChecking: "Checking the conversation service...", accessUnconfigured: "The server is running without ADMIN_API_TOKEN. Set a random secret of at least 32 characters in .env, then restart the API.", accessInvalid: "This key does not match the server's ADMIN_API_TOKEN. Re-enter the correct key in Settings.", accessOffline: "The API service cannot be reached. Check that it is running and verify VITE_API_BASE_URL.",
     social: "Social platforms", magazine: "Magazines & publishers", target: "Editorial destination", noTargets: "No matching destinations.",
     error: "The request failed. Please try again.", scope: "Scope", style: "Style", formats: "Formats", identity: "Client and brand context",
     client: "Client (optional)", brand: "Brand (optional)", identityHint: "This context scopes duplicate checks within the workspace.", brandVoice: "Brand voice and tone", brandAudience: "Intended audience", brandFacts: "Approved facts and messages", brandAvoid: "Terms or claims to avoid", brandGuideHint: "Saved within this workspace and used as style guidance, not independent fact verification.", brandNameRequired: "Enter a brand name before saving its guidance.",
-    removeFile: "Remove file", invalidFile: "Unsupported file type. Use an image, MP4/WebM video, PDF, DOCX, or TXT.", fileLimit: "A message can contain at most 10 attachments.", download: "Download attachment",
+    removeFile: "Remove file", invalidFile: "Unsupported file type. Use an image, MP4/WebM video, PDF, DOCX, or TXT.", fileTooLarge: "The file exceeds the size limit for its type.", fileLimit: "A message can contain at most 10 attachments.", download: "Download attachment",
     uploading: "Uploading files...", run: "Editorial workflow", queued: "Queued", running: "Working", completed: "Completed",
     failed: "Could not complete", cancelled: "Cancelled", pending: "Pending", skipped: "Not run", needsReview: "Needs review",
     draft: "Draft", geo: "GEO brief", intent: "Search intent", primary: "Primary phrase", related: "Related terms", questions: "Likely questions", entities: "Related entities",
@@ -216,6 +227,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, wo
     for (const file of Array.from(list)) {
       const supported = ACCEPTED_TYPES.has(file.type) || ACCEPTED_EXTENSIONS.test(file.name);
       if (!supported) { setNotice(t.invalidFile); continue; }
+      if (!file.size || file.size > maxAttachmentBytes(file)) { setNotice(t.fileTooLarge); continue; }
       valid.push({ file, preview: file.type.startsWith("image/") ? URL.createObjectURL(file) : "" });
     }
     if (valid.length > remaining) setNotice(t.fileLimit);
@@ -336,11 +348,15 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, wo
   const latestUserMessage = [...messages].reverse().find(message => message.role === "user");
   const renderSkills = (skills?: SkillSelection[]) => skills?.length ? <section className="editorial-chat-skill-list" aria-label={ar ? "المهارات المختارة" : "Selected skills"}><b>{ar ? "المهارات المفعّلة تلقائياً" : "Automatically selected skills"}</b>{skills.map(skill => <div className="editorial-chat-skill-item" key={skill.id}><div><code>{skill.skillId}{skill.variant ? ` · ${skill.variant}` : ""}</code><span className={`editorial-chat-skill-status skill-${skill.runtimeStatus}`}>{skill.runtimeStatus === "blocked_on_integration" ? (ar ? "يتطلب تكاملاً غير متاح" : "Integration required") : skill.runtimeStatus === "guidance_only" ? (ar ? "إرشاد فقط" : "Guidance only") : (ar ? "متاحة للصياغة عند إعداد المزود" : "Available for prompt-based work when the provider is configured")}</span></div>{skill.purpose && <p>{skill.purpose.slice(0, 300)}{skill.purpose.length > 300 ? "…" : ""}</p>}{skill.reason && <small>{skill.reason}</small>}</div>)}</section> : null;
 
-  if (!token.trim()) return <section className="editorial-chat-workspace" dir={ar ? "rtl" : "ltr"}>
-    <div className="editorial-chat-token-prompt"><MessageSquare aria-hidden="true"/><p>{t.settings}</p><button type="button" onClick={onOpenSettings}><Settings size={16}/>{t.goSettings}</button></div>
+  if (accessStatus !== "ready") {
+    const message = accessStatus === "checking" ? t.accessChecking : accessStatus === "server-unconfigured" ? t.accessUnconfigured : accessStatus === "invalid-token" ? t.accessInvalid : accessStatus === "offline" ? t.accessOffline : t.settings;
+    const canOpenSettings = accessStatus === "needs-token" || accessStatus === "invalid-token";
+    return <section className="editorial-chat-workspace" dir="rtl" lang={locale} data-locale={locale}>
+    <div className="editorial-chat-token-prompt" role={accessStatus === "checking" ? "status" : "alert"}>{accessStatus === "checking" ? <LoaderCircle className="editorial-chat-spinner" aria-hidden="true"/> : <MessageSquare aria-hidden="true"/>}<p>{message}</p>{canOpenSettings&&<button type="button" onClick={onOpenSettings}><Settings size={16}/>{t.goSettings}</button>}</div>
   </section>;
+  }
 
-  return <section className="editorial-chat-workspace" dir={ar ? "rtl" : "ltr"}>
+  return <section className="editorial-chat-workspace" dir="rtl" lang={locale} data-locale={locale}>
     <aside className="editorial-chat-history">
       <section className="editorial-chat-workspace-picker" aria-label={t.workspace}>
         <div className="editorial-chat-workspace-picker-heading"><span className="editorial-chat-workspace-glyph">W</span><div><small>{t.workspace}</small><b>{workspaceName}</b></div><ChevronDown size={15}/></div>
@@ -356,7 +372,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, wo
             {visibleTargets.length ? (["social", "magazine"] as const).map(type => {
               const group = visibleTargets.filter(target => target.type === type);
               if (!group.length) return null;
-              return <div className="editorial-chat-target-group" key={type}><h3>{type === "social" ? t.social : t.magazine}{group.length > 0 && <small> · {group.length}</small>}</h3>{group.map(target => <button type="button" key={target.id} className="editorial-chat-target-option" disabled={busy || loading} onClick={() => { setTargetId(target.id); setPickerOpen(false); }}><span className="editorial-chat-target-option-heading">{target.name}{targetId === target.id && <Check size={14}/>}</span><span>{target.description}</span><small>{t.scope}: {target.scope}</small><small>{t.style}: {target.styleSummary}</small>{target.formats.length > 0 && <small>{t.formats}: {target.formats.join(" · ")}</small>}</button>)}</div>;
+              return <div className="editorial-chat-target-group" key={type}><h3>{type === "social" ? t.social : t.magazine}{group.length > 0 && <small> · {group.length}</small>}</h3>{group.map(target => <button type="button" key={target.id} className="editorial-chat-target-option" disabled={busy || loading} onClick={() => { setTargetId(target.id); setPickerOpen(false); }}><span className="editorial-chat-target-option-heading" dir="auto">{target.name}{targetId === target.id && <Check size={14}/>}</span><span dir="auto">{target.description}</span><small dir="auto">{t.scope}: {target.scope}</small><small dir="auto">{t.style}: {target.styleSummary}</small>{target.formats.length > 0 && <small dir="auto">{t.formats}: {target.formats.join(" · ")}</small>}</button>)}</div>;
             }) : <p className="editorial-chat-muted">{t.noTargets}</p>}
           </div>}
         </div>
@@ -403,7 +419,7 @@ export default function EditorialChatWorkspace({ apiBase, token, workspaceId, wo
       <form className="editorial-chat-composer" onSubmit={sendMessage}>
         {files.length > 0 && <div className="editorial-chat-file-previews">{files.map((item, index) => <div className="editorial-chat-file-preview" key={`${item.file.name}-${index}`}>{item.preview ? <img src={item.preview} alt={item.file.name}/> : <File size={20}/>}<span title={item.file.name}>{item.file.name}</span><button type="button" aria-label={t.removeFile} onClick={() => removeFile(index)}><X size={15}/></button></div>)}</div>}
         <div className="editorial-chat-composer-row"><button className="editorial-chat-attach-button" type="button" aria-label={t.attach} title={t.attach} disabled={busy} onClick={() => fileRef.current?.click()}><Upload size={18}/></button><input ref={fileRef} className="editorial-chat-file-input" type="file" multiple disabled={busy} accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,.txt,.md" onChange={event => addFiles(event.target.files)}/>
-          <textarea ref={composerRef} value={content} onChange={event => setContent(event.target.value)} placeholder={t.placeholder} rows={1} disabled={busy} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }}/>
+          <textarea ref={composerRef} dir="auto" value={content} onChange={event => setContent(event.target.value)} placeholder={t.placeholder} rows={1} disabled={busy} onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }}/>
           <button className="editorial-chat-send-button" type="submit" aria-label={t.send} disabled={busy || (!content.trim() && files.length === 0) || !targetId || (currentRun != null && ["queued", "running"].includes(currentRun.status))}>{busy ? <LoaderCircle size={18} className="editorial-chat-spinner"/> : <ArrowUp size={18}/>}</button>
         </div><p className="editorial-chat-composer-note"><Image size={13}/>{busy ? t.uploading : t.note}</p>
       </form>

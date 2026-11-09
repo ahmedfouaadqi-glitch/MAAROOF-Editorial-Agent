@@ -9,6 +9,6 @@ export interface EditorialWorkspace {
 
 export const DEFAULT_WORKSPACE_ID: string;
 export const DEFAULT_WORKSPACE_NAME: string;
-export function ensureDefaultWorkspaceCollection(state: Record<string, any>, now?: string): boolean;
-export function listEditorialWorkspaces(state: Record<string, any>, locale?: "ar" | "en"): EditorialWorkspace[];
-export function createEditorialWorkspace(state: Record<string, any>, input: { name: string }): EditorialWorkspace;
+export function ensureDefaultWorkspaceCollection(state: Record<string, unknown>, now?: string): boolean;
+export function listEditorialWorkspaces(state: Record<string, unknown>, locale?: "ar" | "en"): EditorialWorkspace[];
+export function createEditorialWorkspace(state: Record<string, unknown>, input: { name: string }): EditorialWorkspace;

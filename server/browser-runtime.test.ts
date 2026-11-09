@@ -68,6 +68,19 @@ describe("Browser Agent runtime", () => {
     await expect(manager.create({ workspaceId: "workspace-b", destinationId: "destination-a", startUrl: "https://publisher.example/login", approvedHosts: ["publisher.example"] })).resolves.toMatchObject({ workspaceId: "workspace-b" });
   });
 
+  it("reserves a per-workspace browser slot before an asynchronous DNS lookup", async () => {
+    const fake = fakeChromium();
+    let releaseDns!: (records: { address: string; family: number }[]) => void;
+    const dnsGate = new Promise<{ address: string; family: number }[]>(resolve => { releaseDns = resolve; });
+    const manager = new BrowserSessionManager({ chromium: fake.chromium, resolveHost: () => dnsGate, maxSessionsPerWorkspace: 1 });
+    const input = { workspaceId: "workspace-a", destinationId: "destination-a", startUrl: "https://publisher.example/login", approvedHosts: ["publisher.example"] };
+    const first = manager.create(input);
+    await Promise.resolve();
+    await expect(manager.create(input)).rejects.toMatchObject({ status: 429 });
+    releaseDns([{ address: "93.184.216.34", family: 4 }]);
+    await expect(first).resolves.toMatchObject({ workspaceId: "workspace-a" });
+  });
+
   it("prevents another workspace from reading or closing the session", async () => {
     const fake = fakeChromium();
     const manager = new BrowserSessionManager({ chromium: fake.chromium, resolveHost: publicDns });

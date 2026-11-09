@@ -1,6 +1,6 @@
 export class JsonStore {
   constructor(filePath: string);
   init(): Promise<void>;
-  read(): Promise<any>;
-  transact<T>(mutator: (state: any) => T | Promise<T>): Promise<T>;
+  read(): Promise<unknown>;
+  transact<T>(mutator: (state: unknown) => T | Promise<T>): Promise<T>;
 }

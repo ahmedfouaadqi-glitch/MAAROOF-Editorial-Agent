@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { assessSource, listResearch, recordEvidence } from "../../server/editorial-research.mjs";
 
+type AssessedSource = { research: { metadataCompleteness: number; qualityRating: string }; fetched: boolean };
+type ResearchReport = {
+  claims: Array<{ conflictState: string }>;
+  summary: { claimsWithConflictingEvidence: number; evidenceRecordCount: number; claimsWithoutEvidence: number };
+};
 function fixture() {
   return {
     tasks: {
@@ -30,7 +35,7 @@ describe("editorial research service", () => {
       effectiveFrom: "2024-01-01", effectiveTo: "2025-12-31",
       jurisdiction: "Iraq", methodology: "Annual audited administrative dataset.",
       qualityRating: "high", qualityRationale: "Primary institutional report with disclosed methodology."
-    });
+    }) as unknown as AssessedSource;
     expect(source.research.metadataCompleteness).toBe(100);
     expect(source.research.qualityRating).toBe("high");
     expect(source.fetched).toBe(false);
@@ -64,7 +69,7 @@ describe("editorial research service", () => {
     });
     expect(supporting.verificationState).toBe("manually-transcribed-unverified");
     expect(contradicting.stance).toBe("contradicts");
-    const report = listResearch(state, "workspace-a", "task-a");
+    const report = listResearch(state, "workspace-a", "task-a") as unknown as ResearchReport;
     expect(report.claims[0].conflictState).toBe("conflicting-evidence");
     expect(report.summary.claimsWithConflictingEvidence).toBe(1);
     expect(report.summary.evidenceRecordCount).toBe(2);
@@ -83,7 +88,7 @@ describe("editorial research service", () => {
   });
 
   it("reports no evidence distinctly from unverified linked references", () => {
-    const report = listResearch(fixture(), "workspace-a", "task-a");
+    const report = listResearch(fixture(), "workspace-a", "task-a") as unknown as ResearchReport;
     expect(report.claims[0].conflictState).toBe("no-evidence-recorded");
     expect(report.summary.claimsWithoutEvidence).toBe(1);
   });

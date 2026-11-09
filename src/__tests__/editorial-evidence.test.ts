@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { checkOriginality, listClaims, normalizeEditorialText, registerClaim } from "../../server/editorial-evidence.mjs";
 
-function stateFixture() {
+type EvidenceTaskFixture = { workspaceId: string; article: { topic: string; clientId?: string; brandId?: string } };
+type EvidenceState = { tasks: Record<string, EvidenceTaskFixture>; sources: { id: string; workspaceId: string; taskId: string; url: string }[]; claims: unknown[]; originalityChecks: unknown[]; editorialDrafts: { id: string; workspaceId: string; taskId: string; title?: string; sections: { heading: string; body: string }[] }[]; platformVariants: { id: string; workspaceId: string; taskId: string; platformId?: string; body: string; hashtags?: string[] }[] };
+type OriginalityResult = {
+  outcome: string;
+  nearMatches: Array<{ taskId: string; similarity: number }>;
+  exactMatches: Array<{ recordId: string; taskId?: string; contentType?: string; platformId?: string; identityRelationship?: string; brandId?: string }>;
+  comparedByType: Record<string, number>;
+  exactMatchTaskId?: string;
+  exactMatchContentType?: string;
+  comparisonScope?: string;
+  comparedContentCount: number;
+};
+function stateFixture(): EvidenceState {
   return {
     tasks: {
       "task-a": { workspaceId: "workspace-a", article: { topic: "First" } },
@@ -14,8 +26,8 @@ function stateFixture() {
     ],
     claims: [],
     originalityChecks: [],
-    editorialDrafts: [] as any[],
-    platformVariants: [] as any[]
+    editorialDrafts: [] as { id: string; workspaceId: string; taskId: string; sections: { heading: string; body: string }[] }[],
+    platformVariants: [] as { id: string; workspaceId: string; taskId: string; body: string; hashtags?: string[] }[]
   };
 }
 
@@ -56,7 +68,7 @@ describe("editorial evidence", () => {
       workspaceId: "workspace-a",
       taskId: "task-b",
       text: "THE ORGANIZATION ANNOUNCED A MAJOR EXPANSION ACROSS SEVERAL REGIONAL MARKETS THIS YEAR!"
-    });
+    }) as unknown as OriginalityResult;
     expect(result.outcome).toBe("exact-match");
     expect(result.exactMatchTaskId).toBe("task-a");
   });
@@ -72,7 +84,7 @@ describe("editorial evidence", () => {
       workspaceId: "workspace-a",
       taskId: "task-b",
       text: "The company announced a major expansion across several regional markets during the current fiscal year."
-    });
+    }) as unknown as OriginalityResult;
     expect(result.outcome).toBe("possible-near-duplicate");
     expect(result.nearMatches[0].taskId).toBe("task-a");
     expect(result.nearMatches[0].similarity).toBeGreaterThanOrEqual(0.82);
@@ -83,7 +95,7 @@ describe("editorial evidence", () => {
     const text = "A detailed editorial article explains the organization's regional expansion, its market context, and the strategy for responsible growth over the coming year.";
     state.tasks["task-a"].article.topic = "";
     state.editorialDrafts.push({ id: "draft-a", workspaceId: "workspace-a", taskId: "task-a", sections: [{ heading: "", body: text }] });
-    const result = checkOriginality(state, { workspaceId: "workspace-a", taskId: "task-b", text });
+    const result = checkOriginality(state, { workspaceId: "workspace-a", taskId: "task-b", text }) as unknown as OriginalityResult;
     expect(result.outcome).toBe("exact-match");
     expect(result.exactMatchContentType).toBe("article-draft");
     expect(result.exactMatches[0].recordId).toBe("draft-a");
@@ -94,13 +106,13 @@ describe("editorial evidence", () => {
     const state = stateFixture();
     const text = "The organization announces regional expansion with a careful plan for its local communities and future market development.";
     state.platformVariants.push({ id: "social-a", workspaceId: "workspace-a", taskId: "task-a", platformId: "linkedin", body: text, hashtags: [] });
-    const result = checkOriginality(state, { workspaceId: "workspace-a", taskId: "task-b", text });
+    const result = checkOriginality(state, { workspaceId: "workspace-a", taskId: "task-b", text }) as unknown as OriginalityResult;
     expect(result.outcome).toBe("exact-match");
     expect(result.exactMatches[0]).toMatchObject({ recordId: "social-a", contentType: "social-draft", platformId: "linkedin" });
   });
 
   it("compares within the same client across its brands but excludes another client", () => {
-    const state: any = stateFixture();
+    const state = stateFixture();
     const text = "The same substantive article content is deliberately reused to test client scoped duplicate comparison across brands.";
     state.tasks["task-a"].article = { topic: "", clientId: "client-a", brandId: "brand-sibling" };
     state.tasks["task-b"].article = { topic: "", clientId: "client-a", brandId: "brand-current" };
@@ -109,7 +121,7 @@ describe("editorial evidence", () => {
       { id: "draft-sibling", workspaceId: "workspace-a", taskId: "task-a", sections: [{ heading: "", body: text }] },
       { id: "draft-other-client", workspaceId: "workspace-a", taskId: "task-c", sections: [{ heading: "", body: text }] }
     );
-    const result = checkOriginality(state, { workspaceId: "workspace-a", taskId: "task-b", text });
+    const result = checkOriginality(state, { workspaceId: "workspace-a", taskId: "task-b", text }) as unknown as OriginalityResult;
     expect(result.outcome).toBe("exact-match");
     expect(result.comparisonScope).toBe("same-client-plus-unassigned");
     expect(result.exactMatches).toHaveLength(1);
@@ -121,7 +133,7 @@ describe("editorial evidence", () => {
     const text = "A detailed editorial article explains the organization's regional expansion, its market context, and the strategy for responsible growth over the coming year.";
     state.editorialDrafts.push({ id: "draft-a", workspaceId: "workspace-a", taskId: "task-a", title: "Regional expansion strategy", sections: [{ heading: "Market context", body: text }] });
     state.platformVariants.push({ id: "social-a", workspaceId: "workspace-a", taskId: "task-a", body: text });
-    const result = checkOriginality(state, { workspaceId: "workspace-a", taskId: "task-a", text });
+    const result = checkOriginality(state, { workspaceId: "workspace-a", taskId: "task-a", text }) as unknown as OriginalityResult;
     expect(result.outcome).toBe("no-match-found");
     expect(result.comparedContentCount).toBe(0);
   });
@@ -134,7 +146,7 @@ describe("editorial evidence", () => {
       workspaceId: "workspace-b",
       taskId: "task-other",
       text
-    });
+    }) as unknown as OriginalityResult;
     expect(result.outcome).toBe("no-match-found");
   });
 });
