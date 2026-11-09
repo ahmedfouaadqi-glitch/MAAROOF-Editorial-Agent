@@ -164,7 +164,8 @@ export default function App() {
   const [evidenceArticleId, setEvidenceArticleId] = useState<string | null>(null);
   const [draftArticleId, setDraftArticleId] = useState<string | null>(null);
   const [reviewArticleId, setReviewArticleId] = useState<string | null>(null);
-  const apiBase = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8787").replace(/\/$/, "");
+  const configuredApiBase = import.meta.env.VITE_API_BASE_URL?.trim() || "";
+  const apiBase = (configuredApiBase || (import.meta.env.DEV ? "http://localhost:8787" : "")).replace(/\/$/, "");
   const copy = t[locale];
   const activeWorkspace = workspaces.find(item => item.id === workspaceId);
   const workspaceName = activeWorkspace?.name || (workspaceId === "main-workspace" ? (locale === "ar" ? "مساحة العمل الرئيسية" : "Main workspace") : (locale === "ar" ? "مساحة عمل" : "Workspace"));
@@ -194,6 +195,14 @@ export default function App() {
     const requestId = ++workspaceListRequestRef.current;
     async function checkAccess() {
       setWorkspaceNotice("");
+      if (!apiBase) {
+        setWorkspaceBusy(false);
+        setAccessStatus("offline");
+        setWorkspaceNotice(locale === "ar"
+          ? "لم يُضبط عنوان API لهذا البناء. أضف VITE_API_BASE_URL في متغيرات بيئة Lovable ثم أعد البناء."
+          : "No API base URL is configured for this build. Set VITE_API_BASE_URL in Lovable environment variables and rebuild.");
+        return;
+      }
       if (!adminToken.trim()) {
         setWorkspaceBusy(false);
         setAccessStatus("checking");

@@ -1,0 +1,24 @@
+FROM mcr.microsoft.com/playwright:v1.64.1-noble
+
+WORKDIR /app
+ENV NODE_ENV=production \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    DATA_FILE=/app/data/editorial-agent.json \
+    MEDIA_DIR=/app/data/media \
+    BROWSER_AGENT_HOST=127.0.0.1 \
+    BROWSER_AGENT_PORT=8788 \
+    BROWSER_AGENT_URL=http://127.0.0.1:8788 \
+    BROWSER_AGENT_ALLOW_REMOTE=false
+
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+COPY server ./server
+COPY config ./config
+COPY skills ./skills
+RUN mkdir -p /app/data/media \
+    && chmod 0755 /app/server/start-container.sh \
+    && chown -R pwuser:pwuser /app
+
+USER pwuser
+EXPOSE 8787
+CMD ["bash", "/app/server/start-container.sh"]

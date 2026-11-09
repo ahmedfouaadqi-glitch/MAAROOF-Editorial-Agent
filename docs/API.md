@@ -78,7 +78,9 @@ Retries using the same reservation ID and same operation/units are idempotent. R
 - The shared admin bearer token is a temporary operator gate, not production identity authentication.
 - Workspace IDs are record-scoped but must be bound to authenticated users before public multi-tenant deployment.
 - The API binds to loopback by default. Remote binding is rejected unless `API_ALLOW_REMOTE=true`, a strong `ADMIN_API_TOKEN` is configured, and a trusted TLS proxy/firewall protects it.
-- Configure `CORS_ORIGIN`, `HOST`, `API_ALLOW_REMOTE`, `DATA_FILE`, and `ADMIN_API_TOKEN` through environment variables.
+- `CORS_ORIGIN` accepts comma-separated exact HTTP(S) origins (for example `https://project.lovable.app,https://editor.example.com`). Paths, credentials, and wildcards are rejected.
+- For Lovable, set public frontend build variable `VITE_API_BASE_URL` to the HTTPS API origin; keep `ADMIN_API_TOKEN`, `BROWSER_AGENT_TOKEN`, and provider keys server-side.
+- Configure `CORS_ORIGIN`, `HOST`, `API_ALLOW_REMOTE`, `DATA_FILE`, and `ADMIN_API_TOKEN` through environment variables. See [Lovable deployment guide](LOVABLE-DEPLOYMENT.md) for the split frontend/container deployment.
 
 ## Editorial evidence and claims
 - `POST /api/v1/claims` — register a factual/editorial claim for an article and optionally link it to source IDs.

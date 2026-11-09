@@ -12,6 +12,7 @@
     "server": "node --env-file-if-exists=.env server/main.mjs",
     "dev:api": "node --env-file-if-exists=.env server/main.mjs",
     "browser:worker": "node --env-file-if-exists=.env server/browser-worker.mjs",
+    "start:container": "bash server/start-container.sh",
     "browser:install": "playwright install chromium"
   },
   "dependencies": {

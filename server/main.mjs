@@ -3,6 +3,7 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { resolve } from "node:path";
 import { createRequestLimiter } from "./request-limiter.mjs";
+import { isAllowedOrigin, parseAllowedOrigins } from "./cors-origins.mjs";
 import { JsonStore } from "./store.mjs";
 import { DEFAULT_LIMITS, validateLimits, reserveBudget, releaseReservation, commitReservation } from "./research-budget.mjs";
 import { createEditorialTask, listEditorialTasks, advanceEditorialTask } from "./editorial-tasks.mjs";
@@ -41,7 +42,7 @@ import {
 const port = Number(process.env.PORT || 8787);
 const host = process.env.HOST || "127.0.0.1";
 const adminToken = (process.env.ADMIN_API_TOKEN || "").trim();
-const allowedOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";
+const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGIN || "http://localhost:5173");
 const allowRemoteApi = process.env.API_ALLOW_REMOTE === "true";
 const loopbackHosts = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) {
@@ -151,7 +152,7 @@ function enforceRequestLimit(req, res) {
 const server = createServer(async (req, res) => {
   const origin = req.headers.origin;
   if (!enforceRequestLimit(req, res)) return;
-  if (origin && origin !== allowedOrigin) return send(res, 403, { error: "Origin not allowed" });
+  if (origin && !isAllowedOrigin(origin, allowedOrigins)) return send(res, 403, { error: "Origin not allowed" });
   if (origin) res.setHeader("access-control-allow-origin", origin);
   res.setHeader("vary", "Origin");
   res.setHeader("access-control-allow-methods", "GET,POST,PUT,DELETE,OPTIONS");
